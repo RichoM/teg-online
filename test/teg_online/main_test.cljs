@@ -1,5 +1,5 @@
 (ns teg-online.main-test
-  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [teg-online.main :as m]
             [teg-online.board :as b]
             [teg-online.utils :as u]))
