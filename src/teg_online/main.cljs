@@ -45,7 +45,5 @@
   (swap! game join-game (new-player ::p3 "Diego"))
   (swap! game distribute-countries)
 
-  (update-in game [:players id ])
-  
   (reduce + (-> @game :players (nth 0) :army vals))
   )

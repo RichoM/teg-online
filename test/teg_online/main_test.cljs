@@ -4,9 +4,6 @@
             [teg-online.board :as b]
             [teg-online.utils :as u]))
 
-(deftest sanity-check
-  (is (= 1 1)))
-
 (deftest player-list-should-start-empty
   (let [game (m/new-game)]
     (is (empty? (game :players))
