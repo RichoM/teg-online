@@ -24,6 +24,13 @@
                                          (player-countries p)))))
                  (game :players)))))
 
+(defn get-player [game player-id]
+  (u/seek #(= (:id %) player-id)
+          (game :players)))
+
+(defn player-countries [player]
+  (-> player :army keys))
+
 (defn init []
   (print "RICHO!"))
 
@@ -38,5 +45,7 @@
   (swap! game join-game (new-player ::p3 "Diego"))
   (swap! game distribute-countries)
 
+  (update-in game [:players id ])
+  
   (reduce + (-> @game :players (nth 0) :army vals))
   )
