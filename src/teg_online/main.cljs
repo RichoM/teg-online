@@ -15,13 +15,14 @@
   (update game :players conj player))
 
 (defn distribute-countries [game]
-  (assoc game :players
-         (mapv (fn [[player countries]]
-                 (assoc player
-                        :army (into {}
-                                    (mapv (fn [c] [c 1])
-                                          countries))))
-               (u/deal (keys board/countries) (game :players)))))
+  (let [player-countries (u/deal (shuffle (keys board/countries))
+                                     (game :players))]
+    (assoc game :players
+           (mapv (fn [p]
+                   (assoc p :army
+                          (into {} (mapv (fn [c] [c 1])
+                                         (player-countries p)))))
+                 (game :players)))))
 
 (defn init []
   (print "RICHO!"))
