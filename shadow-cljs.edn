@@ -1,12 +1,16 @@
-{:source-paths ["src"]
+{:source-paths ["src" "test"]
 
  :dependencies []
 
  :nrepl {:port 9000
          :middleware []}
 
- :dev-http {8081 ["public"]}
+ :dev-http {8081 ["public" 
+                  "public/test"]}
  
  :builds {:main {:target :browser
                  :output-dir "public/main/js"
-                 :modules {:main {:init-fn teg-online.main/init}}}}}
+                 :modules {:main {:init-fn teg-online.main/init}}}
+          :test {:target :browser-test
+                 :test-dir "public/test"
+                 :ns-regexp "-test\\d?$"}}}
