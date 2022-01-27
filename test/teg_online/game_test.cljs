@@ -23,15 +23,34 @@
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
                  teg/distribute-countries)
-        countries-per-player (/ (count b/countries) 2)]
-    (is (= (js/Math.ceil countries-per-player)
+        countries-per-player (/ (count b/countries) 2)
+        p1-countries (js/Math.ceil countries-per-player)
+        p2-countries (js/Math.floor countries-per-player)]
+    (is (= p1-countries
            (count (-> game 
                       (teg/get-player ::p1)
                       teg/player-countries))))
-    (is (= (js/Math.floor countries-per-player)
+    (is (= p2-countries
            (count (-> game
                       (teg/get-player ::p2)
                       teg/player-countries))))))
+
+(deftest distribute-countries-should-set-one-army-to-each-country-assigned
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 teg/distribute-countries)
+        countries-per-player (/ (count b/countries) 2)
+        p1-countries (js/Math.ceil countries-per-player)
+        p2-countries (js/Math.floor countries-per-player)]
+    (is (= p1-countries
+           (-> game
+               (teg/get-player ::p1)
+               teg/player-army-count)))
+    (is (= p2-countries
+           (-> game
+               (teg/get-player ::p2)
+               teg/player-army-count)))))
 
 (comment
   (def game (-> (teg/new-game)

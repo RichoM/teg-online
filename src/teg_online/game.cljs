@@ -32,6 +32,9 @@
 (defn player-countries [player]
   (-> player :army keys))
 
+(defn player-army-count [player]
+  (reduce + (-> player :army vals)))
+
 (comment
 
   (u/deal (range 13) "ABC")
