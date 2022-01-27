@@ -12,8 +12,8 @@
    :cards #{}
    :army {}})
 
-(defn join-game [game player]
-  (update game :players conj player))
+(defn join-game [game id name]
+  (update game :players conj (new-player id name)))
 
 (defn distribute-countries [game]
   (let [player-countries (u/deal (shuffle (keys board/countries))
@@ -38,9 +38,9 @@
 
   (def game @game)
   (def game (atom (new-game)))
-  (swap! game join-game (new-player ::p1 "Richo"))
-  (swap! game join-game (new-player ::p2 "Lechu"))
-  (swap! game join-game (new-player ::p3 "Diego"))
+  (swap! game join-game ::p1 "Richo")
+  (swap! game join-game ::p2 "Lechu")
+  (swap! game join-game ::p3 "Diego")
   (swap! game distribute-countries)
 
   (reduce + (-> @game :players (nth 0) :army vals)))

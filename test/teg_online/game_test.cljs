@@ -11,17 +11,17 @@
 
 (deftest player-join-should-add-players-to-the-game
   (let [game (-> (teg/new-game)
-                 (teg/join-game (teg/new-player ::p1 "Richo"))
-                 (teg/join-game (teg/new-player ::p2 "Diego")))]
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego"))]
     (is (= 2 (count (game :players)))
         "There should be two players")
     (is (= [::p1 ::p2]
            (map :id (game :players))))))
 
-(deftest distribute-countries
+(deftest distribute-countries-should-randomly-assign-countries-to-each-player
   (let [game (-> (teg/new-game)
-                 (teg/join-game (teg/new-player ::p1 "Richo"))
-                 (teg/join-game (teg/new-player ::p2 "Diego"))
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
                  teg/distribute-countries)
         countries-per-player (/ (count b/countries) 2)]
     (is (= (js/Math.ceil countries-per-player)
@@ -35,8 +35,8 @@
 
 (comment
   (def game (-> (teg/new-game)
-                (teg/join-game (teg/new-player ::p1 "Richo"))
-                (teg/join-game (teg/new-player ::p2 "Diego"))
+                (teg/join-game ::p1 "Richo")
+                (teg/join-game ::p2 "Diego")
                 teg/distribute-countries))
  (teg/get-player game ::p1)
   (group-by :id (game :players))
