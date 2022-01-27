@@ -35,6 +35,12 @@
 (defn player-army-count [player]
   (reduce + (-> player :army vals)))
 
+(defn add-army [game player-id country army]
+  (let [player-idx (u/index-of (game :players)
+                               (get-player game player-id))]
+    (update-in game [:players player-idx :army country] 
+               + army)))
+
 (comment
 
   (u/deal (range 13) "ABC")

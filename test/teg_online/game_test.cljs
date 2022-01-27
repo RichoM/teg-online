@@ -52,12 +52,29 @@
                (teg/get-player ::p2)
                teg/player-army-count)))))
 
+(deftest add-army-should-increment-the-ACAACA
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 teg/distribute-countries)
+        country (first (teg/player-countries (teg/get-player game ::p1)))
+        game (-> game
+                 (teg/add-army ::p1 country 3))]
+    (is (= (-> game (teg/get-player ::p1) :army (get country))
+           4))))
+
 (comment
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")
                 (teg/join-game ::p2 "Diego")
                 teg/distribute-countries))
- (teg/get-player game ::p1)
+  (def country (first (teg/player-countries (teg/get-player game ::p1))))
+  (def game (-> game
+                (teg/add-army ::p1 country 3)))
+  (-> game (teg/get-player ::p1))
+
+  country
+  (teg/get-player game ::p1)
   (group-by :id (game :players))
   (u/seek #(= (:id %) ::p1)
           (game :players))
