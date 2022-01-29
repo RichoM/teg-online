@@ -13,7 +13,10 @@
    :army {}})
 
 (defn join-game [game id name]
-  (update game :players conj (new-player id name)))
+  (if (some #(= id (:id %)) (game :players))
+    (throw (ex-info (u/format "Player with id %1 already joined" id)
+                    {:game game :id id, :name name}))
+    (update game :players conj (new-player id name))))
 
 (defn distribute-countries [game]
   (let [player-countries (u/deal (shuffle (keys board/countries))

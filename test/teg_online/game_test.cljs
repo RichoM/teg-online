@@ -18,6 +18,12 @@
     (is (= [::p1 ::p2]
            (map :id (game :players))))))
 
+(deftest player-join-with-same-id-should-be-forbidden
+  (is (thrown? js/Error
+               (-> (teg/new-game)
+                   (teg/join-game ::p1 "Richo")
+                   (teg/join-game ::p1 "Diego")))))
+
 (deftest distribute-countries-should-randomly-assign-countries-to-each-player
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
