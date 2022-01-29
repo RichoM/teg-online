@@ -53,7 +53,7 @@ var World = (function () {
 			this._html = htmlCanvas || document.getElementById("world");
 			this.html.width = window.innerWidth;
 			this.html.height = window.innerHeight;
-			this.html.style.position = "fixed";
+			//Zthis.html.style.position = "fixed";
 			this._canvas = new Canvas(this.html);
 			this._invalidRect = false;
 
@@ -114,12 +114,13 @@ var World = (function () {
 				x : 0,
 				y : 0
 			};
-
+			/*
 			window.addEventListener("resize", function () {
 				html.width = window.innerWidth;
 				html.height = window.innerHeight;
 				that.changed();
 			});
+			*/
 			window.addEventListener("keydown", function (evt) {
 				that.fullHandleKeyboardEvent(evt, true);
 			});
