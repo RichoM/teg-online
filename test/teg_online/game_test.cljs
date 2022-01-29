@@ -58,7 +58,7 @@
                (teg/get-player ::p2)
                teg/player-army-count)))))
 
-(deftest add-army-should-increment-the-ACAACA
+(deftest add-army-should-increment-the-counter
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
