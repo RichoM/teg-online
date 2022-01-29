@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.utils :as u]))
+            [teg-online.utils.core :as u]))
 
 (deftest player-list-should-start-empty
   (let [game (teg/new-game)]

@@ -1,4 +1,4 @@
-(ns teg-online.utils
+(ns teg-online.utils.core
   (:refer-clojure :exclude [format])
   (:require [clojure.string :as str]))
 

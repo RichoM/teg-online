@@ -1,6 +1,6 @@
 (ns teg-online.game
   (:require [teg-online.board :as board]
-            [teg-online.utils :as u]))
+            [teg-online.utils.core :as u]))
 
 
 (defn new-game []

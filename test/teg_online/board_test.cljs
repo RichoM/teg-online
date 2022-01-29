@@ -1,7 +1,7 @@
 (ns teg-online.board-test
   (:require [cljs.test :refer-macros [deftest is]]
             [teg-online.board :as b]
-            [teg-online.utils :as u]))
+            [teg-online.utils.core :as u]))
 
 (deftest countries-should-have-a-valid-continent
   (doseq [[id {:keys [name continent]}] b/countries]
