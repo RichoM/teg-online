@@ -4,5 +4,8 @@ class Ellipse extends Morph {
 		var w = this.width;
 		var h = this.height;
 		canvas.fillEllipse(c.x, c.y, w/2, h/2, 0, Math.PI * 2, false, this.color);
+		if (this.border) {
+			canvas.drawEllipse(c.x, c.y, w/2, h/2, 0, Math.PI * 2, false, this.border);
+		}
 	}
 }
