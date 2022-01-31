@@ -25,29 +25,71 @@
    ::b/brasil {:position [1058 1181]
                :img "imgs/brasil.png"}})
 
+(def player-colors
+  [[255 0 0]
+   [0 255 0]
+   [0 0 255]
+   [255 0 255]
+   [0 255 255]
+   [255 255 0]
+   [0 0 0]
+   [255 255 255]])
+
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
 
-(defn highlight-form [^js/Form form]
-  (go (<p! (.tint form 155 205 0))))
+(defn highlight-form [^js/Form form [r g b]]
+  (go (<p! (.tint form r g b))))
 
-(defn init-country [{[x y] :position, img :img}]
+(defn hex [n]
+  (let [s (.toString n 16)]
+    (if (< (count s) 2)
+      (str "0" s)
+      s)))
+
+(defn color->str [[r g b]]
+  (str "#"
+       (hex r)
+       (hex g)
+       (hex b)))
+
+(defn make-army-counter [color]
+  (let [morph (js/Ellipse.)
+        label (js/Label. 1)]
+    (set! (.-width morph) 40)
+    (set! (.-height morph) 40)
+    (set! (.-color morph) (color->str color))
+    (set! (.-border morph) "3px solid black")
+    (.addMorph morph label)
+    (set! (.-center label) (.-center label))
+    morph))
+
+(.toString 255 16)
+
+
+(defn init-country [idx name {[x y] :position, img :img}]
   (go
-    (let [original-form (<! (load-form img))
-          tinted-form (<! (highlight-form original-form))
+    (let [color (nth player-colors idx)
+          original-form (<! (load-form img))
+          tinted-form (<! (highlight-form original-form color))
           morph (js/Sprite. original-form)
           picked? (atom false)
           label (js/Label. "")
+          counter (make-army-counter color)
           update-label! (fn []
                           (set! (.-color label) "red")
-                          (set! (.-text label) (js/JSON.stringify (.-center morph)))
+                          (set! (.-text label) (js/JSON.stringify (clj->js color) #_(.-center morph)))
                           (set! (.-center label) (.-center morph)))]
       (set! (.-center morph) #js {:x x :y y})
-      (set! (.-alpha morph) 0.5)
+      (set! (.-center counter) (.-center morph))
+      (set! (.-alpha morph) 0.25)
       (.addMorph world morph)
+      (.addMorph world counter)
       (update-label!)
+      (set! (.-form morph) tinted-form)
       (doto morph
-        ;(.addMorph label)
+        (.addMorph label)
+        ;(.addMorph counter)
         (.on "step" #(when @picked?
                        (set! (.-center morph) (.-cursor js/World))
                        (update-label!)))
@@ -57,12 +99,12 @@
                             (set! (.-form morph) tinted-form)))
         (.on "mouseUp" #(do
                           (reset! picked? false)
-                          (set! (.-form morph) original-form)))))))
+                          #_(set! (.-form morph) original-form)))))))
 
 (defn init-countries []
   (go
-    (doseq [[_ country] country-data]
-      (init-country country))))
+    (doseq [[i [name data]] (map-indexed vector country-data)]
+      (init-country i name data))))
 
 (defn init-map []
   (go
@@ -72,3 +114,6 @@
       (resize-canvas (-> world .-canvas .-html)
                      (.-width map)
                      (.-height map)))))
+
+(defn update-ui [{:keys [players]}]
+  ())
