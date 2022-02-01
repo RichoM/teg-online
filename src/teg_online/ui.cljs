@@ -113,7 +113,29 @@
       (.addMorph world map)
       (resize-canvas (-> world .-canvas .-html)
                      (.-width map)
-                     (.-height map)))))
+                     (.-height map))
+      (let [temp (js/Sprite. form)
+            color-idx (atom -1)]
+        (.addMorph world temp)
+        (set! (.-alpha temp) 0.75)
+        (doto temp
+          (.on "mouseUp" 
+               #(go
+                  (print "Wait...")
+                  (let [idx (mod (swap! color-idx inc)
+                                 (count player-colors))
+                        color (nth player-colors idx)
+                        tinted-form (<! (highlight-form form color))]
+                    (set! (.-form temp) tinted-form)
+                    (print (js/JSON.stringify (clj->js color))))
+                  (print "Done!"))))))))
+
+(comment
+  (def a (atom 0))
+  (swap! a inc)
+
+  (mod 14 13)
+  )
 
 (defn update-ui [{:keys [players]}]
   ())
