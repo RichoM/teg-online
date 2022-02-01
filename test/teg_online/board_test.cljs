@@ -20,4 +20,7 @@
                     name id))
       (is (contains? b/countries neighbour)
           (u/format "%1 (%2) has an invalid neighour (%3)"
+                    name id neighbour))
+      (is (contains? ((b/countries neighbour) :neighbours) id)
+          (u/format "%1 (%2) has non corresponding neighbour (%3)"
                     name id neighbour)))))
