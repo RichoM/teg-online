@@ -8,6 +8,9 @@
  :dev-http {8081 ["public" 
                   "public/test"]}
  
+ ; Fix nREPL bug when using accented characters in a source file
+ :jvm-opts ["-Dfile.encoding=UTF8"]
+
  :builds {:main {:target :browser
                  :output-dir "public/main/js"
                  :modules {:main {:init-fn teg-online.main/init}}}
