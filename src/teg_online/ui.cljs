@@ -12,18 +12,42 @@
   (set! (.-height canvas) h))
 
 (def country-data
-  {::b/colombia {:position [830 1108]
+  {; South America
+   ::b/colombia {:position [718 1028]
                  :img "imgs/colombia.png"}
-   ::b/peru {:position [850 1230]
+   ::b/peru {:position [751 1154]
              :img "imgs/peru.png"}
-   ::b/argentina {:position [899 1456]
+   ::b/argentina {:position [811 1281]
                   :img "imgs/argentina.png"}
-   ::b/chile {:position [826 1433]
+   ::b/chile {:position [790 1287]
               :img "imgs/chile.png"}
-   ::b/uruguay {:position [1029 1356]
+   ::b/uruguay {:position [949 1281]
                 :img "imgs/uruguay.png"}
-   ::b/brasil {:position [1058 1181]
-               :img "imgs/brasil.png"}})
+   ::b/brasil {:position [892 1045]
+               :img "imgs/brasil.png"}
+   
+   ; North America
+   ::b/alaska {:position [23 550]
+               :img "imgs/alaska.png"}
+   ::b/california {:position [263 774]
+                   :img "imgs/california.png"}
+   ::b/canada {:position [289 269]
+               :img "imgs/canada.png"}
+   ::b/groenlandia {:position [721 277]
+                    :img "imgs/groenlandia.png"}
+   ::b/labrador {:position [618 475]
+                 :img "imgs/labrador.png"}
+   ::b/mexico {:position [429 869]
+               :img "imgs/mexico.png"}
+   ::b/nueva-york {:position [399 562]
+                   :img "imgs/nueva_york.png"}
+   ::b/oregon {:position [70 689]
+               :img "imgs/oregon.png"}
+   ::b/terranova {:position [480 532]
+                  :img "imgs/terranova.png"}
+   ::b/yukon {:position [134 416]
+              :img "imgs/yukon.png"}
+   })
 
 (def player-colors
   [[255 0 0]
@@ -32,7 +56,7 @@
    [255 0 255]
    [0 255 255]
    [255 255 0]
-   [0 0 0]
+   [75 75 75]
    [255 255 255]])
 
 (defn load-form [path]
@@ -55,21 +79,19 @@
 
 (defn make-army-counter [color]
   (let [morph (js/Ellipse.)
-        label (js/Label. 1)]
+        label (js/Label. "1")]
     (set! (.-width morph) 40)
     (set! (.-height morph) 40)
     (set! (.-color morph) (color->str color))
     (set! (.-border morph) "3px solid black")
     (.addMorph morph label)
-    (set! (.-center label) (.-center label))
+    (set! (.-center label) (.-center morph))
+    (set! (.-color label) "black")
     morph))
-
-(.toString 255 16)
-
 
 (defn init-country [idx name {[x y] :position, img :img}]
   (go
-    (let [color (nth player-colors idx)
+    (let [color (nth player-colors (mod idx (count player-colors)))
           original-form (<! (load-form img))
           tinted-form (<! (highlight-form original-form color))
           morph (js/Sprite. original-form)
@@ -77,12 +99,12 @@
           label (js/Label. "")
           counter (make-army-counter color)
           update-label! (fn []
-                          (set! (.-color label) "red")
+                          (set! (.-color label) "white")
                           (set! (.-text label) (js/JSON.stringify (clj->js color) #_(.-center morph)))
                           (set! (.-center label) (.-center morph)))]
-      (set! (.-center morph) #js {:x x :y y})
+      (set! (.-position morph) #js {:x x :y y})
       (set! (.-center counter) (.-center morph))
-      (set! (.-alpha morph) 0.25)
+      (set! (.-alpha morph) 1.0)
       (.addMorph world morph)
       (.addMorph world counter)
       (update-label!)
@@ -95,7 +117,7 @@
                        (update-label!)))
         (.on "mouseDown" #(do
                             ;(reset! picked? true)
-                            (.addMorph world morph) ; Send to top
+                            ;(.addMorph world morph) ; Send to top
                             (set! (.-form morph) tinted-form)))
         (.on "mouseUp" #(do
                           (reset! picked? false)
@@ -114,7 +136,7 @@
       (resize-canvas (-> world .-canvas .-html)
                      (.-width map)
                      (.-height map))
-      (let [temp (js/Sprite. form)
+      #_(let [temp (js/Sprite. form)
             color-idx (atom -1)]
         (.addMorph world temp)
         (set! (.-alpha temp) 0.75)
@@ -130,11 +152,20 @@
                     (print (js/JSON.stringify (clj->js color))))
                   (print "Done!"))))))))
 
+(defn init []
+  (go (.removeAllSubmorphs world)
+      (<! (init-map))
+      (<! (init-countries))
+      ))
+
+(init-countries)
+
 (comment
   (def a (atom 0))
   (swap! a inc)
 
   (mod 14 13)
+  (init)
   )
 
 (defn update-ui [{:keys [players]}]

@@ -10,8 +10,7 @@
 (defn init []
   (go
     (print "HELLO!")
-    #_(<! (ui/init-countries))
-    (<! (ui/init-map))
+    (<! (ui/init))
     (print "BYE!")))
 
 
