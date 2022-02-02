@@ -50,20 +50,40 @@
    })
 
 (def player-colors
-  [[255 0 0]
+  [[0 0 0]
+   [255 125 0]
+   [255 0 0]
    [0 255 0]
    [0 0 255]
-   [255 0 255]
+   [205 0 255]
    [0 255 255]
-   [255 255 0]
-   [75 75 75]
-   [255 255 255]])
+   [255 255 0]])
 
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
 
-(defn highlight-form [^js/Form form [r g b]]
-  (go (<p! (.tint form r g b))))
+(defn tint [^js/Form form color]
+  (let [img (.-img form)
+        w (.-width img)
+        h (.-height img)
+        canvas (js/document.createElement "canvas")
+        ctx (.getContext canvas "2d")]
+    (set! (.-width canvas) w)
+    (set! (.-height canvas) h)
+    (set! (.-fillStyle ctx) color)
+    (.drawImage ctx img 0 0)
+    (set! (.-globalCompositeOperation ctx) "source-atop")
+    (.fillRect ctx 0 0 w h)
+    (let [result-img (js/Image.)
+          result-chan (a/promise-chan)]
+      (set! (.-onload result-img)
+            #(a/put! result-chan (js/Form. result-img)))
+      (set! (.-src result-img) (.toDataURL canvas))
+      result-chan)))
+
+(comment
+  (init)
+  )
 
 (defn hex [n]
   (let [s (.toString n 16)]
@@ -91,9 +111,10 @@
 
 (defn init-country [idx name {[x y] :position, img :img}]
   (go
+    (print idx ". " name)
     (let [color (nth player-colors (mod idx (count player-colors)))
           original-form (<! (load-form img))
-          tinted-form (<! (highlight-form original-form color))
+          tinted-form (<! (tint original-form (color->str color)))
           morph (js/Sprite. original-form)
           picked? (atom false)
           label (js/Label. "")
@@ -104,7 +125,7 @@
                           (set! (.-center label) (.-center morph)))]
       (set! (.-position morph) #js {:x x :y y})
       (set! (.-center counter) (.-center morph))
-      (set! (.-alpha morph) 1.0)
+      (set! (.-alpha morph) 0.5)
       (.addMorph world morph)
       (.addMorph world counter)
       (update-label!)
@@ -158,7 +179,6 @@
       (<! (init-countries))
       ))
 
-(init-countries)
 
 (comment
   (def a (atom 0))
@@ -166,6 +186,7 @@
 
   (mod 14 13)
   (init)
+  (init-countries)
   )
 
 (defn update-ui [{:keys [players]}]
