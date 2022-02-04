@@ -2,9 +2,9 @@
   (:require [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
-
 (defn new-game []
-  {:players []})
+  {:players {}
+   :turn-order []})
 
 (defn new-player [id name]
   {:id id
@@ -13,24 +13,19 @@
    :army {}})
 
 (defn join-game [game id name]
-  (if (some #(= id (:id %)) (game :players))
+  (if (contains? (game :players) id)
     (throw (ex-info (u/format "Player with id %1 already joined" id)
                     {:game game :id id, :name name}))
-    (update game :players conj (new-player id name))))
+    (-> game
+        (update :turn-order conj id)
+        (update :players assoc id (new-player id name)))))
 
-(defn distribute-countries [game]
-  (let [player-countries (u/deal (shuffle (keys board/countries))
-                                 (game :players))]
-    (assoc game :players
-           (mapv (fn [p]
-                   (assoc p :army
-                          (into {} (mapv (fn [c] [c 1])
-                                         (player-countries p)))))
-                 (game :players)))))
+(defn get-players [game]
+  (map (game :players)
+       (game :turn-order)))
 
 (defn get-player [game player-id]
-  (u/seek #(= (:id %) player-id)
-          (game :players)))
+  (get-in game [:players player-id]))
 
 (defn player-countries [player]
   (-> player :army keys))
@@ -38,11 +33,25 @@
 (defn player-army-count [player]
   (reduce + (-> player :army vals)))
 
+(defn distribute-countries
+  ([game] (distribute-countries game (shuffle (keys board/countries))))
+  ([game countries]
+   (let [countries-for-player (u/deal countries (get-players game))]
+     (update game :players
+             (fn [players]
+               (reduce-kv (fn [m id p]
+                            (assoc m id
+                                   (assoc p :army
+                                          (reduce (fn [m c]
+                                                    (assoc m c 1))
+                                                  {}
+                                                  (countries-for-player p)))))
+                          {}
+                          players))))))
+
 (defn add-army [game player-id country army]
-  (let [player-idx (u/index-of (game :players)
-                               (get-player game player-id))]
-    (update-in game [:players player-idx :army country] 
-               + army)))
+  (update-in game [:players player-id :army country]
+             + army))
 
 (comment
 

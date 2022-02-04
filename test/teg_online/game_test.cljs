@@ -13,10 +13,10 @@
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego"))]
-    (is (= 2 (count (game :players)))
+    (is (= 2 (count (teg/get-players game)))
         "There should be two players")
     (is (= [::p1 ::p2]
-           (map :id (game :players))))))
+           (map :id (teg/get-players game))))))
 
 (deftest player-join-with-same-id-should-be-forbidden
   (is (thrown? js/Error
@@ -24,36 +24,36 @@
                    (teg/join-game ::p1 "Richo")
                    (teg/join-game ::p1 "Diego")))))
 
-(deftest distribute-countries-should-randomly-assign-countries-to-each-player
+(deftest distribute-countries-should-assign-countries-to-each-player-fairly
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
-                 teg/distribute-countries)
-        countries-per-player (/ (count b/countries) 2)
-        p1-countries (js/Math.ceil countries-per-player)
-        p2-countries (js/Math.floor countries-per-player)]
-    (is (= p1-countries
-           (count (-> game 
-                      (teg/get-player ::p1)
-                      teg/player-countries))))
-    (is (= p2-countries
-           (count (-> game
-                      (teg/get-player ::p2)
-                      teg/player-countries))))))
+                 (teg/distribute-countries [::b/argentina ::b/chile
+                                            ::b/uruguay ::b/brasil
+                                            ::b/colombia]))]
+    (is (= #{::b/argentina ::b/uruguay ::b/colombia}
+           (-> game
+               (teg/get-player ::p1)
+               teg/player-countries
+               set)))
+    (is (= #{::b/chile ::b/brasil}
+           (-> game
+               (teg/get-player ::p2)
+               teg/player-countries
+               set)))))
 
 (deftest distribute-countries-should-set-one-army-to-each-country-assigned
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
-                 teg/distribute-countries)
-        countries-per-player (/ (count b/countries) 2)
-        p1-countries (js/Math.ceil countries-per-player)
-        p2-countries (js/Math.floor countries-per-player)]
-    (is (= p1-countries
+                 (teg/distribute-countries [::b/argentina ::b/chile
+                                            ::b/uruguay ::b/brasil
+                                            ::b/colombia]))]
+    (is (= 3
            (-> game
                (teg/get-player ::p1)
                teg/player-army-count)))
-    (is (= p2-countries
+    (is (= 2
            (-> game
                (teg/get-player ::p2)
                teg/player-army-count)))))

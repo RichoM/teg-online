@@ -3,11 +3,10 @@
   (:require [clojure.string :as str]))
 
 (defn deal [cards players]
-  (let [player-count (count players)
-        shuffled-cards (shuffle cards)]
+  (let [player-count (count players)]
     (into {}
           (map-indexed (fn [i p]
-                         [p (take-nth player-count (drop i shuffled-cards))])
+                         [p (take-nth player-count (drop i cards))])
                        players))))
 
 (defn seek
