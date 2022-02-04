@@ -20,12 +20,12 @@
 
 (comment
   (def game @game)
-  (def game (atom (teg/new-game)))
+  (reset! game (teg/new-game))
   (swap! game teg/join-game ::p1 "Richo")
   (swap! game teg/join-game ::p2 "Lechu")
   (swap! game teg/join-game ::p3 "Diego")
   (swap! game teg/distribute-countries)
-  (swap! game teg/add-army ::p1 :teg-online.board/alaska -100)
+  (swap! game teg/add-army ::p1 :teg-online.board/california 10)
   (ui/update-ui @game)
 (get-in @game [:players ::p1 :army])
   )

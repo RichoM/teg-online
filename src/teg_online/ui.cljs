@@ -88,9 +88,6 @@
    "#a65628"
    "#f781bf"
    "black"])
-   
-(comment
-  (init))
 
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
@@ -194,20 +191,6 @@
               :counter counter
               :tinted-forms tinted-forms}))))
 
-(comment
-  (init)
-
-  (first (.-submorphs world))
-  (go (def original-form (<! (load-form "imgs/argentina.png"))))
-
-  (def a (map (fn [c] (tint original-form c))
-              player-colors))
-  (go (def res (<! (a/map vector a))))
-  res
-
-  @state
-  )
-
 (defn init-countries [game]
   (go
     (doseq [[i [name data]] (map-indexed vector (shuffle country-data))]
@@ -226,18 +209,6 @@
   (go (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries game))))
-
-
-(comment
-  (def a (atom 0))
-  (swap! a inc)
-
-  (mod 14 13)
-  (init)
-  (init-countries)
-
-  (nth (get-in @state [:countries ::b/argentina :tinted-forms]) 3)
-  )
 
 (defn update-ui [{:keys [players turn-order]}]
   (doseq [[idx pid] (map-indexed vector turn-order)]
