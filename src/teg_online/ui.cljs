@@ -3,9 +3,12 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             [teg-online.utils.async :refer [go-try <? chan->promise]]
             [teg-online.utils.core :as u]
+            [teg-online.game :as teg]
             [teg-online.board :as b]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
+
+(def state (atom {:countries {}}))
 
 (defn resize-canvas [canvas w h]
   (print [w h])
@@ -126,7 +129,7 @@
            (hex g)
            (hex b)))))
 
-(defn make-army-counter [color ^js country]
+(defn make-army-counter [color]
   (let [morph (js/Ellipse.)
         label (js/Label. "1")
         text-color (if (contains? #{"black" "blue" "green"} color)
@@ -140,38 +143,32 @@
     (.addMorph morph label)
     (set! (.-center label) (.-center morph))
     (set! (.-color label) text-color)
-    #_(let [picked? (atom false)
-          offset (atom [0 0])]
-      (doto morph
-        (.on "step"
-             #(when @picked?
-                (let [[offset-x offset-y] @offset]
-                  (set! (.-left morph) (+ offset-x js/World.cursor.x))
-                  (set! (.-top morph) (+ offset-y js/World.cursor.y))
-                  (let [{x1 "x", y1 "y"} (js->clj (.-center morph))
-                        {x2 "x", y2 "y"} (js->clj (.-center country))]
-                    (print (- x1 x2) (- y1 y2))))))
-        (.on "mouseDown"
-             #(do (reset! offset
-                          [(- (.-left morph) js/World.cursor.x)
-                           (- (.-top morph) js/World.cursor.y)])
-                  (reset! picked? true)))
-        (.on "mouseUp"
-             #(do (reset! picked? false)
-                  (reset! offset [0 0])))))
+    (set! (.-alpha morph) 0)
     morph))
 
-(defn init-country [idx name {[x y] :position, img :img, [ox oy] :counter-offset}]
+(defn update-army-counter [^js morph color count]
+  (set! (.-color morph) color)
+  (let [text-color (if (contains? #{"black" "blue" "green"} color)
+                     "white"
+                     "black")]
+    (set! (.-border morph) text-color)
+    (let [label (first (.-submorphs morph))]
+      (set! (.-text label) (str count))
+      (set! (.-color label) text-color)
+      (set! (.-center label) (.-center morph)))))
+  
+
+(defn init-country [idx name {[x y] :position, img :img, [ox oy] :counter-offset} game]
   (go
     (print idx ". " name)
-    (let [color (nth player-colors (mod idx 8))
-          original-form (<! (load-form img))
-          tinted-form (<! (tint original-form (color->str color)))
+    (let [original-form (<! (load-form img))
+          tinted-forms (<! (a/map vector
+                                  (mapv (fn [c] (tint original-form (color->str c)))
+                                        player-colors)))
           morph (js/Sprite. original-form)
-          counter (make-army-counter color morph)
+          counter (make-army-counter "black")
           min-alpha 0.5
           max-alpha 1.0]
-      (set! (.-form morph) tinted-form)
       (set! (.-position morph) #js {:x x :y y})
       (let [cx (+ x (/ (.-width morph) 2))
             cy (+ y (/ (.-height morph) 2))]
@@ -180,7 +177,7 @@
           (set! (.-height morph) (- (.-height morph) d))
           (set! (.-center morph) (clj->js {:x cx :y cy}))
           (set! (.-center counter) (clj->js {:x (+ cx ox) :y (+ cy oy)}))))
-      (set! (.-alpha morph) min-alpha)
+      (set! (.-alpha morph) 0) ; Initially transparent
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
@@ -190,15 +187,31 @@
              #(do (print name)
                   (.addMorph world morph)
                   (.addMorph world counter)
-                  (set! (.-alpha morph) min-alpha)))))))
+                  (set! (.-alpha morph) min-alpha))))
+      (swap! state 
+             assoc-in [:countries name] 
+             {:morph morph
+              :counter counter
+              :tinted-forms tinted-forms}))))
 
 (comment
-  (init))
+  (init)
 
-(defn init-countries []
+  (first (.-submorphs world))
+  (go (def original-form (<! (load-form "imgs/argentina.png"))))
+
+  (def a (map (fn [c] (tint original-form c))
+              player-colors))
+  (go (def res (<! (a/map vector a))))
+  res
+
+  @state
+  )
+
+(defn init-countries [game]
   (go
     (doseq [[i [name data]] (map-indexed vector (shuffle country-data))]
-      (init-country i name data))))
+      (init-country i name data game))))
 
 (defn init-map []
   (go
@@ -209,10 +222,10 @@
                      (.-width map)
                      (.-height map)))))
 
-(defn init []
+(defn init [game]
   (go (.removeAllSubmorphs world)
       (<! (init-map))
-      (<! (init-countries))))
+      (<! (init-countries game))))
 
 
 (comment
@@ -222,7 +235,17 @@
   (mod 14 13)
   (init)
   (init-countries)
+
+  (nth (get-in @state [:countries ::b/argentina :tinted-forms]) 3)
   )
 
-(defn update-ui [{:keys [players]}]
-  ())
+(defn update-ui [{:keys [players turn-order]}]
+  (doseq [[idx pid] (map-indexed vector turn-order)]
+    (let [{:keys [army]} (players pid)]
+      (doseq [[country army-count] army]
+        (print country army-count)
+        (when-let [{:keys [morph counter tinted-forms]} (get-in @state [:countries country])]
+          (set! (.-form morph) (nth tinted-forms idx))
+          (set! (.-alpha morph) 0.5)
+          (set! (.-alpha counter) 1)
+          (update-army-counter counter (nth player-colors idx) army-count))))))

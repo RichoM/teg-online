@@ -10,7 +10,11 @@
 (defn init []
   (go
     (print "HELLO!")
-    (<! (ui/init))
+    (add-watch game :state-change
+               (fn [key atom old-state new-state]
+                 (ui/update-ui new-state)
+                 (print "State changed!")))
+    (<! (ui/init game))
     (print "BYE!")))
 
 
@@ -21,5 +25,7 @@
   (swap! game teg/join-game ::p2 "Lechu")
   (swap! game teg/join-game ::p3 "Diego")
   (swap! game teg/distribute-countries)
-
+  (swap! game teg/add-army ::p1 :teg-online.board/alaska -100)
+  (ui/update-ui @game)
+(get-in @game [:players ::p1 :army])
   )
