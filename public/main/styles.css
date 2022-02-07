@@ -1,0 +1,15 @@
+body {
+  background-color: #be9773;
+}
+
+#top-bar {
+  height: 55px;  
+  border-bottom: 5px solid #8c4f50;
+}
+
+#board-panel {
+  width: 100%;
+  height: calc(100% - 55px);
+  position:absolute;
+  overflow: scroll;
+}
