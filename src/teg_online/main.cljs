@@ -15,6 +15,11 @@
                  (ui/update-ui new-state)
                  (print "State changed!")))
     (<! (ui/init game))
+    (do
+      (swap! game teg/join-game ::p1 "Richo")
+      (swap! game teg/join-game ::p2 "Lechu")
+      (swap! game teg/join-game ::p3 "Diego")
+      (swap! game teg/distribute-countries))
     (print "BYE!")))
 
 

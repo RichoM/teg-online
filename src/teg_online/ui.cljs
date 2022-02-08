@@ -309,8 +309,10 @@
 
 (defn init-countries [game]
   (go
-    (doseq [[i [name data]] (map-indexed vector (shuffle country-data))]
-      (init-country i name data game))))
+    (<! (a/map vector
+               (map-indexed (fn [i [name data]]
+                              (init-country i name data game))
+                            (shuffle country-data))))))
 
 (defn init-map []
   (go
