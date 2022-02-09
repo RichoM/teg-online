@@ -8,12 +8,17 @@
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
-(def state (atom {:countries {}}))
+(defonce state (atom {}))
 
-(defn resize-canvas [canvas w h]
-  (print [w h])
-  (set! (.-width canvas) w)
-  (set! (.-height canvas) h))
+(defn resize-board []
+  (let [board-panel (js/document.querySelector "#board-panel")
+        players-bar (js/document.querySelector "#players-bar")]
+    (aset (.-style board-panel)
+          "height" (u/format "calc(100% - %1px)"
+                             (.-offsetHeight players-bar)))))
+
+(.addEventListener js/window "resize" resize-board)
+(resize-board)
 
 (def country-data
   {; South America
@@ -179,16 +184,6 @@
                 :counter-offset [26 -17]}
    })
 
-(def player-colors-ACAACA
-  ["red"
-   "green"
-   "blue"
-   "yellow"
-   "orange"
-   "hotpink"
-   "black"
-   "skyblue"])
-
 (def player-colors
   ["#e41a1c"
    "#377eb8"
@@ -251,7 +246,7 @@
     (set! (.-center label) (.-center morph))
     (set! (.-color label) text-color)
     (set! (.-alpha morph) 0)
-    (let [picked? (atom false)]
+    #_(let [picked? (atom false)]
       (doto morph
         (.on "step" #(when @picked? 
                        (set! (.-center morph) js/World.cursor)
@@ -284,10 +279,9 @@
           morph (js/Sprite. original-form)
           counter (make-army-counter "black" morph)
           min-alpha 0.5
-          max-alpha 0.75]
+          max-alpha 0.7]
       (set! (.-position morph) #js {:x x :y y})
-      (let [cx (+ x (/ (.-width morph) 2))
-            cy (+ y (/ (.-height morph) 2))]
+      (let [{cx "x" cy "y"} (js->clj (.-center morph))]
         (set! (.-center morph) (clj->js {:x cx :y cy}))
         (set! (.-center counter) (clj->js {:x (+ cx ox) :y (+ cy oy)})))
       (set! (.-alpha morph) 0) ; Initially transparent
@@ -296,13 +290,13 @@
       (doto morph
         (.on "mouseDown"
              #(set! (.-alpha morph) max-alpha))
-        (.on "mouseUp" 
+        (.on "mouseUp"
              #(do (print name)
                   (.addMorph world morph)
                   (.addMorph world counter)
                   (set! (.-alpha morph) min-alpha))))
-      (swap! state 
-             assoc-in [:countries name] 
+      (swap! state
+             assoc-in [:countries name]
              {:morph morph
               :counter counter
               :tinted-forms tinted-forms}))))
@@ -310,8 +304,7 @@
 (defn init-countries [game]
   (go
     (<! (a/map vector
-               (map-indexed (fn [i [name data]]
-                              (init-country i name data game))
+               (map-indexed (fn [i [name data]] (init-country i name data game))
                             (shuffle country-data))))))
 
 (defn init-map []
@@ -319,14 +312,9 @@
     (let [form (<! (load-form "imgs/teg_board.png"))
           map (js/Sprite. form)]
       (.addMorph world map)
-      (resize-canvas (-> world .-canvas .-html)
-                     (.-width map)
-                     (.-height map)))))
-
-(defn init [game]
-  (go (.removeAllSubmorphs world)
-      (<! (init-map))
-      (<! (init-countries game))))
+      (let [canvas (-> world .-canvas .-html)]
+        (set! (.-width canvas) (.-width map))
+        (set! (.-height canvas) (.-height map))))))
 
 (defn update-ui [{:keys [players turn-order]}]
   (doseq [[idx pid] (map-indexed vector turn-order)]
@@ -337,4 +325,22 @@
           (set! (.-form morph) (nth tinted-forms idx))
           (set! (.-alpha morph) 0.5)
           (set! (.-alpha counter) 1)
-          (update-army-counter counter (nth player-colors idx) army-count))))))
+          (update-army-counter counter (nth player-colors idx) army-count)))))
+  (resize-board))
+
+(defn init [game]
+  (go (reset! state {:game game})
+      (.removeAllSubmorphs world)
+      (<! (init-map))
+      (<! (init-countries game))
+      (add-watch game :state-change
+                 (fn [key atom old-state new-state]
+                   (update-ui new-state)
+                   (print key)))
+      (update-ui @game)))
+
+(comment
+  (init (@state :game))
+  (update-ui @(@state :game))
+
+  )
