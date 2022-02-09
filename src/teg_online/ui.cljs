@@ -4,7 +4,8 @@
             [teg-online.utils.async :refer [go-try <? chan->promise]]
             [teg-online.utils.core :as u]
             [teg-online.game :as teg]
-            [teg-online.board :as b]))
+            [teg-online.board :as b]
+            [crate.core :as crate]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
@@ -316,7 +317,7 @@
         (set! (.-width canvas) (.-width map))
         (set! (.-height canvas) (.-height map))))))
 
-(defn update-ui [{:keys [players turn-order]}]
+(defn update-countries [{:keys [players turn-order]}]
   (doseq [[idx pid] (map-indexed vector turn-order)]
     (let [{:keys [army]} (players pid)]
       (doseq [[country army-count] army]
@@ -325,7 +326,53 @@
           (set! (.-form morph) (nth tinted-forms idx))
           (set! (.-alpha morph) 0.5)
           (set! (.-alpha counter) 1)
-          (update-army-counter counter (nth player-colors idx) army-count)))))
+          (update-army-counter counter (nth player-colors idx) army-count))))))
+
+
+(defn update-players [{:keys [players turn-order turn]}]
+  (let [players-row (js/document.querySelector "#players-bar .row")
+        player-count (count turn-order)]
+    (set! (.-innerHTML players-row) "")
+    (doseq [[idx pid] (map-indexed vector turn-order)]
+      (let [player (players pid)]
+        (.appendChild players-row
+                      (crate/html
+                       [:div {:class (u/format "col-sm-%1 player player-%2 %3"
+                                               (max 3 (js/Math.ceil (/ 12 player-count)))
+                                               (inc idx)
+                                               (when (= idx (mod turn player-count))
+                                                 "player-turn"))}
+                        [:div.row
+                         [:div.col-auto.text-truncate
+                          [:i.fas.fa-square]
+                          [:span.mx-1 (player :name)]]]
+                        [:div.row
+                         [:div.col-auto 
+                          [:i.fas.fa-flag]
+                          [:span.mx-1 (count (teg/player-countries player))]]
+                         [:div.col-auto 
+                          [:i.fas.fa-shield-alt]
+                          [:span.mx-1 (teg/player-army-count player)]]]]))))))
+
+(comment
+  (update-ui @(@state :game))
+  (def html (crate/html
+             [:div {:class (u/format "col-sm-%1 player player-%2 %3"
+                                     3 1 "player-turn")}
+              [:div.row
+               [:div.col-auto.text-truncate
+                [:i.fas.fa-square]
+                [:span "Richo"]]]
+              [:div.row
+               [:div.col-auto [:i.fas.fa-flag] 10]
+               [:div.col-auto [:i.fas.fa-shield-alt] 10]]]))
+  (def players-bar (js/document.querySelector "#players-bar"))
+  (.appendChild players-bar html)
+  )
+
+(defn update-ui [game]
+  (update-countries game)
+  (update-players game)
   (resize-board))
 
 (defn init [game]
