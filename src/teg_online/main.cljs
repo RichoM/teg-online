@@ -10,18 +10,18 @@
 (defn init []
   (go
     (print "HELLO!")
-    (add-watch game :state-change
-               (fn [key atom old-state new-state]
-                 (ui/update-ui new-state)
-                 (print "State changed!")))
     (<! (ui/init game))
     (do
       (swap! game teg/join-game ::p1 "Richo")
       (swap! game teg/join-game ::p2 "Lechu")
       (swap! game teg/join-game ::p3 "Diego")
+      (swap! game teg/join-game ::p4 "Sofi")
+      (swap! game teg/join-game ::p5 "Santi")
+      (swap! game teg/join-game ::p6 "Papa")
+      (swap! game teg/join-game ::p7 "Tera")
+      (swap! game teg/join-game ::p8 "Maxi")
       (swap! game teg/distribute-countries))
     (print "BYE!")))
-
 
 (comment
   (def game @game)
