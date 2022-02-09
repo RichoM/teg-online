@@ -260,7 +260,7 @@
 
 (defn update-army-counter [^js morph color count]
   (set! (.-color morph) color)
-  (let [text-color (if (contains? #{"black" "blue" "green"} color)
+  (let [text-color (if (contains? #{"black"} color)
                      "white"
                      "black")]
     (set! (.-border morph) text-color)
@@ -270,9 +270,8 @@
       (set! (.-center label) (.-center morph)))))
   
 
-(defn init-country [idx name {[x y] :position, img :img, [ox oy] :counter-offset} game]
+(defn init-country [country-id {[x y] :position, img :img, [ox oy] :counter-offset} game]
   (go
-    ;(print idx ". " name)
     (let [original-form (<! (load-form img))
           tinted-forms (<! (a/map vector
                                   (mapv (fn [c] (tint original-form (color->str c)))
@@ -292,12 +291,13 @@
         (.on "mouseDown"
              #(set! (.-alpha morph) max-alpha))
         (.on "mouseUp"
-             #(do (print name)
+             #(do (print country-id)
                   (.addMorph world morph)
                   (.addMorph world counter)
-                  (set! (.-alpha morph) min-alpha))))
+                  (set! (.-alpha morph) min-alpha)
+                  (swap! game teg/add-army country-id 1))))
       (swap! state
-             assoc-in [:countries name]
+             assoc-in [:countries country-id]
              {:morph morph
               :counter counter
               :tinted-forms tinted-forms}))))
@@ -305,8 +305,8 @@
 (defn init-countries [game]
   (go
     (<! (a/map vector
-               (map-indexed (fn [i [name data]] (init-country i name data game))
-                            (shuffle country-data))))))
+               (map (fn [[name data]] (init-country name data game))
+                    (shuffle country-data))))))
 
 (defn init-map []
   (go
@@ -331,8 +331,10 @@
               (set! (.-alpha counter) 1)
               (update-army-counter counter (nth player-colors player-idx) army))
             (do
+              (set! (.-form morph) (.-originalForm morph))
               (set! (.-alpha morph) 0)
-              (set! (.-alpha counter) 0))))))))
+              (set! (.-alpha counter) 0)
+              (update-army-counter counter "white" 0))))))))
 
 (defn update-players [{:keys [players turn-order turn] :as game}]
   (let [players-row (js/document.querySelector "#players-bar .row")
