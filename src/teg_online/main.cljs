@@ -31,6 +31,9 @@
   (swap! game teg/join-game ::p3 "Diego")
   (swap! game teg/distribute-countries)
   (swap! game teg/add-army ::p1 :teg-online.board/california 10)
+
+  (swap! game update-in [:turn] inc)
+
   (ui/update-ui @game)
 (get-in @game [:players ::p1 :army])
   )

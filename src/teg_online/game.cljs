@@ -4,7 +4,8 @@
 
 (defn new-game []
   {:players {}
-   :turn-order []})
+   :turn-order []
+   :turn 0})
 
 (defn new-player [id name]
   {:id id
