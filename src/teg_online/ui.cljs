@@ -12,10 +12,10 @@
 
 (defn resize-board []
   (let [board-panel (js/document.querySelector "#board-panel")
-        players-bar (js/document.querySelector "#players-bar")]
+        top-bar (js/document.querySelector "#top-bar")]
     (aset (.-style board-panel)
           "height" (u/format "calc(100% - %1px)"
-                             (.-offsetHeight players-bar)))))
+                             (.-offsetHeight top-bar)))))
 
 (.addEventListener js/window "resize" resize-board)
 (resize-board)

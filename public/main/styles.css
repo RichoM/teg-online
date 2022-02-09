@@ -3,7 +3,7 @@ body {
   font-family: 'AndadaSCRegular';
 }
 
-#players-bar {
+#top-bar {
   border-bottom: 5px solid #8c4f50;
 }
 
@@ -13,11 +13,16 @@ body {
   overflow: scroll;
 }
 
-.player-turn {
-  background: #ffc69b;
+#players-bar {
+  background-color: gray;
 }
 
-.players .col {  
+.player-turn {
+  background: #ffc69b !important;
+}
+
+.player {  
+  background-color: #be9773;
   border-top: 1px solid #8c4f50;
   border-left: 1px solid #8c4f50;
 }
