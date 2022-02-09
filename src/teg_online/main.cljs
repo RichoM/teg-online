@@ -12,6 +12,7 @@
     (print "HELLO!")
     (<! (ui/init game))
     (do
+      (reset! game (teg/new-game))
       (swap! game teg/join-game ::p1 "Richo")
       (swap! game teg/join-game ::p2 "Lechu")
       (swap! game teg/join-game ::p3 "Diego")
@@ -20,7 +21,8 @@
       (swap! game teg/join-game ::p6 "Papa")
       (swap! game teg/join-game ::p7 "Tera")
       (swap! game teg/join-game ::p8 "Maxi")
-      (swap! game teg/distribute-countries))
+      (swap! game teg/distribute-countries)
+      )
     (print "BYE!")))
 
 (comment
@@ -33,7 +35,10 @@
   (swap! game teg/add-army ::p1 :teg-online.board/california 10)
 
   (swap! game update-in [:turn] inc)
+  (swap! game update-in [:players ::p1 :name] (constantly "Un nombre mucho muy muuuuy largo"))
 
   (ui/update-ui @game)
-(get-in @game [:players ::p1 :army])
+  (get-in @game [:players ::p1 :army])
+
+
   )

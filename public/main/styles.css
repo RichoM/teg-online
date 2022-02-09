@@ -14,7 +14,7 @@ body {
 }
 
 #players-bar {
-  background-color: gray;
+  /*background-color: gray;*/
 }
 
 .player-turn {
@@ -23,8 +23,8 @@ body {
 
 .player {  
   background-color: #be9773;
-  border-top: 1px solid #8c4f50;
-  border-left: 1px solid #8c4f50;
+  border-right: 1px solid #8c4f50;
+  border-bottom: 1px solid #8c4f50;
 }
 
 .player-1 i {

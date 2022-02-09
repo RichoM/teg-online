@@ -331,14 +331,17 @@
 
 (defn update-players [{:keys [players turn-order turn]}]
   (let [players-row (js/document.querySelector "#players-bar .row")
-        player-count (count turn-order)]
+        player-count (count turn-order)
+        player-width (/ 12 (if (> player-count 4)
+                             (js/Math.ceil (/ player-count 2))
+                             player-count))]
     (set! (.-innerHTML players-row) "")
     (doseq [[idx pid] (map-indexed vector turn-order)]
       (let [player (players pid)]
         (.appendChild players-row
                       (crate/html
                        [:div {:class (u/format "col-sm-%1 player player-%2 %3"
-                                               (max 3 (js/Math.ceil (/ 12 player-count)))
+                                               player-width
                                                (inc idx)
                                                (when (= idx (mod turn player-count))
                                                  "player-turn"))}
@@ -389,5 +392,7 @@
 (comment
   (init (@state :game))
   (update-ui @(@state :game))
+
+  (get-in @state [:game :players])
 
   )
