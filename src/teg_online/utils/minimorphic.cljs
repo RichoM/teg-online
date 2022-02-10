@@ -5,24 +5,26 @@
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
 
-(defn tint [^js/Form form color]
-  (let [img (.-img form)
-        w (.-width img)
-        h (.-height img)
-        canvas (js/document.createElement "canvas")
-        ctx (.getContext canvas "2d")]
-    (set! (.-width canvas) w)
-    (set! (.-height canvas) h)
-    (set! (.-fillStyle ctx) color)
-    (.drawImage ctx img 0 0)
-    (set! (.-globalCompositeOperation ctx) "source-atop")
-    (.fillRect ctx 0 0 w h)
-    (let [result-img (js/Image.)
-          result-chan (a/promise-chan)]
-      (set! (.-onload result-img)
-            #(a/put! result-chan (js/Form. result-img)))
-      (set! (.-src result-img) (.toDataURL canvas))
-      result-chan)))
+(def tint
+  (memoize
+   (fn [^js/Form form color]
+     (let [img (.-img form)
+           w (.-width img)
+           h (.-height img)
+           canvas (js/document.createElement "canvas")
+           ctx (.getContext canvas "2d")]
+       (set! (.-width canvas) w)
+       (set! (.-height canvas) h)
+       (set! (.-fillStyle ctx) color)
+       (.drawImage ctx img 0 0)
+       (set! (.-globalCompositeOperation ctx) "source-atop")
+       (.fillRect ctx 0 0 w h)
+       (let [result-img (js/Image.)
+             result-chan (a/promise-chan)]
+         (set! (.-onload result-img)
+               #(a/put! result-chan (js/Form. result-img)))
+         (set! (.-src result-img) (.toDataURL canvas))
+         result-chan)))))
 
 (defn make-pickable [^js/Morph morph]
   (let [picked? (atom false)]
