@@ -26,13 +26,11 @@
     (print "BYE!")))
 
 (defn ^:dev/before-load-async reload-begin* [done]
-  (go (print "Reloading...")
-      (<! (ui/terminate))
+  (go (<! (ui/terminate))
       (done)))
 
 (defn ^:dev/after-load-async reload-end* [done]
   (go (<! (ui/initialize game))
-      (print "Reload done!")
       (done)))
 
 (comment

@@ -59,8 +59,6 @@
              #(set! (.-alpha morph) max-alpha))
         (.on "mouseUp"
              #(do (print country-id)
-                  (.addMorph world morph)
-                  (.addMorph world counter)
                   (set! (.-alpha morph) min-alpha)
                   (swap! game teg/add-army country-id 1))))
       (swap! state
@@ -108,12 +106,12 @@
           (set! (.-alpha counter) (if player-idx 1 0))
           (update-army-counter counter color (if player-idx army 0))))))
 
-(defn update-countries [{:keys [turn-order] :as game}]
+(defn update-countries [{:keys [turn-order countries]}]
   (go (let [player-indices (into {} (map-indexed (fn [idx pid] [pid idx])
                                                  turn-order))]
         (<! (a/map vector
                    (map (partial update-country player-indices)
-                        (vals (game :countries))))))))
+                        (vals countries)))))))
 
 (defn update-players [{:keys [players turn-order turn] :as game}]
   (go (let [players-row (js/document.querySelector "#players-bar .row")
@@ -149,13 +147,10 @@
       (resize-board)))
 
 (defn start-update-loop []
-  (go (print "START UPDATE LOOP!")
-      (loop []
+  (go (loop []
         (when-some [update (<! (@state :updates))]
           (<! (update-ui update))
-          (print "STATE CHANGE")
-          (recur)))
-      (print "STOP UPDATE LOOP!")))
+          (recur)))))
 
 (defn initialize [game]
   (go (reset! state {:game game
@@ -165,7 +160,6 @@
       (<! (init-countries game))
       (add-watch game :state-change
                  (fn [_key _atom _old-state new-state]
-                   (print "WATCHER!")
                    (a/put! (@state :updates) new-state)))
       (start-update-loop)
       (update-ui @game)))
