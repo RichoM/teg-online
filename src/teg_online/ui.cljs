@@ -43,9 +43,6 @@
 (defn init-country [country-id {[x y] :position, img :img, [ox oy] :counter-offset} game]
   (go
     (let [original-form (<! (mm/load-form img))
-          tinted-forms (<! (a/map vector
-                                  (mapv (fn [c] (mm/tint original-form c))
-                                        player-colors)))
           morph (js/Sprite. original-form)
           counter (make-army-counter "black")
           min-alpha 0.5
@@ -69,8 +66,7 @@
       (swap! state
              assoc-in [:countries country-id]
              {:morph morph
-              :counter counter
-              :tinted-forms tinted-forms}))))
+              :counter counter}))))
 
 (defn init-countries [game]
   (go
@@ -98,63 +94,65 @@
       (set! (.-color label) text-color)
       (set! (.-center label) (.-center morph)))))
 
+(defn update-country [player-indices {:keys [id owner army]}]
+  (go (when-let [{:keys [^js/Morph morph counter]}
+                 (get-in @state [:countries id])]
+        (let [player-idx (player-indices owner)
+              color (get player-colors player-idx "white")
+              ^js/Form original-form (.-originalForm morph)
+              ^js/Form tinted-form (if player-idx
+                                     (<! (mm/tint original-form color))
+                                     original-form)]
+          (set! (.-form morph) tinted-form)
+          (set! (.-alpha morph) (if player-idx 0.5 0))
+          (set! (.-alpha counter) (if player-idx 1 0))
+          (update-army-counter counter color (if player-idx army 0))))))
+
 (defn update-countries [{:keys [turn-order] :as game}]
-  (let [player-indices (into {} (map-indexed (fn [idx pid] [pid idx])
-                                             turn-order))]
-    (doseq [{:keys [id owner army]} (vals (game :countries))]
-      (let [player-idx (player-indices owner)]
-        (when-let [{:keys [morph counter tinted-forms]}
-                   (get-in @state [:countries id])]
-          (if player-idx
-            (do 
-              (set! (.-form morph) (nth tinted-forms player-idx))
-              (set! (.-alpha morph) 0.5)
-              (set! (.-alpha counter) 1)
-              (update-army-counter counter (nth player-colors player-idx) army))
-            (do
-              (set! (.-form morph) (.-originalForm morph))
-              (set! (.-alpha morph) 0)
-              (set! (.-alpha counter) 0)
-              (update-army-counter counter "white" 0))))))))
+  (go (let [player-indices (into {} (map-indexed (fn [idx pid] [pid idx])
+                                                 turn-order))]
+        (<! (a/map vector
+                   (map (partial update-country player-indices)
+                        (vals (game :countries))))))))
 
 (defn update-players [{:keys [players turn-order turn] :as game}]
-  (let [players-row (js/document.querySelector "#players-bar .row")
-        player-count (count turn-order)
-        player-width (/ 12 (if (> player-count 4)
-                             (js/Math.ceil (/ player-count 2))
-                             player-count))]
-    (set! (.-innerHTML players-row) "")
-    (doseq [[idx pid] (map-indexed vector turn-order)]
-      (let [player (players pid)]
-        (.appendChild players-row
-                      (crate/html
-                       [:div {:class (u/format "col-sm-%1 player player-%2 %3"
-                                               player-width
-                                               (inc idx)
-                                               (when (= idx (mod turn player-count))
-                                                 "player-turn"))}
-                        [:div.row
-                         [:div.col-auto.text-truncate
-                          [:i.fas.fa-square]
-                          [:span.mx-1 (player :name)]]]
-                        [:div.row
-                         [:div.col-auto 
-                          [:i.fas.fa-flag]
-                          [:span.mx-1 (count (teg/player-countries game pid))]]
-                         [:div.col-auto 
-                          [:i.fas.fa-shield-alt]
-                          [:span.mx-1 (teg/player-army-count game pid)]]]]))))))
+  (go (let [players-row (js/document.querySelector "#players-bar .row")
+            player-count (count turn-order)
+            player-width (/ 12 (if (> player-count 4)
+                                 (js/Math.ceil (/ player-count 2))
+                                 player-count))]
+        (set! (.-innerHTML players-row) "")
+        (doseq [[idx pid] (map-indexed vector turn-order)]
+          (let [player (players pid)]
+            (.appendChild players-row
+                          (crate/html
+                           [:div {:class (u/format "col-sm-%1 player player-%2 %3"
+                                                   player-width
+                                                   (inc idx)
+                                                   (when (= idx (mod turn player-count))
+                                                     "player-turn"))}
+                            [:div.row
+                             [:div.col-auto.text-truncate
+                              [:i.fas.fa-square]
+                              [:span.mx-1 (player :name)]]]
+                            [:div.row
+                             [:div.col-auto
+                              [:i.fas.fa-flag]
+                              [:span.mx-1 (count (teg/player-countries game pid))]]
+                             [:div.col-auto
+                              [:i.fas.fa-shield-alt]
+                              [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
 (defn update-ui [game]
-  (update-countries game)
-  (update-players game)
-  (resize-board))
+  (go (<! (update-players game))
+      (<! (update-countries game))
+      (resize-board)))
 
 (defn start-update-loop []
   (go (print "START UPDATE LOOP!")
       (loop []
         (when-some [update (<! (@state :updates))]
-          (update-ui update)
+          (<! (update-ui update))
           (print "STATE CHANGE")
           (recur)))
       (print "STOP UPDATE LOOP!")))
