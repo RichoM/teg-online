@@ -150,19 +150,33 @@
   (update-players game)
   (resize-board))
 
-(defn init [game]
-  (go (reset! state {:game game})
+(defn start-update-loop []
+  (go (print "START UPDATE LOOP!")
+      (loop []
+        (when-some [update (<! (@state :updates))]
+          (update-ui update)
+          (print "STATE CHANGE")
+          (recur)))
+      (print "STOP UPDATE LOOP!")))
+
+(defn initialize [game]
+  (go (reset! state {:game game
+                     :updates (a/chan (a/sliding-buffer 1))})
       (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries game))
       (add-watch game :state-change
-                 (fn [key atom old-state new-state]
-                   (update-ui new-state)
-                   (print key)))
+                 (fn [_key _atom _old-state new-state]
+                   (print "WATCHER!")
+                   (a/put! (@state :updates) new-state)))
+      (start-update-loop)
       (update-ui @game)))
 
+(defn terminate []
+  (go (a/close! (@state :updates))))
+
 (comment
-  (init (@state :game))
+  (initialize (@state :game))
   (update-ui @(@state :game))
 
   (get-in @state [:game :players])

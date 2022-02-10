@@ -62,8 +62,6 @@
                 (teg/join-game ::p2 "Diego")
                 teg/distribute-countries))
   (def country (first (teg/player-countries game ::p1)))
-  (def game (-> game
-                (teg/add-army ::p1 country 3)))
   (-> game (teg/get-player ::p1))
 
   country

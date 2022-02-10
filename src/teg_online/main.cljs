@@ -10,7 +10,7 @@
 (defn init []
   (go
     (print "HELLO!")
-    (<! (ui/init game))
+    (<! (ui/initialize game))
     (do
       (reset! game (teg/new-game))
       (swap! game teg/join-game ::p1 "Richo")
@@ -24,6 +24,14 @@
       (swap! game teg/distribute-countries)
       )
     (print "BYE!")))
+
+(defn ^:dev/before-load reload-begin* []
+  (go (print "Reloading...")
+      (<! (ui/terminate))))
+
+(defn ^:dev/after-load reload-end* []
+  (go (<! (ui/initialize game))
+      (print "Reload done!")))
 
 (comment
   (def game @game)

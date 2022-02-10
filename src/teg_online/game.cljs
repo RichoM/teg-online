@@ -56,9 +56,6 @@
   (update-in game [:countries country :army] + army))
 
 (comment
-  (def countries (keys board/countries))
-  (def countries-for-player (u/deal countries (get-players game)))
-  (keys countries-for-player)
 
   (u/deal (range 13) "ABC")
 
