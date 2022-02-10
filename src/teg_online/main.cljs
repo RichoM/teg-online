@@ -50,5 +50,6 @@
   (ui/update-ui @game)
   (get-in @game [:players ::p1 :army])
 
-
+  (get-in @game [:countries :teg-online.board/alaska :owner])
+  (swap! game assoc-in [:countries :teg-online.board/alaska :owner] ::p5)
   )
