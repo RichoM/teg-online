@@ -2,6 +2,7 @@
   (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
             [cljs.core.async.interop :refer-macros [<p!]]
             [teg-online.utils.async :refer [go-try <? chan->promise]]
+            [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.core :as u]
             [teg-online.game :as teg]
             [teg-online.board :as b]
@@ -195,44 +196,8 @@
    "#f781bf"
    "black"])
 
-(defn load-form [path]
-  (go (<p! (js/Form.loadImage path))))
 
-(defn tint [^js/Form form color]
-  (let [img (.-img form)
-        w (.-width img)
-        h (.-height img)
-        canvas (js/document.createElement "canvas")
-        ctx (.getContext canvas "2d")]
-    (set! (.-width canvas) w)
-    (set! (.-height canvas) h)
-    (set! (.-fillStyle ctx) color)
-    (.drawImage ctx img 0 0)
-    (set! (.-globalCompositeOperation ctx) "source-atop")
-    (.fillRect ctx 0 0 w h)
-    (let [result-img (js/Image.)
-          result-chan (a/promise-chan)]
-      (set! (.-onload result-img)
-            #(a/put! result-chan (js/Form. result-img)))
-      (set! (.-src result-img) (.toDataURL canvas))
-      result-chan)))
-
-(defn hex [n]
-  (let [s (.toString n 16)]
-    (if (< (count s) 2)
-      (str "0" s)
-      s)))
-
-(defn color->str [color]
-  (if (string? color)
-    color
-    (let [[r g b] color]
-      (str "#"
-           (hex r)
-           (hex g)
-           (hex b)))))
-
-(defn make-army-counter [color ^js country]
+(defn make-army-counter [color]
   (let [morph (js/Ellipse.)
         label (js/Label. "1")
         text-color (if (contains? #{"black" "blue" "green"} color)
@@ -241,21 +206,12 @@
     (set! (.-font label) "14px Arial")
     (set! (.-width morph) 30)
     (set! (.-height morph) 30)
-    (set! (.-color morph) (color->str color))
+    (set! (.-color morph) color)
     (set! (.-border morph) text-color)
     (.addMorph morph label)
     (set! (.-center label) (.-center morph))
     (set! (.-color label) text-color)
     (set! (.-alpha morph) 0)
-    #_(let [picked? (atom false)]
-      (doto morph
-        (.on "step" #(when @picked? 
-                       (set! (.-center morph) js/World.cursor)
-                       (let [{x "x" y "y"} (js->clj (.-center morph))
-                             {cx "x" cy "y"} (js->clj (.-center country))]
-                         (print [(- x cx) (- y cy)]))))
-        (.on "mouseDown" #(do (reset! picked? true)))
-        (.on "mouseUp" #(do (reset! picked? false)))))
     morph))
 
 (defn update-army-counter [^js morph color count]
@@ -272,12 +228,12 @@
 
 (defn init-country [country-id {[x y] :position, img :img, [ox oy] :counter-offset} game]
   (go
-    (let [original-form (<! (load-form img))
+    (let [original-form (<! (mm/load-form img))
           tinted-forms (<! (a/map vector
-                                  (mapv (fn [c] (tint original-form (color->str c)))
+                                  (mapv (fn [c] (mm/tint original-form c))
                                         player-colors)))
           morph (js/Sprite. original-form)
-          counter (make-army-counter "black" morph)
+          counter (make-army-counter "black")
           min-alpha 0.5
           max-alpha 0.7]
       (set! (.-position morph) #js {:x x :y y})
@@ -310,7 +266,7 @@
 
 (defn init-map []
   (go
-    (let [form (<! (load-form "imgs/teg_board.png"))
+    (let [form (<! (mm/load-form "imgs/teg_board.png"))
           map (js/Sprite. form)]
       (.addMorph world map)
       (let [canvas (-> world .-canvas .-html)]
