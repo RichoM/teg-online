@@ -156,15 +156,21 @@
                             ::teg/regroup "Reagrupando..."
                             "")]]
                         [:div.col-auto
-                         [:button#confirm-button.btn.btn-primary.btn-lg {:type "button" :disabled false}
+                         [:button#confirm-button.btn.btn-primary.btn-lg
+                          {:type "button" :disabled false}
                           (case phase
                             ::teg/add-army "Confirmar"
                             ::teg/attack "Reagrupar"
                             ::teg/regroup "Finalizar turno")]]]))
         (.addEventListener (js/document.querySelector "#confirm-button")
                            "click"
-                           #(do (print (js/Date.now))
-                                (modals/show :header [:h3 (js/Date.now)]))))))
+                           #(go (print (js/Date.now))
+                                (when-let [nombre (<! (modals/prompt "Bienvenido" "Ingrese su nombre" "??"))]
+                                  (<! (modals/alert "Su nombre es..." nombre)))
+                                (<! (modals/alert "Woooo" "Este es un mensaje del más allá..."))
+                                (<! (modals/alert "2" "Segundo mensaje"))
+                                (when (<! (modals/confirm "Pregunta:" "Querés ver un tercer mensaje??"))
+                                  (<! (modals/alert "3" "Este es el tercer y último mensaje"))))))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
