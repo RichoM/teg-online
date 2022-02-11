@@ -3,6 +3,7 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             [teg-online.utils.async :refer [go-try <? chan->promise]]
             [teg-online.utils.minimorphic :as mm]
+            [teg-online.utils.modals :as modals]
             [teg-online.utils.core :as u]
             [teg-online.ui-constants :refer [country-data player-colors]]
             [teg-online.game :as teg]
@@ -155,11 +156,15 @@
                             ::teg/regroup "Reagrupando..."
                             "")]]
                         [:div.col-auto
-                         [:button.btn.btn-primary.btn-lg {:type "button" :disabled true}
+                         [:button#confirm-button.btn.btn-primary.btn-lg {:type "button" :disabled false}
                           (case phase
                             ::teg/add-army "Confirmar"
                             ::teg/attack "Reagrupar"
-                            ::teg/regroup "Finalizar turno")]]])))))
+                            ::teg/regroup "Finalizar turno")]]]))
+        (.addEventListener (js/document.querySelector "#confirm-button")
+                           "click"
+                           #(do (print (js/Date.now))
+                                (modals/show :header [:h3 (js/Date.now)]))))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
