@@ -17,10 +17,6 @@ body {
   overflow: scroll;
 }
 
-#players-bar {
-  /*background-color: gray;*/
-}
-
 .player-turn {
   background: #ffc69b !important;
 }
