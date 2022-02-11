@@ -50,4 +50,6 @@
 
   (get-in @game [:countries :teg-online.board/alaska :owner])
   (swap! game assoc-in [:countries :teg-online.board/alaska :owner] ::p5)
+
+  (swap! game assoc-in [:phase] ::teg/regroup)
   )
