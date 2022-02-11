@@ -31,6 +31,26 @@
    (js/document.querySelector "#modal-dialogs")
    js/document.body))
 
+
+(defn on-click [element callback]
+  (doto element (.addEventListener "click" callback)))
+
+(defn on-enter [element callback]
+  (doto element
+    (.addEventListener "keypress"
+                       (fn [evt]
+                         (let [keycode (or (.-keyCode evt)
+                                           (.-which evt))]
+                           (when (= 13 keycode)
+                             (callback)
+                             (.hide (js/bootstrap.Modal.getInstance element))))))))
+
+(defn on-shown [element callback]
+  (doto element (.addEventListener "shown.bs.modal" callback)))
+
+(defn on-hidden [element callback]
+  (doto element (.addEventListener "hidden.bs.modal" callback)))
+
 (defn show [& {:keys [header body footer]}]
   (hide)
   (let [container (find-container)
@@ -40,15 +60,12 @@
         current {:modal bs-modal
                  :ready ready-chan}]
     (reset! current-modal current)
-    (doto html-modal
-      (.addEventListener "shown.bs.modal"
-                         #(a/close! ready-chan))
-      (.addEventListener "hidden.bs.modal"
-                         #(do (.remove html-modal)
-                              (compare-and-set! current-modal current nil))))
     (.appendChild container html-modal)
     (.show bs-modal)
-    html-modal))
+    (doto html-modal
+      (on-shown #(a/close! ready-chan))
+      (on-hidden #(do (.remove html-modal)
+                      (compare-and-set! current-modal current nil))))))
 
 (defn alert [title message]
   (let [result (a/chan)
@@ -59,25 +76,17 @@
                          :body [:h5 message]
                          :footer accept-button)]
     (doto html-modal
-      (.addEventListener "keypress"
-                         (fn [evt]
-                           (let [keycode (or (.-keyCode evt)
-                                             (.-which evt))]
-                             (when (= 13 keycode)
-                               (.hide (js/bootstrap.Modal.getInstance html-modal))))))
-      (.addEventListener "hidden.bs.modal"
-                         #(a/close! result)))
+      (on-enter (constantly :nop))
+      (on-hidden #(a/close! result)))
     result))
 
 (defn confirm [title message]
   (let [result (a/promise-chan)
         value (atom false)
-        yes-btn (doto (crate/html accept-button)
-                  (.addEventListener "click"
-                                     #(reset! value true)))
-        no-btn (doto (crate/html cancel-button)
-                 (.addEventListener "click"
-                                    #(reset! value false)))
+        yes-btn (on-click (crate/html accept-button)
+                          #(reset! value true))
+        no-btn (on-click (crate/html cancel-button)
+                         #(reset! value false))
         html-modal (show :header (list [:h4
                                         [:i.fas.fa-question-circle]
                                         [:span.ms-2 title]]
@@ -85,27 +94,18 @@
                          :body [:h5 message]
                          :footer (list yes-btn no-btn))]
     (doto html-modal
-      (.addEventListener "keypress"
-                         (fn [evt]
-                           (let [keycode (or (.-keyCode evt)
-                                             (.-which evt))]
-                             (when (= 13 keycode)
-                               (reset! value true)
-                               (.hide (js/bootstrap.Modal.getInstance html-modal))))))
-      (.addEventListener "hidden.bs.modal"
-                         #(a/put! result @value)))
+      (on-enter #(reset! value true))
+      (on-hidden #(a/put! result @value)))
     result))
 
 (defn prompt [title message default]
   (let [result (a/promise-chan)
         value (atom nil)
         input (crate/html [:input.form-control {:type "text" :value default}])
-        yes-btn (doto (crate/html accept-button)
-                  (.addEventListener "click"
-                                     #(reset! value (.-value input))))
-        no-btn (doto (crate/html cancel-button)
-                 (.addEventListener "click"
-                                    #(reset! value nil)))
+        yes-btn (on-click (crate/html accept-button)
+                          #(reset! value (.-value input)))
+        no-btn (on-click (crate/html cancel-button)
+                         #(reset! value nil))
         html-modal (show :header (list [:h4
                                         [:i.fas.fa-question-circle]
                                         [:span.ms-2 title]]
@@ -115,17 +115,10 @@
                                 [:div.row input]]
                          :footer (list yes-btn no-btn))]
     (doto html-modal
-      (.addEventListener "keypress"
-                         (fn [evt]
-                           (let [keycode (or (.-keyCode evt)
-                                             (.-which evt))]
-                             (when (= 13 keycode)
-                               (reset! value (.-value input))
-                               (.hide (js/bootstrap.Modal.getInstance html-modal))))))
-      (.addEventListener "hidden.bs.modal"
-                         #(if-let [val @value]
-                            (a/put! result val)
-                            (a/close! result))))
+      (on-enter #(reset! value (.-value input)))
+      (on-hidden #(if-let [val @value]
+                    (a/put! result val)
+                    (a/close! result))))
     result))
 
 (comment
