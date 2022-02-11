@@ -2,12 +2,18 @@
   (:require [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
+(def game-phases 
+  [::add-army
+   ::attack
+   ::regroup])
+
 (defn new-game []
   {:players {}
    :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
                          {}
                          board/countries)
    :turn-order []
+   :phase ::add-army
    :turn 0})
 
 (defn new-player [id name]

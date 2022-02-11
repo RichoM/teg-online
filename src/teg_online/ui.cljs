@@ -141,9 +141,30 @@
                               [:i.fas.fa-shield-alt]
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
+(defn update-status-panel [{:keys [phase]}]
+  (go (let [status-bar (js/document.querySelector "#status-bar")]
+        (set! (.-innerHTML status-bar) "")
+        (.appendChild status-bar
+                      (crate/html
+                       [:div.row.align-items-center.p-1
+                        [:div.col.text-truncate
+                         [:h4.text-truncate
+                          (case phase
+                            ::teg/add-army "Incorporando ejércitos..."
+                            ::teg/attack "Atacando..."
+                            ::teg/regroup "Reagrupando..."
+                            "")]]
+                        [:div.col-auto
+                         [:button.btn.btn-primary.btn-lg {:type "button" :disabled true}
+                          (case phase
+                            ::teg/add-army "Confirmar"
+                            ::teg/attack "Reagrupar"
+                            ::teg/regroup "Finalizar turno")]]])))))
+
 (defn update-ui [game]
   (go (<! (update-players game))
       (<! (update-countries game))
+      (<! (update-status-panel game))
       (resize-board)))
 
 (defn start-update-loop []
@@ -172,5 +193,10 @@
   (update-ui @(@state :game))
 
   (get-in @state [:game :players])
-
+  (def m (js/Morph.))
+  (.addMorph world m)
+  (set! (.-width m) 10)
+  (set! (.-height m) 10)
+  (set! (.-position m) #js {:x 20 :y 20})
+  (.-position m)
   )
