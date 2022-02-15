@@ -25,7 +25,7 @@
 (resize-board)
 
 (defn get-game []
-  (when-let [game-atom (@state :game)]
+  (when-let [game-atom (@state :game-atom)]
     @game-atom))
 
 (defn show-add-army-dialog [country-name initial-value min-value max-value]
@@ -85,7 +85,7 @@
 (defn finish-turn []
   (go
     (when (<! (modals/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
-      (let [game-atom (@state :game)
+      (let [game-atom (@state :game-atom)
             additions (get-in @state [:user-data :additions] {})]
         (swap! state dissoc :user-data)
         (doseq [[country-id extra-army] additions]
@@ -227,7 +227,7 @@
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
 (defn finish-turn-enabled []
-  (let [game-atom (@state :game)
+  (let [game-atom (@state :game-atom)
         {:keys [phase]} @game-atom]
     (case phase
       ::teg/add-army (= 0 (get-in @state [:user-data :remaining] 0))
@@ -279,33 +279,33 @@
      :additions {}}))
 
 
-(defn initialize [game]
-  (go (reset! state {:game game
+(defn initialize [game-atom]
+  (go (reset! state {:game-atom game-atom
                      :updates (a/chan (a/sliding-buffer 1))})
       (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries))
       (add-watch state :ui-change
-                 #(a/put! (@state :updates) @game))
+                 #(a/put! (@state :updates) @game-atom))
       (let [state-change (fn [_key _atom old-state new-state]
                            (when (not= (old-state :turn)
                                        (new-state :turn))
                              (swap! state assoc :user-data
                                     (reset-user-data new-state)))
                            (a/put! (@state :updates) new-state))]
-        (add-watch game :state-change state-change)
-        (state-change :state-change game {} @game))
+        (add-watch game-atom :state-change state-change)
+        (state-change :state-change game-atom {} @game-atom))
       (start-update-loop)))
 
 (defn terminate []
   (go (a/close! (@state :updates))))
 
 (comment
-  @(@state :game)
-  (initialize (@state :game))
-  (update-ui @(@state :game))
+  @(@state :game-atom)
+  (initialize (@state :game-atom))
+  (update-ui @(@state :game-atom))
 
-  (get-in @state [:game :players])
+  (get-in @state [:game-atom :players])
   (def m (js/Morph.))
   (.addMorph world m)
   (set! (.-width m) 10)
@@ -320,8 +320,8 @@
   (go (print (<! (show-add-army-dialog "Argentina" 6 5 10))))
 
   
-  (swap! (@state :game) update-in [:turn] inc)
+  (swap! (@state :game-atom) update-in [:turn] inc)
   (-> @state :user-data)
-  (@(@state :game) :turn)
+  (@(@state :game-atom) :turn)
 
   )
