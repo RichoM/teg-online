@@ -13,6 +13,11 @@
 
  :builds {:main {:target :browser
                  :output-dir "public/main/js"
+                 :compiler-options {:externs ["externs.js"]
+                                    :infer-externs :auto
+                                    ;:pseudo-names true
+                                    ;:pretty-print true
+                                    }
                  :modules {:main {:init-fn teg-online.main/init}}}
           :test {:target :browser-test
                  :test-dir "public/test"
