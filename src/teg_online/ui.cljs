@@ -24,6 +24,9 @@
 (.addEventListener js/window "resize" resize-board)
 (resize-board)
 
+(defn get-game []
+  (when-let [game-atom (@state :game)]
+    @game-atom))
 
 (defn show-add-army-dialog [country-name initial-value min-value max-value]
   (let [result-chan (a/promise-chan)
@@ -79,7 +82,7 @@
     morph))
 
 
-(defn on-finish-turn []
+(defn finish-turn []
   (go
     (when (<! (modals/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
       (let [game-atom (@state :game)
@@ -90,30 +93,32 @@
             (swap! game-atom teg/add-army country-id extra-army)))
         (swap! game-atom teg/next-turn)))))
 
-(defn on-country-click [country-id game-atom]
-  (go (let [{:keys [phase] :as game} @game-atom]
-        (when-let [current-player (teg/get-current-player game)]
-          (when (= current-player
-                   (get-in game [:countries country-id :owner]))
-            (case phase
-              ::teg/add-army
-              (let [country-name (:name (b/countries country-id))
-                    initial-army (teg/get-army game country-id)
-                    current-army (+ initial-army
-                                    (get-in @state [:user-data :additions country-id] 0))
-                    remaining (get-in @state [:user-data :remaining] 0)
-                    addition (<! (show-add-army-dialog country-name
-                                                       current-army
-                                                       initial-army
-                                                       (+ current-army remaining)))]
-                (when (not (zero? addition))
-                  (swap! state #(-> %
-                                    (update-in [:user-data :remaining] - addition)
-                                    (update-in [:user-data :additions country-id] + addition)))
-                  (when (zero? (-> @state :user-data :remaining))
-                    (<! (on-finish-turn)))))))))))
+(defn can-interact-with-country? [country-id]
+  (when-let [game (get-game)]
+    (when-let [current-player (teg/get-current-player game)]
+      (= current-player (get-in game [:countries country-id :owner])))))
 
-(defn init-country [country-id {[x y] :position, img :img, [ox oy] :counter-offset} game]
+(defn click-country [country-id]
+  (go (let [{:keys [phase] :as game} (get-game)]
+        (case phase
+          ::teg/add-army
+          (let [country-name (:name (b/countries country-id))
+                initial-army (teg/get-army game country-id)
+                current-army (+ initial-army
+                                (get-in @state [:user-data :additions country-id] 0))
+                remaining (get-in @state [:user-data :remaining] 0)
+                addition (<! (show-add-army-dialog country-name
+                                                   current-army
+                                                   initial-army
+                                                   (+ current-army remaining)))]
+            (when (not (zero? addition))
+              (swap! state #(-> %
+                                (update-in [:user-data :remaining] - addition)
+                                (update-in [:user-data :additions country-id] + addition)))
+              (when (zero? (-> @state :user-data :remaining))
+                (<! (finish-turn)))))))))
+
+(defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
   (go
     (let [original-form (<! (mm/load-form img))
           morph (js/Sprite. original-form)
@@ -127,11 +132,19 @@
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
+        (.on "mouseEnter"
+             #(when (can-interact-with-country? country-id)
+                (set! (.-alpha morph) selected-alpha)))
+        (.on "mouseLeave"
+             #(when (can-interact-with-country? country-id)
+                (set! (.-alpha morph) 0.5)))
         (.on "mouseDown"
-             #(set! (.-alpha morph) selected-alpha))
+             #(when (can-interact-with-country? country-id)
+                (set! (.-alpha morph) selected-alpha)))
         (.on "mouseUp"
-             #(do (on-country-click country-id game)
-                  (set! (.-alpha morph) 0.5))))
+             #(go (when (can-interact-with-country? country-id)
+                    (<! (click-country country-id))
+                    (set! (.-alpha morph) 0.5)))))
       (swap! state
              assoc-in [:countries country-id]
              {:morph morph
@@ -140,8 +153,7 @@
 (defn init-countries [game]
   (go
     (<! (a/map vector
-               (map (fn [[name data]] (init-country name data game))
-                    (shuffle country-data))))))
+               (map init-country (shuffle country-data))))))
 
 (defn init-map []
   (go
@@ -249,7 +261,7 @@
                               ::teg/regroup "Finalizar turno")]]]))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
-                             on-finish-turn)))))
+                             finish-turn)))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
