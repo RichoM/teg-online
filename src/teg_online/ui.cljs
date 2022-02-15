@@ -150,10 +150,8 @@
              {:morph morph
               :counter counter}))))
 
-(defn init-countries [game]
-  (go
-    (<! (a/map vector
-               (map init-country (shuffle country-data))))))
+(defn init-countries []
+  (go (<! (a/map vector (map init-country (shuffle country-data))))))
 
 (defn init-map []
   (go
@@ -286,7 +284,7 @@
                      :updates (a/chan (a/sliding-buffer 1))})
       (.removeAllSubmorphs world)
       (<! (init-map))
-      (<! (init-countries game))
+      (<! (init-countries))
       (add-watch state :ui-change
                  #(a/put! (@state :updates) @game))
       (let [state-change (fn [_key _atom old-state new-state]
