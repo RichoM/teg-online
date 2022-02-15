@@ -26,11 +26,12 @@ class Canvas {
 		this.ctx.fillStyle = fillStyle;
 		this.ctx.fill();
 	}
-	drawEllipse(x, y, radiusX, radiusY, startAngle, endAngle, counterClockwise, strokeStyle) {
+	drawEllipse(x, y, radiusX, radiusY, startAngle, endAngle, counterClockwise, strokeStyle, lineWidth) {
 		this.ctx.beginPath();
 		this.ctx.ellipse(x, y, radiusX, radiusY, 0, startAngle, endAngle, counterClockwise);
 		this.ctx.closePath();
 		this.ctx.strokeStyle = strokeStyle;
+		this.ctx.lineWidth = lineWidth;
 		this.ctx.stroke();
 	}
 	fillEllipse(x, y, radiusX, radiusY, startAngle, endAngle, counterClockwise, fillStyle) {
