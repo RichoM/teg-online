@@ -14,7 +14,7 @@
                          board/countries)
    :turn-order []
    :phase ::add-army
-   :turn 0})
+   :turn nil})
 
 (defn new-player [id name]
   {:id id
@@ -29,12 +29,18 @@
         (update :turn-order conj id)
         (update :players assoc id (new-player id name)))))
 
+(defn start-game [game]
+  (assoc game :turn 0))
+
 (defn get-players [game]
   (map (game :players)
        (game :turn-order)))
 
 (defn get-player [game player-id]
   (get-in game [:players player-id]))
+
+(defn get-current-player [{:keys [turn turn-order]}]
+  (when turn (nth turn-order (mod turn (count turn-order)))))
 
 (defn get-army [game country-id]
   (get-in game [:countries country-id :army]))
@@ -46,6 +52,18 @@
 (defn player-army-count [game player-id]
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
+
+(defn calculate-extra-army 
+  ([game] (calculate-extra-army game (get-current-player game)))
+  ([{:keys [turn turn-order] :as game} player-id]
+   (when turn
+     (let [player-count (count turn-order)]
+       (condp > turn
+         player-count 5
+         (* 2 player-count) 3
+         (max 3 (js/Math.floor
+                 (/ (count (player-countries game player-id))
+                    2))))))))
 
 (defn distribute-countries
   ([game] (distribute-countries game (shuffle (keys board/countries))))
@@ -60,6 +78,9 @@
 
 (defn add-army [game country army]
   (update-in game [:countries country :army] + army))
+
+(defn next-turn [game]
+  (update game :turn inc))
 
 (comment
 

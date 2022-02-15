@@ -22,6 +22,7 @@
       (swap! game teg/join-game ::p7 "Tera")
       (swap! game teg/join-game ::p8 "Maxi")
       (swap! game teg/distribute-countries)
+      (swap! game teg/start-game)
       )
     (print "BYE!")))
 
@@ -49,7 +50,9 @@
   (get-in @game [:players ::p1 :army])
 
   (get-in @game [:countries :teg-online.board/alaska :owner])
-  (swap! game assoc-in [:countries :teg-online.board/alaska :owner] ::p5)
+  (swap! game assoc-in [:countries :teg-online.board/siberia :owner] ::p1)
 
   (swap! game assoc-in [:phase] ::teg/regroup)
+
+  (teg/get-current-player @game)
   )
