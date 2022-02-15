@@ -152,12 +152,13 @@
         (set! (.-width canvas) (.-width map))
         (set! (.-height canvas) (.-height map))))))
 
-(defn update-army-counter [^js morph color count]
+(defn update-army-counter [^js morph color count highlight?]
   (set! (.-color morph) color)
   (let [text-color (if (contains? #{"black"} color)
                      "white"
                      "black")]
     (set! (.-border morph) text-color)
+    (set! (.-lineWidth morph) (if highlight? 3 1))
     (let [label (first (.-submorphs morph))]
       (set! (.-text label) (str count))
       (set! (.-color label) text-color)
@@ -176,9 +177,9 @@
           (set! (.-form morph) tinted-form)
           (set! (.-alpha morph) (if player-idx 0.5 0))
           (set! (.-alpha counter) (if player-idx 1 0))
-
-          (update-army-counter counter color (if player-idx (+ army additions) 0))
-          (set! (.-lineWidth counter) (if (> additions 0) 3 1))))))
+          (update-army-counter counter color 
+                               (if player-idx (+ army additions) 0)
+                               (> additions 0))))))
 
 (defn update-countries [{:keys [turn-order countries]}]
   (go (let [player-indices (into {} (map-indexed (fn [idx pid] [pid idx])
