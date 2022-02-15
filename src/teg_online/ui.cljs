@@ -24,6 +24,43 @@
 (.addEventListener js/window "resize" resize-board)
 (resize-board)
 
+
+(defn show-add-army-dialog [country-name initial-value min-value max-value]
+  (let [result-chan (a/promise-chan)
+        result-value (atom nil)
+        counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
+        counter-span (crate/html [:span @counter-value])
+        minus-btn (modals/on-click
+                   (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
+                   #(swap! counter-value dec))
+        plus-btn (modals/on-click
+                  (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
+                  #(swap! counter-value inc))
+        accept-button (modals/on-click
+                       (crate/html modals/accept-button)
+                       #(reset! result-value (- @counter-value initial-value)))
+        cancel-button (modals/on-click
+                       (crate/html modals/cancel-button)
+                       #(reset! result-value nil))]
+    (add-watch counter-value :update
+               (fn [_ _ _ val] (set! (.-innerText counter-span) val)))
+    (doto (modals/show :header (list [:h1 country-name]
+                                     modals/close-button)
+                       :body [:div.container
+                              [:div.row
+                               [:div.col-12.text-center.fa-4x
+                                [:i.fas.fa-shield-alt.pe-3]
+                                counter-span]]
+                              [:div.row.py-3
+                               [:div.col-6 [:div.d-grid minus-btn]]
+                               [:div.col-6 [:div.d-grid plus-btn]]]]
+                       :footer (list accept-button cancel-button))
+      (modals/on-enter #(reset! result-value @counter-value))
+      (modals/on-hidden #(if-let [val @result-value]
+                           (a/put! result-chan val)
+                           (a/close! result-chan))))
+    result-chan))
+
 (defn make-army-counter [color]
   (let [morph (js/Ellipse.)
         label (js/Label. "1")
@@ -59,6 +96,12 @@
         (.on "mouseDown"
              #(set! (.-alpha morph) max-alpha))
         (.on "mouseUp"
+             #(go (let [d (<! (show-add-army-dialog (:name (b/countries country-id))
+                                                    (teg/get-army @game country-id)
+                                                    (teg/get-army @game country-id)
+                                                    (+ (teg/get-army @game country-id) 10)))]
+                    (swap! game teg/add-army country-id d))))
+        #_(.on "mouseUp"
              #(do (print country-id)
                   (set! (.-alpha morph) min-alpha)
                   (swap! game teg/add-army country-id 1))))
@@ -94,7 +137,7 @@
       (set! (.-center label) (.-center morph)))))
 
 (defn update-country [player-indices {:keys [id owner army]}]
-  (go (when-let [{:keys [^js/Morph morph counter]}
+  (go (when-let [{:keys [morph counter]}
                  (get-in @state [:countries id])]
         (let [player-idx (player-indices owner)
               color (get player-colors player-idx "white")
@@ -210,4 +253,7 @@
   (set! (.-height m) 10)
   (set! (.-position m) #js {:x 20 :y 20})
   (.-position m)
+
+  (go (print (<! (show-add-army-dialog "Argentina" 6 5 10))))
+  
   )
