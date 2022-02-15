@@ -41,7 +41,7 @@
                        #(reset! result-value (- @counter-value initial-value)))
         cancel-button (modals/on-click
                        (crate/html modals/cancel-button)
-                       #(reset! result-value nil))]
+                       #(reset! result-value 0))]
     (add-watch counter-value :update
                (fn [_ _ _ val] (set! (.-innerText counter-span) val)))
     (doto (modals/show :header (list [:h1 country-name]
@@ -78,6 +78,18 @@
     (set! (.-alpha morph) 0)
     morph))
 
+
+(defn on-finish-turn []
+  (go
+    (when (<! (modals/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
+      (let [game-atom (@state :game)
+            additions (get-in @state [:user-data :additions] {})]
+        (swap! state dissoc :user-data)
+        (doseq [[country-id extra-army] additions]
+          (when (> extra-army 0)
+            (swap! game-atom teg/add-army country-id extra-army)))
+        (swap! game-atom teg/next-turn)))))
+
 (defn on-country-click [country-id game-atom]
   (go (let [{:keys [phase] :as game} @game-atom]
         (when-let [current-player (teg/get-current-player game)]
@@ -94,9 +106,12 @@
                                                        current-army
                                                        initial-army
                                                        (+ current-army remaining)))]
-                (swap! state #(-> %
-                                  (update-in [:user-data :remaining] - addition)
-                                  (update-in [:user-data :additions country-id] + addition))))))))))
+                (when (not (zero? addition))
+                  (swap! state #(-> %
+                                    (update-in [:user-data :remaining] - addition)
+                                    (update-in [:user-data :additions country-id] + addition)))
+                  (when (zero? (-> @state :user-data :remaining))
+                    (<! (on-finish-turn)))))))))))
 
 (defn init-country [country-id {[x y] :position, img :img, [ox oy] :counter-offset} game]
   (go
@@ -199,17 +214,6 @@
                              [:div.col-auto
                               [:i.fas.fa-shield-alt]
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
-
-(defn on-finish-turn []
-  (go
-    (when (<! (modals/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
-      (let [game-atom (@state :game)
-            additions (get-in @state [:user-data :additions] {})]
-        (swap! state dissoc :user-data)
-        (doseq [[country-id extra-army] additions]
-          (when (> extra-army 0)
-            (swap! game-atom teg/add-army country-id extra-army)))
-        (swap! game-atom teg/next-turn)))))
 
 (defn finish-turn-enabled []
   (let [game-atom (@state :game)
