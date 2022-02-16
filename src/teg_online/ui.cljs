@@ -173,16 +173,29 @@
         (set! (.-height canvas) (.-height map))))))
 
 (defn update-army-counter [^js morph color count highlight?]
-  (set! (.-color morph) color)
+  (.removeAllSubmorphs morph)
   (let [text-color (if (contains? #{"black"} color)
                      "white"
                      "black")]
-    (set! (.-border morph) text-color)
-    (set! (.-lineWidth morph) (if highlight? 3 1))
-    (let [label (first (.-submorphs morph))]
-      (set! (.-text label) (str count))
-      (set! (.-color label) text-color)
-      (set! (.-center label) (.-center morph)))))
+    (doto morph
+      (mm/set-color! color)
+      (mm/set-border! text-color))
+    (let [label (doto (js/Label. "1")
+                  (mm/set-font! "14px Arial")
+                  (mm/set-color! text-color)
+                  (mm/set-text! (str count)))
+          stack (doto (js/Ellipse.)
+                  (mm/set-color! color)
+                  (mm/set-border! text-color)
+                  (mm/set-width! (.-width morph))
+                  (mm/set-height! (.-height morph))
+                  (mm/set-top! (- (.-top morph) 3))
+                  (mm/set-left! (+ (.-left morph) 1)))]
+      (if highlight?
+        (do (.addMorph morph stack)
+            (set! (.-center label) (.-center stack)))
+        (set! (.-center label) (.-center morph)))
+      (.addMorph morph label))))
 
 (defn update-country [player-indices {:keys [id owner army]}]
   (go (when-let [{:keys [morph counter]}

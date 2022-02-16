@@ -26,6 +26,30 @@
          (set! (.-src result-img) (.toDataURL canvas))
          result-chan)))))
 
+(defn set-width! [morph width]
+  (set! (.-width morph) width))
+
+(defn set-height! [morph height]
+  (set! (.-height morph) height))
+
+(defn set-top! [morph top]
+  (set! (.-top morph) top))
+
+(defn set-left! [morph left]
+  (set! (.-left morph) left))
+
+(defn set-color! [morph color]
+  (set! (.-color morph) color))
+
+(defn set-border! [^js morph border]
+  (set! (.-border morph) border))
+
+(defn set-font! [morph font]
+  (set! (.-font morph) font))
+
+(defn set-text! [morph text]
+  (set! (.-text morph) text))
+
 (defn make-pickable [^js/Morph morph]
   (let [picked? (atom false)]
     (doto morph
