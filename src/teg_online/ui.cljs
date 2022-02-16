@@ -3,7 +3,7 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             [teg-online.utils.async :refer [go-try <? chan->promise]]
             [teg-online.utils.minimorphic :as mm]
-            [teg-online.utils.modals :as modals]
+            [teg-online.utils.bootstrap :as bt]
             [teg-online.utils.core :as u]
             [teg-online.ui-constants :refer [country-data player-colors]]
             [teg-online.game :as teg]
@@ -33,35 +33,35 @@
         result-value (atom nil)
         counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
         counter-span (crate/html [:span @counter-value])
-        minus-btn (modals/on-click
+        minus-btn (bt/on-click
                    (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
                    #(swap! counter-value dec))
-        plus-btn (modals/on-click
+        plus-btn (bt/on-click
                   (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
                   #(swap! counter-value inc))
-        accept-button (modals/on-click
-                       (crate/html modals/accept-button)
+        accept-button (bt/on-click
+                       (crate/html bt/accept-modal-btn)
                        #(reset! result-value (- @counter-value initial-value)))
-        cancel-button (modals/on-click
-                       (crate/html modals/cancel-button)
+        cancel-button (bt/on-click
+                       (crate/html bt/cancel-modal-btn)
                        #(reset! result-value 0))]
     (add-watch counter-value :update
                (fn [_ _ _ val] (set! (.-innerText counter-span) val)))
-    (doto (modals/show :header (list [:h1 country-name]
-                                     modals/close-button)
-                       :body [:div.container
-                              [:div.row
-                               [:div.col-12.text-center.fa-4x
-                                [:i.fas.fa-shield-alt.pe-3]
-                                counter-span]]
-                              [:div.row.py-3
-                               [:div.col-6 [:div.d-grid minus-btn]]
-                               [:div.col-6 [:div.d-grid plus-btn]]]]
-                       :footer (list accept-button cancel-button))
-      (modals/on-enter #(reset! result-value @counter-value))
-      (modals/on-hidden #(if-let [val @result-value]
-                           (a/put! result-chan val)
-                           (a/close! result-chan))))
+    (doto (bt/show-modal :header (list [:h1 country-name]
+                                       bt/close-modal-btn)
+                         :body [:div.container
+                                [:div.row
+                                 [:div.col-12.text-center.fa-4x
+                                  [:i.fas.fa-shield-alt.pe-3]
+                                  counter-span]]
+                                [:div.row.py-3
+                                 [:div.col-6 [:div.d-grid minus-btn]]
+                                 [:div.col-6 [:div.d-grid plus-btn]]]]
+                         :footer (list accept-button cancel-button))
+      (bt/on-modal-keypress-enter #(reset! result-value @counter-value))
+      (bt/on-modal-hidden #(if-let [val @result-value]
+                             (a/put! result-chan val)
+                             (a/close! result-chan))))
     result-chan))
 
 (defn make-army-counter [color]
@@ -84,7 +84,7 @@
 
 (defn finish-turn []
   (go
-    (when (<! (modals/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
+    (when (<! (bt/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
       (let [game-atom (@state :game-atom)
             additions (get-in @state [:user-data :additions] {})]
         (swap! state dissoc :user-data)
