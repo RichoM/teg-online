@@ -29,40 +29,50 @@
     @game-atom))
 
 (defn show-add-army-dialog [country-name initial-value min-value max-value]
-  (let [result-chan (a/promise-chan)
-        result-value (atom nil)
-        counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
-        counter-span (crate/html [:span @counter-value])
-        minus-btn (bt/on-click
-                   (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
-                   #(swap! counter-value dec))
-        plus-btn (bt/on-click
-                  (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
-                  #(swap! counter-value inc))
-        accept-button (bt/on-click
-                       (crate/html bt/accept-modal-btn)
-                       #(reset! result-value (- @counter-value initial-value)))
-        cancel-button (bt/on-click
-                       (crate/html bt/cancel-modal-btn)
-                       #(reset! result-value 0))]
-    (add-watch counter-value :update
-               (fn [_ _ _ val] (set! (.-innerText counter-span) val)))
-    (doto (bt/show-modal :header (list [:h1 country-name]
-                                       bt/close-modal-btn)
-                         :body [:div.container
-                                [:div.row
-                                 [:div.col-12.text-center.fa-4x
-                                  [:i.fas.fa-shield-alt.pe-3]
-                                  counter-span]]
-                                [:div.row.py-3
-                                 [:div.col-6 [:div.d-grid minus-btn]]
-                                 [:div.col-6 [:div.d-grid plus-btn]]]]
-                         :footer (list accept-button cancel-button))
-      (bt/on-modal-keypress-enter #(reset! result-value @counter-value))
-      (bt/on-modal-hidden #(if-let [val @result-value]
-                             (a/put! result-chan val)
-                             (a/close! result-chan))))
-    result-chan))
+  (go (let [result-value (atom nil)
+            counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
+            counter-span (crate/html [:span @counter-value])
+            get-delta #(- @counter-value initial-value)
+            delta-span (crate/html [:span.ps-5.text-black-50 ""])
+            minus-btn (bt/on-click
+                       (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
+                       #(swap! counter-value dec))
+            plus-btn (bt/on-click
+                      (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
+                      #(swap! counter-value inc))
+            accept-button (bt/on-click
+                           (crate/html bt/accept-modal-btn)
+                           #(reset! result-value (get-delta)))
+            cancel-button (bt/on-click
+                           (crate/html bt/cancel-modal-btn)
+                           #(reset! result-value 0))]
+        (add-watch counter-value :update
+                   (fn [_ _ _ val] 
+                     (set! (.-disabled minus-btn) (<= val min-value))
+                     (set! (.-disabled plus-btn) (>= val max-value))
+                     (set! (.-innerText counter-span) val)
+                     (let [delta (get-delta)]
+                       (set! (.-innerText delta-span) (u/format "(%1%2)"
+                                                                (if (neg? delta) "-" "+")
+                                                                (js/Math.abs delta))))))
+        (reset! counter-value initial-value)
+        (<! (-> (bt/make-modal :header (list [:h1 country-name]
+                                             bt/close-modal-btn)
+                               :body [:div.container
+                                      [:div.row
+                                       [:div.col-12.text-center.fa-4x
+                                        [:i.fas.fa-shield-alt.pe-3]
+                                        counter-span
+                                        delta-span]]
+                                      [:div.row.py-3
+                                       [:div.col-6 [:div.d-grid minus-btn]]
+                                       [:div.col-6 [:div.d-grid plus-btn]]]]
+                               :footer (list accept-button cancel-button))
+                (bt/on-modal-keypress-enter (fn [modal]
+                                              (reset! result-value (get-delta))
+                                              (bt/hide-modal modal)))
+                bt/show-modal))
+        @result-value)))
 
 (defn make-army-counter [color]
   (let [morph (js/Ellipse.)
