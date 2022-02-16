@@ -38,6 +38,9 @@
 (defn set-left! [morph left]
   (set! (.-left morph) left))
 
+(defn set-center! [^js/Morph morph center]
+  (set! (.-center morph) center))
+
 (defn set-color! [morph color]
   (set! (.-color morph) color))
 
@@ -60,3 +63,13 @@
                        (print [(- x cx) (- y cy)]))))
       (.on "mouseDown" #(do (reset! picked? true)))
       (.on "mouseUp" #(do (reset! picked? false))))))
+
+(defn vanish [^js/Morph morph seconds]
+  (doto morph
+    (.on "step"
+         (fn [_ delta]
+           (set! (.-top morph) (- (.-top morph) (* 20 delta)))
+           (let [alpha (- (.-alpha morph) (/ delta seconds))]
+             (set! (.-alpha morph) alpha)
+             (when (< alpha 0.01)
+               (.remove morph)))))))

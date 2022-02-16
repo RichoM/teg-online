@@ -91,7 +91,6 @@
     (set! (.-alpha morph) 0)
     morph))
 
-
 (defn finish-turn []
   (go
     (when (<! (bt/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
@@ -122,6 +121,15 @@
                                                    initial-army
                                                    (+ current-army remaining)))]
             (when (not (zero? addition))
+              (let [{:strs [x y]} (js->clj (.-center (get-in @state [:countries country-id :counter])))
+                    label (doto (js/Label. (u/format "%1%2"
+                                                     (if (pos? addition) "+" "-")
+                                                     (js/Math.abs addition)))
+                            (mm/set-font! "bold 30px Arial")
+                            (mm/set-color! (if (pos? addition) "lawngreen" "darkred"))
+                            (mm/set-center! (clj->js {:x x :y (- y 30)}))
+                            (mm/vanish 2))]
+                (.addMorph world label))
               (swap! state #(-> %
                                 (update-in [:user-data :remaining] - addition)
                                 (update-in [:user-data :additions country-id] + addition)))
