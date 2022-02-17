@@ -182,7 +182,7 @@
 
 (defn update-army-counter [^js morph color count highlight?]
   (.removeAllSubmorphs morph)
-  (let [text-color (if (contains? #{"black"} color)
+  (let [text-color (if (contains? #{"black" "purple"} color)
                      "white"
                      "black")]
     (doto morph
