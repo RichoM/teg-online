@@ -1,6 +1,16 @@
 (ns teg-online.ui-constants
   (:require [teg-online.board :as b]))
 
+(def player-colors
+  ["#e41a1c"
+   "#377eb8"
+   "#4daf4a"
+   "#ff7f00"
+   "#ffff33"
+   "purple"
+   "#f781bf"
+   "black"])
+
 (def country-data
   {; South America
    ::b/colombia {:position [572 822]
@@ -163,13 +173,3 @@
    ::b/sumatra {:position [1754 938]
                 :img "imgs/sumatra.png"
                 :counter-offset [26 -17]}})
-
-(def player-colors
-  ["#e41a1c"
-   "#377eb8"
-   "#4daf4a"
-   "#ff7f00"
-   "#ffff33"
-   "purple" ;"#a65628"
-   "#f781bf"
-   "black"])

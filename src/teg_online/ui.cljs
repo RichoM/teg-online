@@ -222,24 +222,24 @@
                                  player-count))]
         (set! (.-innerHTML players-row) "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
-          (let [player (players pid)]
+          (let [player (players pid)
+                icon-style (u/format "color: %1;" (player-colors idx))]
             (.appendChild players-row
                           (crate/html
-                           [:div {:class (u/format "col-sm-%1 player player-%2 %3"
+                           [:div {:class (u/format "col-sm-%1 player %2"
                                                    player-width
-                                                   (inc idx)
                                                    (when (= idx (mod turn player-count))
                                                      "player-turn"))}
                             [:div.row
                              [:div.col-auto.text-truncate
-                              [:i.fas.fa-square]
+                              [:i.fas.fa-square {:style icon-style}]
                               [:span.mx-1 (player :name)]]]
                             [:div.row
                              [:div.col-auto
-                              [:i.fas.fa-flag]
+                              [:i.fas.fa-flag {:style icon-style}]
                               [:span.mx-1 (count (teg/player-countries game pid))]]
                              [:div.col-auto
-                              [:i.fas.fa-shield-alt]
+                              [:i.fas.fa-shield-alt {:style icon-style}]
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
 (defn finish-turn-enabled []

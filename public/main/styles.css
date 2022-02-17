@@ -26,35 +26,3 @@ body {
   border-right: 1px solid #8c4f50;
   border-bottom: 1px solid #8c4f50;
 }
-
-.player-1 i {
-  color: #e41a1c;
-}
-
-.player-2 i {
-  color: #377eb8;
-}
-
-.player-3 i {
-  color: #4daf4a;
-}
-
-.player-4 i {
-  color: #ff7f00;
-}
-
-.player-5 i {
-  color: #ffff33;
-}
-
-.player-6 i {
-  color: purple; /*#a65628;*/
-}
-
-.player-7 i {
-  color: #f781bf;
-}
-
-.player-8 i {
-  color: black;
-}
