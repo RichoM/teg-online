@@ -165,7 +165,7 @@
         (oset! canvas :width (oget map :width))
         (oset! canvas :height (oget map :height))))))
 
-(defn update-army-counter [^js morph color count highlight?]
+(defn update-army-counter [^js/Morph morph color count highlight?]
   (.removeAllSubmorphs morph)
   (let [text-color (if (contains? #{"black" "purple"} color)
                      "white"
@@ -183,7 +183,9 @@
                  :extent (oget morph :extent)
                  :position {:x (+ (oget morph :x) 1)
                             :y (- (oget morph :y) 3)})]      
-      (oset! label :center (oget (if highlight? stack morph) :center))
+      (oset! label :center 
+             (oget (if highlight? stack morph) 
+                   :center))
       (when highlight? 
         (.addMorph morph stack))
       (.addMorph morph label))))
@@ -193,10 +195,10 @@
                  (get-in @state [:countries id])]
         (let [player-idx (player-indices owner)
               color (get player-colors player-idx "white")
-              ^js/Form original-form (oget morph :originalForm)
-              ^js/Form tinted-form (if player-idx
-                                     (<! (mm/tint original-form color))
-                                     original-form)
+              original-form (oget morph :originalForm)
+              tinted-form (if player-idx
+                            (<! (mm/tint original-form color))
+                            original-form)
               additions (get-in @state [:user-data :additions id] 0)]
           (oset! morph :form tinted-form)
           (oset! morph :alpha (if player-idx 0.5 0))
@@ -240,7 +242,7 @@
                               [:i.fas.fa-shield-alt {:style icon-style}]
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
-(defn finish-turn-enabled []
+(defn finish-turn-enabled? []
   (let [game-atom (@state :game-atom)
         {:keys [phase]} @game-atom]
     (case phase
@@ -266,7 +268,7 @@
                               "")]]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
-                            {:type "button" :disabled (not (finish-turn-enabled))}
+                            {:type "button" :disabled (not (finish-turn-enabled?))}
                             (case phase
                               ::teg/add-army "Confirmar"
                               ::teg/attack "Reagrupar"
@@ -313,36 +315,3 @@
 
 (defn terminate []
   (go (a/close! (@state :updates))))
-
-(comment
-  @(@state :game-atom)
-  (initialize (@state :game-atom))
-  (update-ui @(@state :game-atom))
-
-  (get-in @state [:game-atom :players])
-  (def m (mm/make-morph
-          :width 100
-          :height 20
-          :center {:x 500 :y 400}
-          :color "green"))
-  (.addMorph world m)
-
-  (oget m :center.x)
-  (oset! m :center.x 500)
-  (set! (.-width m) 10)
-  (set! (.-height m) 10)
-  (set! (.-position m) #js {:x 20 :y 20})
-  (.-position m)
-
-  (def t (atom 0 :validator #(> % 0)))
-
-  (swap! t dec)
-  
-  (go (print (<! (show-add-army-dialog "Argentina" 6 5 10))))
-
-  
-  (swap! (@state :game-atom) update-in [:turn] inc)
-  (-> @state :user-data)
-  (@(@state :game-atom) :turn)
-
-  )
