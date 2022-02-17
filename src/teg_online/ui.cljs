@@ -31,7 +31,7 @@
     @game-atom))
 
 (defn show-add-army-dialog [country-name initial-value min-value max-value]
-  (go (let [result-value (atom nil)
+  (go (let [result-value (atom 0)
             counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span @counter-value])
             get-delta #(- @counter-value initial-value)
