@@ -2,7 +2,7 @@
   (:require [clojure.core.async :as a :refer [go <!]]
             [oops.core :refer [oget oset!]]
             [teg-online.utils.minimorphic :as mm]
-            [teg-online.utils.bootstrap :as bt]
+            [teg-online.utils.bootstrap :as bs]
             [teg-online.utils.core :as u]
             [teg-online.ui-constants :refer [country-data player-colors]]
             [teg-online.game :as teg]
@@ -32,17 +32,17 @@
             counter-span (crate/html [:span @counter-value])
             get-delta #(- @counter-value initial-value)
             delta-span (crate/html [:span.ps-5.text-black-50 ""])
-            minus-btn (bt/on-click
+            minus-btn (bs/on-click
                        (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
                        #(swap! counter-value dec))
-            plus-btn (bt/on-click
+            plus-btn (bs/on-click
                       (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
                       #(swap! counter-value inc))
-            accept-button (bt/on-click
-                           (crate/html bt/accept-modal-btn)
+            accept-button (bs/on-click
+                           (crate/html bs/accept-modal-btn)
                            #(reset! result-value (get-delta)))
-            cancel-button (bt/on-click
-                           (crate/html bt/cancel-modal-btn)
+            cancel-button (bs/on-click
+                           (crate/html bs/cancel-modal-btn)
                            #(reset! result-value 0))]
         (add-watch counter-value :update
                    (fn [_ _ _ val] 
@@ -55,8 +55,8 @@
                                         (if (neg? delta) "-" "+")
                                         (js/Math.abs delta))))))
         (reset! counter-value initial-value)
-        (<! (-> (bt/make-modal :header (list [:h1 country-name]
-                                             bt/close-modal-btn)
+        (<! (-> (bs/make-modal :header (list [:h1 country-name]
+                                             bs/close-modal-btn)
                                :body [:div.container
                                       [:div.row
                                        [:div.col-12.text-center.fa-4x
@@ -67,15 +67,15 @@
                                        [:div.col-6 [:div.d-grid minus-btn]]
                                        [:div.col-6 [:div.d-grid plus-btn]]]]
                                :footer (list accept-button cancel-button))
-                (bt/on-modal-keypress-enter (fn [modal]
+                (bs/on-modal-keypress-enter (fn [modal]
                                               (reset! result-value (get-delta))
-                                              (bt/hide-modal modal)))
-                bt/show-modal))
+                                              (bs/hide-modal modal)))
+                bs/show-modal))
         @result-value)))
 
 (defn finish-turn []
   (go
-    (when (<! (bt/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
+    (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
       (let [game-atom (@state :game-atom)
             additions (get-in @state [:user-data :additions] {})]
         (swap! state dissoc :user-data)
