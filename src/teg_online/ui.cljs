@@ -1,6 +1,8 @@
 (ns teg-online.ui
   (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
             [cljs.core.async.interop :refer-macros [<p!]]
+            [oops.core :refer [oget oset! ocall oapply ocall! oapply!
+                               oget+ oset!+ ocall+ oapply+ ocall!+ oapply!+]]
             [teg-online.utils.async :refer [go-try <? chan->promise]]
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bt]
@@ -52,9 +54,10 @@
                      (set! (.-disabled plus-btn) (>= val max-value))
                      (set! (.-innerText counter-span) val)
                      (let [delta (get-delta)]
-                       (set! (.-innerText delta-span) (u/format "(%1%2)"
-                                                                (if (neg? delta) "-" "+")
-                                                                (js/Math.abs delta))))))
+                       (set! (.-innerText delta-span)
+                             (u/format "(%1%2)"
+                                       (if (neg? delta) "-" "+")
+                                       (js/Math.abs delta))))))
         (reset! counter-value initial-value)
         (<! (-> (bt/make-modal :header (list [:h1 country-name]
                                              bt/close-modal-btn)
@@ -73,23 +76,6 @@
                                               (bt/hide-modal modal)))
                 bt/show-modal))
         @result-value)))
-
-(defn make-army-counter [color]
-  (let [morph (js/Ellipse.)
-        label (js/Label. "1")
-        text-color (if (contains? #{"black" "blue" "green"} color)
-                     "white"
-                     "black")]
-    (set! (.-font label) "14px Arial")
-    (set! (.-width morph) 30)
-    (set! (.-height morph) 30)
-    (set! (.-color morph) color)
-    (set! (.-border morph) text-color)
-    (.addMorph morph label)
-    (set! (.-center label) (.-center morph))
-    (set! (.-color label) text-color)
-    (set! (.-alpha morph) 0)
-    morph))
 
 (defn finish-turn []
   (go
@@ -125,9 +111,9 @@
                     label (doto (js/Label. (u/format "%1%2"
                                                      (if (pos? addition) "+" "-")
                                                      (js/Math.abs addition)))
-                            (mm/set-font! "bold 30px Arial")
-                            (mm/set-color! (if (pos? addition) "lawngreen" "darkred"))
-                            (mm/set-center! (clj->js {:x x :y (- y 30)}))
+                            (oset! :font "bold 30px Arial")
+                            (oset! :color (if (pos? addition) "lawngreen" "darkred"))
+                            (oset! :center (clj->js {:x x :y (- y 30)}))
                             (mm/vanish 2))]
                 (.addMorph world label))
               (swap! state #(-> %
@@ -140,13 +126,14 @@
   (go
     (let [original-form (<! (mm/load-form img))
           morph (js/Sprite. original-form)
-          counter (make-army-counter "black")
+          counter (js/Ellipse.)
           selected-alpha 0.25]
+      (set! (.-extent counter) #js {:w 30 :h 30})
       (set! (.-position morph) #js {:x x :y y})
       (let [{cx "x" cy "y"} (js->clj (.-center morph))]
-        (set! (.-center morph) (clj->js {:x cx :y cy}))
-        (set! (.-center counter) (clj->js {:x (+ cx ox) :y (+ cy oy)})))
+        (set! (.-center counter) (clj->js {:x (+ cx ox), :y (+ cy oy)})))
       (set! (.-alpha morph) 0) ; Initially transparent
+      (set! (.-alpha counter) 0)
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
@@ -186,19 +173,17 @@
                      "white"
                      "black")]
     (doto morph
-      (mm/set-color! color)
-      (mm/set-border! text-color))
-    (let [label (doto (js/Label. "1")
-                  (mm/set-font! "14px Arial")
-                  (mm/set-color! text-color)
-                  (mm/set-text! (str count)))
+      (oset! :color color)
+      (oset! :!border text-color))
+    (let [label (doto (js/Label. (str count))
+                  (oset! :font "14px Arial")
+                  (oset! :color text-color))
           stack (doto (js/Ellipse.)
-                  (mm/set-color! color)
-                  (mm/set-border! text-color)
-                  (mm/set-width! (.-width morph))
-                  (mm/set-height! (.-height morph))
-                  (mm/set-top! (- (.-top morph) 3))
-                  (mm/set-left! (+ (.-left morph) 1)))]
+                  (oset! :color color)
+                  (oset! :!border text-color)
+                  (oset! :extent (.-extent morph))
+                  (oset! :position (clj->js {:x (+ (.-x morph) 1)
+                                             :y (- (.-y morph) 3)})))]
       (if highlight?
         (do (.addMorph morph stack)
             (set! (.-center label) (.-center stack)))
