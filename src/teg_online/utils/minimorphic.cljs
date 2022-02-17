@@ -3,6 +3,24 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             [oops.core :refer [oget oset!]]))
 
+(defn- set-attrs! [^js/Morph morph attrs]
+  (doseq [[k v] attrs]
+    (oset! morph k (clj->js v)))
+  morph)
+
+(defn make-morph ^js/Morph [& {:as attrs}]
+  (set-attrs! (js/Morph.) attrs))
+
+(defn make-sprite ^js/Sprite [form & {:as attrs}]
+  (set-attrs! (js/Sprite. form) attrs))
+
+(defn make-ellipse ^js/Ellipse [& {:as attrs}]
+  (set-attrs! (js/Ellipse.) attrs))
+
+(defn make-label ^js/Label [text & {:as attrs}]
+  (set-attrs! (js/Label. text) attrs))
+
+
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
 
