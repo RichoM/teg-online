@@ -64,13 +64,23 @@
   )
 
 (defn vanish [^js/Morph morph seconds]
-  (doto morph
-    (.on "step"
-         (fn [_ delta]
-           (oset! morph :top (- (oget morph :top)
-                                (* 20 delta)))
-           (let [alpha (- (oget morph :alpha) 
-                          (/ delta seconds))]
-             (oset! morph :alpha alpha)
-             (when (< alpha 0.01)
-               (.remove morph)))))))
+  (on-step morph
+           (fn [_ delta]
+             (let [alpha (- (oget morph :alpha)
+                            (/ delta seconds))]
+               (oset! morph :alpha alpha)
+               (when (< alpha 0.01)
+                 (.remove morph))))))
+
+(defn translate [^js/Morph morph dx dy seconds]
+  (on-step morph
+           (fn [_ delta]
+             (oset! morph :x (+ (oget morph :x)
+                                (* delta (/ dx seconds))))
+             (oset! morph :y (+ (oget morph :y)
+                                (* delta (/ dy seconds)))))))
+
+(comment
+  (translate (first (oget js/World.current :submorphs))
+             100 100 1)
+  )

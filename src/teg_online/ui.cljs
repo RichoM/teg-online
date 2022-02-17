@@ -115,6 +115,7 @@
                             (oset! :color (if (pos? addition) "lawngreen" "darkred"))
                             (oset! :center (clj->js {:x x 
                                                      :y (- y 30)}))
+                            (mm/translate 0 -100 2)
                             (mm/vanish 2))]
                 (.addMorph world label))
               (swap! state #(-> %
