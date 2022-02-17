@@ -39,16 +39,29 @@
 (defn on-mouse-up [^js/Morph morph callback]
   (doto morph (.on "mouseUp" callback)))
 
-(defn make-pickable [^js/Morph morph]
-  (let [picked? (atom false)]
-    (doto morph
-      (.on "step" #(when @picked?
-                     (oset! morph :center js/World.cursor)
-                     (let [{x "x" y "y"} (js->clj (oget morph :center))
-                           {cx "x" cy "y"} (js->clj (oget morph :owner.center))]
-                       (print [(- x cx) (- y cy)]))))
-      (.on "mouseDown" #(do (reset! picked? true)))
-      (.on "mouseUp" #(do (reset! picked? false))))))
+(defn on-step [^js/Morph morph callback]
+  (doto morph (.on "step" callback)))
+
+(defn make-draggable [^js/Morph morph]
+  (let [picked? (atom false)
+        offset (atom [0 0])]
+    (-> morph
+        (on-step #(when @picked?
+                    (oset! morph :center
+                           (clj->js {:x (+ (@offset :x) (oget js/World.cursor :x))
+                                     :y (+ (@offset :y) (oget js/World.cursor :y))}))
+                    (let [{x "x" y "y"} (js->clj (oget morph :center))
+                          {ox "x" oy "y"} (js->clj (oget morph :owner.center))]
+                      (print [(- x ox) (- y oy)]))))
+        (on-mouse-down #(do (reset! offset
+                                    {:x (- (oget morph :center.x) (oget js/World.cursor :x))
+                                     :y (- (oget morph :center.y) (oget js/World.cursor :y))})
+                            (reset! picked? true)))
+        (on-mouse-up #(do (reset! picked? false))))))
+
+(comment
+  (make-draggable (first (oget js/World.current :submorphs)))
+  )
 
 (defn vanish [^js/Morph morph seconds]
   (doto morph
