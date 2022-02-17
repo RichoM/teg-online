@@ -1,6 +1,7 @@
 {:source-paths ["src" "test"]
 
- :dependencies [[crate "0.2.5"]]
+ :dependencies [[crate "0.2.5"]
+                [binaryage/oops "0.7.1"]]
 
  :nrepl {:port 9000
          :middleware []}
