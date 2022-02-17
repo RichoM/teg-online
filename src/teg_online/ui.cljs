@@ -108,15 +108,14 @@
                                       (get-in [:countries country-id :counter])
                                       (oget :center)
                                       js->clj)
-                    label (doto (js/Label. (u/format "%1%2"
-                                                     (if (pos? addition) "+" "-")
-                                                     (js/Math.abs addition)))
-                            (oset! :font "bold 30px Arial")
-                            (oset! :color (if (pos? addition) "lawngreen" "darkred"))
-                            (oset! :center (clj->js {:x x 
-                                                     :y (- y 30)}))
-                            (mm/translate 0 -100 2)
-                            (mm/vanish 2))]
+                    label (-> (mm/make-label (u/format "%1%2"
+                                                       (if (pos? addition) "+" "-")
+                                                       (js/Math.abs addition))
+                                             :font "bold 30px Arial"
+                                             :color (if (pos? addition) "lawngreen" "darkred")
+                                             :center (clj->js {:x x, :y (- y 30)}))
+                              (mm/translate 0 -100 2)
+                              (mm/vanish 2))]
                 (.addMorph world label))
               (swap! state #(-> %
                                 (update-in [:user-data :remaining] - addition)
@@ -127,15 +126,16 @@
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
   (go
     (let [original-form (<! (mm/load-form img))
-          morph (js/Sprite. original-form)
-          counter (js/Ellipse.)
+          morph (mm/make-sprite
+                 original-form
+                 :position {:x x :y y}
+                 :alpha 0)
+          counter (mm/make-ellipse
+                   :extent {:w 30 :h 30}
+                   :center (let [{cx "x" cy "y"} (js->clj (oget morph :center))]
+                             {:x (+ cx ox), :y (+ cy oy)})
+                   :alpha 0)
           selected-alpha 0.25]
-      (oset! counter :extent #js {:w 30, :h 30})
-      (oset! morph :position #js {:x x, :y y})
-      (let [{cx "x" cy "y"} (js->clj (oget morph :center))]
-        (oset! counter :center (clj->js {:x (+ cx ox), :y (+ cy oy)})))
-      (oset! morph :alpha 0) ; Initially transparent
-      (oset! counter :alpha 0) ; Initially transparent
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
@@ -159,7 +159,7 @@
 (defn init-map []
   (go
     (let [form (<! (mm/load-form "imgs/teg_board.png"))
-          map (js/Sprite. form)]
+          map (mm/make-sprite form)]
       (.addMorph world map)
       (let [canvas (oget world :canvas.html)]
         (oset! canvas :width (oget map :width))
@@ -173,15 +173,16 @@
     (doto morph
       (oset! :color color)
       (oset! :!border text-color))
-    (let [label (doto (js/Label. (str count))
-                  (oset! :font "14px Arial")
-                  (oset! :color text-color))
-          stack (doto (js/Ellipse.)
-                  (oset! :color color)
-                  (oset! :!border text-color)
-                  (oset! :extent (oget morph :extent))
-                  (oset! :position (clj->js {:x (+ (oget morph :x) 1)
-                                             :y (- (oget morph :y) 3)})))]      
+    (let [label (mm/make-label
+                 (str count)
+                 :font "14px Arial"
+                 :color text-color)
+          stack (mm/make-ellipse
+                 :color color
+                 :!border text-color
+                 :extent (oget morph :extent)
+                 :position {:x (+ (oget morph :x) 1)
+                            :y (- (oget morph :y) 3)})]      
       (oset! label :center (oget (if highlight? stack morph) :center))
       (when highlight? 
         (.addMorph morph stack))
@@ -319,8 +320,15 @@
   (update-ui @(@state :game-atom))
 
   (get-in @state [:game-atom :players])
-  (def m (js/Morph.))
+  (def m (mm/make-morph
+          :width 100
+          :height 20
+          :center {:x 500 :y 400}
+          :color "green"))
   (.addMorph world m)
+
+  (oget m :center.x)
+  (oset! m :center.x 500)
   (set! (.-width m) 10)
   (set! (.-height m) 10)
   (set! (.-position m) #js {:x 20 :y 20})
