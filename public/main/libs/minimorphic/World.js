@@ -44,7 +44,7 @@ var World = (function () {
 		static get current() { return instances[instances.length - 1]; }
 		static get cursor() { return cursor; }
 		static get wireframe() { return wireframe; }
-		static set wireframe(v) { wireframe = true;	}
+		static set wireframe(v) { wireframe = v;	}
 
 		constructor(htmlCanvas) {
 			super();
