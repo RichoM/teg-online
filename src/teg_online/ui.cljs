@@ -1,9 +1,6 @@
 (ns teg-online.ui
-  (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
-            [cljs.core.async.interop :refer-macros [<p!]]
-            [oops.core :refer [oget oset! ocall oapply ocall! oapply!
-                               oget+ oset!+ ocall+ oapply+ ocall!+ oapply!+]]
-            [teg-online.utils.async :refer [go-try <? chan->promise]]
+  (:require [clojure.core.async :as a :refer [go <!]]
+            [oops.core :refer [oget oset!]]
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bt]
             [teg-online.utils.core :as u]

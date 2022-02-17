@@ -1,6 +1,5 @@
 (ns teg-online.utils.bootstrap
-  (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
-            [clojure.string :as str]
+  (:require [clojure.core.async :as a :refer [go <!]]
             [crate.core :as crate]))
 
 (defn find-container [selector]

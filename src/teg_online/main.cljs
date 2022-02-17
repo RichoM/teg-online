@@ -1,7 +1,5 @@
 (ns teg-online.main
-  (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
-            [cljs.core.async.interop :refer-macros [<p!]]
-            [teg-online.utils.async :refer [go-try <? chan->promise]]
+  (:require [clojure.core.async :as a :refer [go <!]]
             [teg-online.game :as teg]
             [teg-online.ui :as ui]))
 

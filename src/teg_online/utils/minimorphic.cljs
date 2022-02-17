@@ -1,5 +1,5 @@
 (ns teg-online.utils.minimorphic
-  (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
+  (:require [clojure.core.async :as a :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
             [oops.core :refer [oget oset!]]))
 
