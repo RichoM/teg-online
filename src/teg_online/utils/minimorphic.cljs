@@ -1,6 +1,7 @@
 (ns teg-online.utils.minimorphic
   (:require [clojure.core.async :as a :refer [go go-loop <! timeout]]
-            [cljs.core.async.interop :refer-macros [<p!]]))
+            [cljs.core.async.interop :refer-macros [<p!]]
+            [oops.core :refer [oget oset!]]))
 
 (defn load-form [path]
   (go (<p! (js/Form.loadImage path))))
@@ -8,31 +9,43 @@
 (def tint
   (memoize
    (fn [^js/Form form color]
-     (let [img (.-img form)
-           w (.-width img)
-           h (.-height img)
+     (let [img (oget form :img)
+           w (oget img :width)
+           h (oget img :height)
            canvas (js/document.createElement "canvas")
            ctx (.getContext canvas "2d")]
-       (set! (.-width canvas) w)
-       (set! (.-height canvas) h)
-       (set! (.-fillStyle ctx) color)
+       (oset! canvas :width w)
+       (oset! canvas :height h)
+       (oset! ctx :fillStyle color)
        (.drawImage ctx img 0 0)
-       (set! (.-globalCompositeOperation ctx) "source-atop")
+       (oset! ctx :globalCompositeOperation "source-atop")
        (.fillRect ctx 0 0 w h)
        (let [result-img (js/Image.)
              result-chan (a/promise-chan)]
-         (set! (.-onload result-img)
-               #(a/put! result-chan (js/Form. result-img)))
-         (set! (.-src result-img) (.toDataURL canvas))
+         (oset! result-img :onload
+                #(a/put! result-chan (js/Form. result-img)))
+         (oset! result-img :src (.toDataURL canvas))
          result-chan)))))
+
+(defn on-mouse-enter [^js/Morph morph callback]
+  (doto morph (.on "mouseEnter" callback)))
+
+(defn on-mouse-leave [^js/Morph morph callback]
+  (doto morph (.on "mouseLeave" callback)))
+
+(defn on-mouse-down [^js/Morph morph callback]
+  (doto morph (.on "mouseDown" callback)))
+
+(defn on-mouse-up [^js/Morph morph callback]
+  (doto morph (.on "mouseUp" callback)))
 
 (defn make-pickable [^js/Morph morph]
   (let [picked? (atom false)]
     (doto morph
       (.on "step" #(when @picked?
-                     (set! (.-center morph) js/World.cursor)
-                     (let [{x "x" y "y"} (js->clj (.-center morph))
-                           {cx "x" cy "y"} (js->clj (.-center (.-owner morph)))]
+                     (oset! morph :center js/World.cursor)
+                     (let [{x "x" y "y"} (js->clj (oget morph :center))
+                           {cx "x" cy "y"} (js->clj (oget morph :owner.center))]
                        (print [(- x cx) (- y cy)]))))
       (.on "mouseDown" #(do (reset! picked? true)))
       (.on "mouseUp" #(do (reset! picked? false))))))
@@ -41,8 +54,10 @@
   (doto morph
     (.on "step"
          (fn [_ delta]
-           (set! (.-top morph) (- (.-top morph) (* 20 delta)))
-           (let [alpha (- (.-alpha morph) (/ delta seconds))]
-             (set! (.-alpha morph) alpha)
+           (oset! morph :top (- (oget morph :top)
+                                (* 20 delta)))
+           (let [alpha (- (oget morph :alpha) 
+                          (/ delta seconds))]
+             (oset! morph :alpha alpha)
              (when (< alpha 0.01)
                (.remove morph)))))))

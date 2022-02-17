@@ -19,9 +19,8 @@
 (defn resize-board []
   (let [board-panel (js/document.querySelector "#board-panel")
         top-bar (js/document.querySelector "#top-bar")]
-    (aset (.-style board-panel)
-          "height" (u/format "calc(100% - %1px)"
-                             (.-offsetHeight top-bar)))))
+    (oset! board-panel :style.height
+           (u/format "calc(100% - %1px)" (oget top-bar :offsetHeight)))))
 
 (.addEventListener js/window "resize" resize-board)
 (resize-board)
@@ -50,14 +49,14 @@
                            #(reset! result-value 0))]
         (add-watch counter-value :update
                    (fn [_ _ _ val] 
-                     (set! (.-disabled minus-btn) (<= val min-value))
-                     (set! (.-disabled plus-btn) (>= val max-value))
-                     (set! (.-innerText counter-span) val)
+                     (oset! minus-btn :disabled (<= val min-value))
+                     (oset! plus-btn :disabled (>= val max-value))
+                     (oset! counter-span :innerText val)
                      (let [delta (get-delta)]
-                       (set! (.-innerText delta-span)
-                             (u/format "(%1%2)"
-                                       (if (neg? delta) "-" "+")
-                                       (js/Math.abs delta))))))
+                       (oset! delta-span :innerText
+                              (u/format "(%1%2)"
+                                        (if (neg? delta) "-" "+")
+                                        (js/Math.abs delta))))))
         (reset! counter-value initial-value)
         (<! (-> (bt/make-modal :header (list [:h1 country-name]
                                              bt/close-modal-btn)
@@ -106,14 +105,19 @@
                                                    current-army
                                                    initial-army
                                                    (+ current-army remaining)))]
+            (print addition)
             (when (not (zero? addition))
-              (let [{:strs [x y]} (js->clj (.-center (get-in @state [:countries country-id :counter])))
+              (let [{:strs [x y]} (-> @state
+                                      (get-in [:countries country-id :counter])
+                                      (oget :center)
+                                      js->clj)
                     label (doto (js/Label. (u/format "%1%2"
                                                      (if (pos? addition) "+" "-")
                                                      (js/Math.abs addition)))
                             (oset! :font "bold 30px Arial")
                             (oset! :color (if (pos? addition) "lawngreen" "darkred"))
-                            (oset! :center (clj->js {:x x :y (- y 30)}))
+                            (oset! :center (clj->js {:x x 
+                                                     :y (- y 30)}))
                             (mm/vanish 2))]
                 (.addMorph world label))
               (swap! state #(-> %
@@ -128,28 +132,24 @@
           morph (js/Sprite. original-form)
           counter (js/Ellipse.)
           selected-alpha 0.25]
-      (set! (.-extent counter) #js {:w 30 :h 30})
-      (set! (.-position morph) #js {:x x :y y})
-      (let [{cx "x" cy "y"} (js->clj (.-center morph))]
-        (set! (.-center counter) (clj->js {:x (+ cx ox), :y (+ cy oy)})))
-      (set! (.-alpha morph) 0) ; Initially transparent
-      (set! (.-alpha counter) 0)
+      (oset! counter :extent #js {:w 30, :h 30})
+      (oset! morph :position #js {:x x, :y y})
+      (let [{cx "x" cy "y"} (js->clj (oget morph :center))]
+        (oset! counter :center (clj->js {:x (+ cx ox), :y (+ cy oy)})))
+      (oset! morph :alpha 0) ; Initially transparent
+      (oset! counter :alpha 0) ; Initially transparent
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
-        (.on "mouseEnter"
-             #(when (can-interact-with-country? country-id)
-                (set! (.-alpha morph) selected-alpha)))
-        (.on "mouseLeave"
-             #(when (can-interact-with-country? country-id)
-                (set! (.-alpha morph) 0.5)))
-        (.on "mouseDown"
-             #(when (can-interact-with-country? country-id)
-                (set! (.-alpha morph) selected-alpha)))
-        (.on "mouseUp"
-             #(go (when (can-interact-with-country? country-id)
-                    (<! (click-country country-id))
-                    (set! (.-alpha morph) 0.5)))))
+        (mm/on-mouse-enter #(when (can-interact-with-country? country-id)
+                              (oset! morph :alpha selected-alpha)))
+        (mm/on-mouse-leave #(when (can-interact-with-country? country-id)
+                              (oset! morph :alpha 0.5)))
+        (mm/on-mouse-down #(when (can-interact-with-country? country-id)
+                             (oset! morph :alpha selected-alpha)))
+        (mm/on-mouse-up #(go (when (can-interact-with-country? country-id)
+                               (<! (click-country country-id))
+                               (oset! morph :alpha 0.5)))))
       (swap! state
              assoc-in [:countries country-id]
              {:morph morph
@@ -163,9 +163,9 @@
     (let [form (<! (mm/load-form "imgs/teg_board.png"))
           map (js/Sprite. form)]
       (.addMorph world map)
-      (let [canvas (-> world .-canvas .-html)]
-        (set! (.-width canvas) (.-width map))
-        (set! (.-height canvas) (.-height map))))))
+      (let [canvas (oget world :canvas.html)]
+        (oset! canvas :width (oget map :width))
+        (oset! canvas :height (oget map :height))))))
 
 (defn update-army-counter [^js morph color count highlight?]
   (.removeAllSubmorphs morph)
@@ -181,13 +181,12 @@
           stack (doto (js/Ellipse.)
                   (oset! :color color)
                   (oset! :!border text-color)
-                  (oset! :extent (.-extent morph))
-                  (oset! :position (clj->js {:x (+ (.-x morph) 1)
-                                             :y (- (.-y morph) 3)})))]
-      (if highlight?
-        (do (.addMorph morph stack)
-            (set! (.-center label) (.-center stack)))
-        (set! (.-center label) (.-center morph)))
+                  (oset! :extent (oget morph :extent))
+                  (oset! :position (clj->js {:x (+ (oget morph :x) 1)
+                                             :y (- (oget morph :y) 3)})))]      
+      (oset! label :center (oget (if highlight? stack morph) :center))
+      (when highlight? 
+        (.addMorph morph stack))
       (.addMorph morph label))))
 
 (defn update-country [player-indices {:keys [id owner army]}]
@@ -195,14 +194,14 @@
                  (get-in @state [:countries id])]
         (let [player-idx (player-indices owner)
               color (get player-colors player-idx "white")
-              ^js/Form original-form (.-originalForm morph)
+              ^js/Form original-form (oget morph :originalForm)
               ^js/Form tinted-form (if player-idx
                                      (<! (mm/tint original-form color))
                                      original-form)
               additions (get-in @state [:user-data :additions id] 0)]
-          (set! (.-form morph) tinted-form)
-          (set! (.-alpha morph) (if player-idx 0.5 0))
-          (set! (.-alpha counter) (if player-idx 1 0))
+          (oset! morph :form tinted-form)
+          (oset! morph :alpha (if player-idx 0.5 0))
+          (oset! counter :alpha (if player-idx 1 0))
           (update-army-counter counter color 
                                (if player-idx (+ army additions) 0)
                                (> additions 0))))))
@@ -220,7 +219,7 @@
             player-width (/ 12 (if (> player-count 4)
                                  (js/Math.ceil (/ player-count 2))
                                  player-count))]
-        (set! (.-innerHTML players-row) "")
+        (oset! players-row :innerHTML "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
           (let [player (players pid)
                 icon-style (u/format "color: %1;" (player-colors idx))]
@@ -251,7 +250,7 @@
 
 (defn update-status-panel [{:keys [phase turn]}]
   (go (let [status-bar (js/document.querySelector "#status-bar")]
-        (set! (.-innerHTML status-bar) "")
+        (oset! status-bar :innerHTML "")
         (when turn
           (.appendChild status-bar
                         (crate/html
