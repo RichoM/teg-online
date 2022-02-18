@@ -1,15 +1,21 @@
 (ns teg-online.ui-constants
   (:require [teg-online.board :as b]))
 
-(def player-colors
-  ["#e41a1c"
-   "#377eb8"
-   "#4daf4a"
-   "#ff7f00"
-   "#ffff33"
-   "purple"
-   "#f781bf"
-   "black"])
+(def player-colors ["#e41a1c"
+                    "#377eb8"
+                    "#4daf4a"
+                    "#ff7f00"
+                    "#ffff33"
+                    "purple"
+                    "#f781bf"
+                    "black"])
+
+(def dice-images ["imgs/Dice-1.svg"
+                  "imgs/Dice-2.svg"
+                  "imgs/Dice-3.svg"
+                  "imgs/Dice-4.svg"
+                  "imgs/Dice-5.svg"
+                  "imgs/Dice-6a.svg"])
 
 (def country-data
   {; South America

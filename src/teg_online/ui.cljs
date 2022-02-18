@@ -4,7 +4,7 @@
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bs]
             [teg-online.utils.core :as u]
-            [teg-online.ui-constants :refer [country-data player-colors]]
+            [teg-online.ui-constants :refer [country-data player-colors dice-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [crate.core :as crate]))
@@ -74,12 +74,7 @@
         @result-value)))
 
 (defn show-attack-dialog [attacker defender]
-  (go (let [imgs ["imgs/Dice-1.svg"
-                  "imgs/Dice-2.svg"
-                  "imgs/Dice-3.svg"
-                  "imgs/Dice-4.svg"
-                  "imgs/Dice-5.svg"
-                  "imgs/Dice-6a.svg"]
+  (go (let [imgs dice-images
             attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
             finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
             modal (bs/make-modal
