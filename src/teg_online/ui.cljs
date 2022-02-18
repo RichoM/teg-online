@@ -175,19 +175,32 @@
 
 (defn finish-turn []
   (go
-    (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
-      (let [game-atom (@state :game-atom)
-            additions (get-in @state [:user-data :additions] {})]
-        (swap! state dissoc :user-data)
-        (doseq [[country-id extra-army] additions]
-          (when (> extra-army 0)
-            (swap! game-atom teg/add-army country-id extra-army)))
-        (swap! game-atom teg/next-turn)))))
+    (let [game-atom (@state :game-atom)
+          {:keys [phase]} @game-atom]
+      (case phase
+        ::teg/add-army (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
+                         (let [additions (get-in @state [:user-data :additions] {})]
+                           (swap! state dissoc :user-data)
+                           (doseq [[country-id extra-army] additions]
+                             (when (> extra-army 0)
+                               (swap! game-atom teg/add-army country-id extra-army)))
+                           (swap! game-atom teg/next-turn)))
+        ::teg/attack (do
+                       ;; TODO(Richo): The right thing to do is to keep the current player and regroup,
+                       ;; but for now I'm just advancing the turn (just to test)
+                       #_(swap! game-atom teg/next-phase ::teg/regroup)
+                       (swap! game-atom teg/next-turn))))))
 
 (defn can-interact-with-country? [country-id]
   (when-let [game (get-game)]
     (when-let [current-player (teg/get-current-player game)]
-      (= current-player (get-in game [:countries country-id :owner])))))
+      (case (game :phase)
+        ::teg/add-army (= current-player (get-in game [:countries country-id :owner]))
+        ::teg/attack (if-let [selected-country (get-in @state [:user-data :selected-country])]
+                       (and (not= current-player (teg/country-owner game country-id))
+                            (contains? (get-in b/countries [selected-country :neighbours]) country-id))
+                       (and (= current-player (teg/country-owner game country-id))
+                            (> (teg/get-army game country-id) 1)))))))
 
 (defn click-country [country-id]
   (go (let [{:keys [phase] :as game} (get-game)]
@@ -221,7 +234,13 @@
                                 (update-in [:user-data :remaining] - addition)
                                 (update-in [:user-data :additions country-id] + addition)))
               (when (zero? (-> @state :user-data :remaining))
-                (<! (finish-turn)))))))))
+                (<! (finish-turn)))))
+
+          ::teg/attack
+          (if-let [selected-country (get-in @state [:user-data :selected-country])]
+            (do (<! (show-attack-dialog selected-country country-id))
+                (swap! state assoc-in [:user-data :selected-country] nil))
+            (swap! state assoc-in [:user-data :selected-country] country-id))))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
   (go
@@ -299,9 +318,13 @@
               tinted-form (if player-idx
                             (<! (mm/tint original-form color))
                             original-form)
-              additions (get-in @state [:user-data :additions id] 0)]
+              additions (get-in @state [:user-data :additions id] 0)
+              selected? (= id (get-in @state [:user-data :selected-country]))]
+          (print id selected?)
           (oset! morph :form tinted-form)
-          (oset! morph :alpha (if player-idx 0.5 0))
+          (oset! morph :alpha (if player-idx 
+                                (if selected? 0.25 0.5)
+                                0))
           (oset! counter :alpha (if player-idx 1 0))
           (update-army-counter counter color 
                                (if player-idx (+ army additions) 0)
@@ -347,7 +370,7 @@
         {:keys [phase]} @game-atom]
     (case phase
       ::teg/add-army (= 0 (get-in @state [:user-data :remaining] 0))
-      false)))
+      true)))
 
 (defn update-status-panel [{:keys [phase turn]}]
   (go (let [status-bar (js/document.querySelector "#status-bar")]
@@ -392,9 +415,11 @@
           (recur)))))
 
 (defn reset-user-data [{:keys [phase] :as game}]
-  (when (= phase ::teg/add-army)
-    {:remaining (teg/calculate-extra-army game)
-     :additions {}}))
+  (case phase
+    ::teg/add-army {:remaining (teg/calculate-extra-army game)
+                    :additions {}}
+    ::teg/attack {:selected-country nil}
+    nil))
 
 
 (defn initialize [game-atom]
