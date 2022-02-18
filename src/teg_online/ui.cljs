@@ -197,8 +197,9 @@
       (case (game :phase)
         ::teg/add-army (= current-player (get-in game [:countries country-id :owner]))
         ::teg/attack (if-let [selected-country (get-in @state [:user-data :selected-country])]
-                       (and (not= current-player (teg/country-owner game country-id))
-                            (contains? (get-in b/countries [selected-country :neighbours]) country-id))
+                       (or (= selected-country country-id)
+                           (and (not= current-player (teg/country-owner game country-id))
+                                (contains? (get-in b/countries [selected-country :neighbours]) country-id)))
                        (and (= current-player (teg/country-owner game country-id))
                             (> (teg/get-army game country-id) 1)))))))
 
@@ -238,8 +239,9 @@
 
           ::teg/attack
           (if-let [selected-country (get-in @state [:user-data :selected-country])]
-            (do (<! (show-attack-dialog selected-country country-id))
-                (swap! state assoc-in [:user-data :selected-country] nil))
+            (if (= selected-country country-id)
+              (swap! state assoc-in [:user-data :selected-country] nil)
+              (<! (show-attack-dialog selected-country country-id)))
             (swap! state assoc-in [:user-data :selected-country] country-id))))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
