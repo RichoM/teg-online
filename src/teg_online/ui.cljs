@@ -77,8 +77,8 @@
   (go (let [imgs dice-images
             attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
             finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
-            attacker-span (crate/html [:span])
-            defender-span (crate/html [:span])
+            attacker-army-span (crate/html [:span])
+            defender-army-span (crate/html [:span])
             modal (bs/make-modal
                    :header bs/close-modal-btn
                    :body [:div.container
@@ -88,10 +88,10 @@
                           [:div.row
                            [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
-                            attacker-span]
+                            attacker-army-span]
                            [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
-                            defender-span]]
+                            defender-army-span]]
                           [:hr]
                           [:div
                            [:div.row.py-2
@@ -109,64 +109,59 @@
                            [:div.col.d-grid finish-btn]]])
             get-dice #(.querySelectorAll modal ".dice")
             get-dice-pairs #(partition-all 2 (get-dice))
-            update-dice-count (fn [hide?]
-                                (let [[a-count d-count] (teg/get-dice-count (get-game) attacker defender)
-                                      class (if hide? "d-none" "dice-disabled")]
-                                  (doseq [[idx [a-die d-die]] (map-indexed vector (get-dice-pairs))]
-                                    (if (>= idx a-count)
-                                      (.add (oget a-die :classList) class)
-                                      (.remove (oget a-die :classList) class))
-                                    (if (>= idx d-count)
-                                      (.add (oget d-die :classList) class)
-                                      (.remove (oget d-die :classList) class)))
-                                  (oset! attack-btn :disabled (<= a-count 0))))
-            update-army-span #(let [game (get-game)]
-                                (oset! attacker-span :innerText (str (teg/get-army game attacker)))
-                                (oset! defender-span :innerText (str (teg/get-army game defender))))]
-        (update-dice-count true)
-        (update-army-span)
+            update-modal (fn [& {:keys [hide-dice?]}]
+                           (let [game (get-game)]
+                             (oset! attacker-army-span :innerText (str (teg/get-army game attacker)))
+                             (oset! defender-army-span :innerText (str (teg/get-army game defender)))
+                             (let [[a-count d-count] (teg/get-dice-count game attacker defender)
+                                   class (if hide-dice? "d-none" "dice-disabled")]
+                               (oset! attack-btn :disabled (<= a-count 0))
+                               (doseq [[idx [a-die d-die]] (map-indexed vector (get-dice-pairs))]
+                                 (if (>= idx a-count)
+                                   (.add (oget a-die :classList) class)
+                                   (.remove (oget a-die :classList) class))
+                                 (if (>= idx d-count)
+                                   (.add (oget d-die :classList) class)
+                                   (.remove (oget d-die :classList) class))))))]
+        (update-modal :hide-dice? true)
         (bs/on-click finish-btn (partial bs/hide-modal modal))
-        (bs/on-click attack-btn #(go (let [dice (get-dice)]
-                                       (oset! attack-btn :disabled true)
-                                       (update-dice-count true)
-                                       (doseq [die dice]
-                                         (doto (oget die :classList)
-                                           (.remove "dice-winner")
-                                           (.remove "dice-loser")
-                                           (.remove "dice-disabled")
-                                           (.add "rotate-center")))
-                                       (<! (a/timeout 200))
-                                       (let [delay 15]
-                                         (loop [i 0]
-                                           (when (<= (* i delay) 200)
-                                             (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
-                                             (<! (a/timeout delay))
-                                             (recur (inc i)))))
-                                       (let [[a-count d-count] (teg/get-dice-count (get-game) attacker defender)
-                                             a-throw (sort > (repeatedly a-count (partial rand-int 6)))
-                                             d-throw (sort > (repeatedly d-count (partial rand-int 6)))]
-                                         (doseq [[i [a-die d-die]] (map-indexed vector (get-dice-pairs))]
-                                           (let [a (nth a-throw i nil)
-                                                 d (nth d-throw i nil)]
-                                             (oset! a-die :src (if a
-                                                                 (nth imgs a)
-                                                                 (last imgs)))
-                                             (oset! d-die :src (if d
-                                                                 (nth imgs d)
-                                                                 (last imgs)))
-                                             (if (> a d)
-                                               (do (.add (oget a-die :classList) "dice-winner")
-                                                   (.add (oget d-die :classList) "dice-loser"))
-                                               (do (.add (oget d-die :classList) "dice-winner")
-                                                   (.add (oget a-die :classList) "dice-loser")))))
-                                         (swap! (@state :game-atom)
-                                                teg/attack
-                                                [attacker a-throw]
-                                                [defender d-throw]))
-                                       (<! (a/timeout 200))
-                                       (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
-                                       (update-dice-count false)
-                                       (update-army-span))))
+        (bs/on-click attack-btn
+                     #(go (let [dice (get-dice)]
+                            (update-modal :hide-dice? true)
+                            (oset! attack-btn :disabled true)
+                            (doseq [die dice]
+                              (doto (oget die :classList)
+                                (.remove "dice-winner")
+                                (.remove "dice-loser")
+                                (.remove "dice-disabled")
+                                (.add "rotate-center")))
+                            (<! (a/timeout 200))
+                            (let [delay 15]
+                              (loop [i 0]
+                                (when (<= (* i delay) 200)
+                                  (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
+                                  (<! (a/timeout delay))
+                                  (recur (inc i)))))
+                            (let [[a-count d-count] (teg/get-dice-count (get-game) attacker defender)
+                                  a-throw (sort > (repeatedly a-count (partial rand-int 6)))
+                                  d-throw (sort > (repeatedly d-count (partial rand-int 6)))]
+                              (doseq [[i [a-die d-die]] (map-indexed vector (get-dice-pairs))]
+                                (let [a (nth a-throw i nil)
+                                      d (nth d-throw i nil)]
+                                  (oset! a-die :src (if a (nth imgs a) (last imgs)))
+                                  (oset! d-die :src (if d (nth imgs d) (last imgs)))
+                                  (if (> a d)
+                                    (do (.add (oget a-die :classList) "dice-winner")
+                                        (.add (oget d-die :classList) "dice-loser"))
+                                    (do (.add (oget d-die :classList) "dice-winner")
+                                        (.add (oget a-die :classList) "dice-loser")))))
+                              (swap! (@state :game-atom)
+                                     teg/attack
+                                     [attacker a-throw]
+                                     [defender d-throw]))
+                            (<! (a/timeout 200))
+                            (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
+                            (update-modal :hide-dice? false))))
         (<! (bs/show-modal modal)))))
 
 (comment
