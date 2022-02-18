@@ -94,6 +94,12 @@
 (defn next-turn [game]
   (update game :turn inc))
 
+(defn get-defender-dice-count [game country-id]
+  (min 3 (get-army game country-id)))
+
+(defn get-attacker-dice-count [game country-id]
+  (min 3 (dec (get-army game country-id))))
+
 (comment
 
   (u/deal (range 13) "ABC")

@@ -65,11 +65,42 @@
     (is (thrown? js/Error (teg/add-army game ::b/richopolis 1))
         "Adding army to non-existent country")))
 
+(deftest get-dice-count-with-only-one-army
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile]))]
+    (is (= 0 (teg/get-attacker-dice-count game ::b/argentina)))
+    (is (= 1 (teg/get-defender-dice-count game ::b/chile)))))
+
+(deftest get-dice-count-with-more-than-one-army
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile])
+                 (teg/add-army ::b/argentina 1)
+                 (teg/add-army ::b/chile 1))]
+    (is (= 1 (teg/get-attacker-dice-count game ::b/argentina)))
+    (is (= 2 (teg/get-defender-dice-count game ::b/chile)))))
+
+(deftest get-dice-count-with-more-than-max-army
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile])
+                 (teg/add-army ::b/argentina 10)
+                 (teg/add-army ::b/chile 10))]
+    (is (= 3 (teg/get-attacker-dice-count game ::b/argentina)))
+    (is (= 3 (teg/get-defender-dice-count game ::b/chile)))))
+
 (comment
+  (teg/get-army game ::b/argentina)
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")
                 (teg/join-game ::p2 "Diego")
-                teg/distribute-countries))
+                (teg/distribute-countries [::b/argentina ::b/chile])
+                (teg/add-army ::b/argentina 2)
+                (teg/add-army ::b/chile 2)))
   (def country (first (teg/player-countries game ::p1)))
   (-> game (teg/get-player ::p1))
 
