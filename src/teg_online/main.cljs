@@ -34,6 +34,17 @@
 
 (comment
   (def game @game)
+
+  (do
+    (reset! game (teg/new-game))
+    (swap! game teg/join-game ::p1 "Richo")
+    (swap! game teg/join-game ::p2 "Lechu")
+    (swap! game teg/join-game ::p3 "Diego")
+    (swap! game teg/distribute-countries)
+    (swap! game teg/start-game)
+    (swap! game teg/add-army :teg-online.board/argentina 2)
+    (swap! game teg/add-army :teg-online.board/chile 2))
+
   (reset! game (teg/new-game))
   (swap! game teg/join-game ::p1 "Richo")
   (swap! game teg/join-game ::p2 "Lechu")

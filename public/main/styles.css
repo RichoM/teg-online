@@ -29,6 +29,23 @@ body {
 
 .dice {
   width: 70px;
+  border-radius: 10px;
+  border: 2px solid white;
+  -webkit-box-sizing: content-box; /* Safari/Chrome, other WebKit */
+  -moz-box-sizing: content-box;    /* Firefox, other Gecko */
+  box-sizing: content-box;         /* Opera/IE 8+ */
+}
+
+.dice-winner {
+  border: 2px solid lawngreen !important;
+}
+
+.dice-loser {
+  border: 2px solid red !important;
+}
+
+.dice-disabled {
+  background-color: #5a5454;
 }
 
 .rotate-center {

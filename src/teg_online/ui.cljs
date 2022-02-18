@@ -84,32 +84,55 @@
                            [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [attacker :name])]]
                            [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [defender :name])]]]
                           [:div.row
-                           [:div.col-6.text-center.fa-2x 
+                           [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
-                            [:span 4]]                           
+                            [:span 4]]
                            [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
                             [:span 4]]]
                           [:hr]
-                          [:div.row.py-2
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
-                          [:div.row.py-2
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
-                          [:div.row.py-2
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
-                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
+                          [:div
+                           [:div.row.py-2
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]]
+                           [:div.row.py-2
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]]
+                           [:div.row.py-2
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]
+                            [:div.col-6.text-center [:img.dice {:src (last imgs)}]]]]
                           [:hr]
                           [:div.row
                            [:div.col.d-grid attack-btn]
-                           [:div.col.d-grid finish-btn]]])]
-        (bs/on-click finish-btn #(go (let [dice (.querySelectorAll modal "img")]
-                                       (doseq [die dice]
-                                         (oset! die :src (rand-nth imgs))))))
-        (bs/on-click attack-btn #(go (let [dice (.querySelectorAll modal "img")]
+                           [:div.col.d-grid finish-btn]]])
+            get-dice #(.querySelectorAll modal ".dice")
+            get-dice-pairs #(partition-all 2 (get-dice))
+            update-dice-count (fn [a-count d-count hide?]
+                                (let [class (if hide? "d-none" "dice-disabled")]
+                                  (doseq [[idx [a-die d-die]] (map-indexed vector (get-dice-pairs))]
+                                  (if (>= idx a-count)
+                                    (.add (oget a-die :classList) class)
+                                    (.remove (oget a-die :classList) class))
+                                  (if (>= idx d-count)
+                                    (.add (oget d-die :classList) class)
+                                    (.remove (oget d-die :classList) class)))))]
+        (let [game (get-game)]
+          (update-dice-count (teg/get-attacker-dice-count game attacker)
+                             (teg/get-defender-dice-count game defender)
+                             false))
+        (bs/on-click finish-btn update-dice-count)
+        (bs/on-click attack-btn #(go (let [game (get-game)
+                                           a-count (teg/get-attacker-dice-count game attacker)
+                                           d-count (teg/get-defender-dice-count game attacker)
+                                           dice (get-dice)]
                                        (oset! attack-btn :disabled true)
-                                       (doseq [die dice] (.add (oget die :classList) "rotate-center"))
+                                       (update-dice-count a-count d-count true)
+                                       (doseq [die dice]
+                                         (doto (oget die :classList)
+                                           (.remove "dice-winner")
+                                           (.remove "dice-loser")
+                                           (.remove "dice-disabled")
+                                           (.add "rotate-center")))
                                        (<! (a/timeout 200))
                                        (let [delay 15]
                                          (loop [i 0]
@@ -117,6 +140,26 @@
                                              (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
                                              (<! (a/timeout delay))
                                              (recur (inc i)))))
+                                       (let [a-throw (sort > (repeatedly a-count (partial rand-int 6)))
+                                             d-throw (sort > (repeatedly d-count (partial rand-int 6)))]
+                                         (print "ATTACKER" a-throw)
+                                         (print "DEFENDER" d-throw)
+                                         (doseq [[i [a-die d-die]] (map-indexed vector (get-dice-pairs))]
+                                           (print i a-die d-die)
+                                           (let [a (nth a-throw i nil)
+                                                 d (nth d-throw i nil)]
+                                             (print a d)
+                                             (oset! a-die :src (if a 
+                                                                 (nth imgs a)
+                                                                 (last imgs)))
+                                             (oset! d-die :src (if d 
+                                                                 (nth imgs d)
+                                                                 (last imgs)))
+                                             (if (> a d)
+                                               (do (.add (oget a-die :classList) "dice-winner")
+                                                   (.add (oget d-die :classList) "dice-loser"))
+                                               (do (.add (oget d-die :classList) "dice-winner")
+                                                   (.add (oget a-die :classList) "dice-loser"))))))
                                        #_(doseq [die dice]
                                            (oset! die :src (nth imgs 3)))
                                        (<! (a/timeout 200))
@@ -125,9 +168,11 @@
         (<! (bs/show-modal modal)))))
 
 (comment
+  (def get-dice #(js/document.querySelectorAll ".dice"))
 
-  (show-attack-dialog ::b/argentina ::b/chile)
+(def get-dice-pairs #(partition-all 2 (get-dice)))
   
+  (sort > (repeatedly 5 (partial rand-int 6)))
   
   )
 
@@ -324,6 +369,8 @@
                               ::teg/attack "Atacando..."
                               ::teg/regroup "Reagrupando..."
                               "")]]
+                          [:div.col-auto (bs/on-click (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} "TEST"])
+                                                      #(show-attack-dialog ::b/argentina ::b/chile))]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled?))}
