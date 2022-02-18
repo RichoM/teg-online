@@ -73,6 +73,69 @@
                 bs/show-modal))
         @result-value)))
 
+(defn show-attack-dialog [attacker defender]
+  (go (let [imgs ["imgs/Dice-1.svg"
+                  "imgs/Dice-2.svg"
+                  "imgs/Dice-3.svg"
+                  "imgs/Dice-4.svg"
+                  "imgs/Dice-5.svg"
+                  "imgs/Dice-6a.svg"]
+            attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
+            finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
+            modal (bs/make-modal
+                   :header bs/close-modal-btn
+                   :body [:div.container
+                          [:div.row
+                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [attacker :name])]]
+                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [defender :name])]]]
+                          [:div.row
+                           [:div.col-6.text-center.fa-2x 
+                            [:i.fas.fa-shield-alt.pe-3]
+                            [:span 4]]                           
+                           [:div.col-6.text-center.fa-2x
+                            [:i.fas.fa-shield-alt.pe-3]
+                            [:span 4]]]
+                          [:hr]
+                          [:div.row.py-2
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
+                          [:div.row.py-2
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
+                          [:div.row.py-2
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]
+                           [:div.col-6.text-center [:img.img-fluid.dice {:src (nth imgs 5)}]]]
+                          [:hr]
+                          [:div.row
+                           [:div.col.d-grid attack-btn]
+                           [:div.col.d-grid finish-btn]]])]
+        (bs/on-click finish-btn #(go (let [dice (.querySelectorAll modal "img")]
+                                       (doseq [die dice]
+                                         (oset! die :src (rand-nth imgs))))))
+        (bs/on-click attack-btn #(go (let [dice (.querySelectorAll modal "img")]
+                                       (oset! attack-btn :disabled true)
+                                       (doseq [die dice] (.add (oget die :classList) "rotate-center"))
+                                       (<! (a/timeout 200))
+                                       (let [delay 15]
+                                         (loop [i 0]
+                                           (when (<= (* i delay) 200)
+                                             (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
+                                             (<! (a/timeout delay))
+                                             (recur (inc i)))))
+                                       #_(doseq [die dice]
+                                           (oset! die :src (nth imgs 3)))
+                                       (<! (a/timeout 200))
+                                       (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
+                                       (oset! attack-btn :disabled false))))
+        (<! (bs/show-modal modal)))))
+
+(comment
+
+  (show-attack-dialog ::b/argentina ::b/chile)
+  
+  
+  )
+
 (defn finish-turn []
   (go
     (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
