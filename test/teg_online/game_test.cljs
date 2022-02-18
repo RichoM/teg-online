@@ -56,6 +56,15 @@
     (is (= (teg/get-army game country)
            4))))
 
+(deftest add-army-should-throw-if-invalid-country
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego"))]
+    (is (thrown? js/Error (teg/add-army game ::b/argentina 1))
+        "Adding army to free country")
+    (is (thrown? js/Error (teg/add-army game ::b/richopolis 1))
+        "Adding army to non-existent country")))
+
 (comment
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")

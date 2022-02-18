@@ -76,7 +76,19 @@
                 {:id country, :owner player, :army 1})))
      @temp)))
 
+(defn country-exists? [game country-id]
+  (contains? (game :countries) country-id))
+
+(defn country-owner [game country-id]
+  (get-in game [:countries country-id :owner]))
+
 (defn add-army [game country army]
+  (when-not (country-exists? game country)
+    (throw (ex-info (u/format "Country %1 does not exist" country)
+                    {:game game, :country-id country})))
+  (when-not (country-owner game country)
+    (throw (ex-info (u/format "Country %1 has no owner" country)
+                    {:game game, :country-id country})))
   (update-in game [:countries country :army] + army))
 
 (defn next-turn [game]
