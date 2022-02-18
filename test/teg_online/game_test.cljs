@@ -61,17 +61,16 @@
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego"))]
     (is (thrown? js/Error (teg/add-army game ::b/argentina 1))
-        "Adding army to free country")
+        "Adding army to free country should throw error")
     (is (thrown? js/Error (teg/add-army game ::b/richopolis 1))
-        "Adding army to non-existent country")))
+        "Adding army to non-existent country should throw error")))
 
 (deftest get-dice-count-with-only-one-army
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
                  (teg/distribute-countries [::b/argentina ::b/chile]))]
-    (is (= 0 (teg/get-attacker-dice-count game ::b/argentina)))
-    (is (= 1 (teg/get-defender-dice-count game ::b/chile)))))
+    (is (= [0 1] (teg/get-dice-count game ::b/argentina ::b/chile)))))
 
 (deftest get-dice-count-with-more-than-one-army
   (let [game (-> (teg/new-game)
@@ -80,8 +79,7 @@
                  (teg/distribute-countries [::b/argentina ::b/chile])
                  (teg/add-army ::b/argentina 1)
                  (teg/add-army ::b/chile 1))]
-    (is (= 1 (teg/get-attacker-dice-count game ::b/argentina)))
-    (is (= 2 (teg/get-defender-dice-count game ::b/chile)))))
+    (is (= [1 2] (teg/get-dice-count game ::b/argentina ::b/chile)))))
 
 (deftest get-dice-count-with-more-than-max-army
   (let [game (-> (teg/new-game)
@@ -90,17 +88,150 @@
                  (teg/distribute-countries [::b/argentina ::b/chile])
                  (teg/add-army ::b/argentina 10)
                  (teg/add-army ::b/chile 10))]
-    (is (= 3 (teg/get-attacker-dice-count game ::b/argentina)))
-    (is (= 3 (teg/get-defender-dice-count game ::b/chile)))))
+    (is (= [3 3] (teg/get-dice-count game ::b/argentina ::b/chile)))))
+
+(deftest attack-should-reduce-the-army-count-according-to-dice-throws
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5) teg/next-turn
+                 (teg/add-army ::b/chile 5) teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/chile 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [4 5 6]] 
+                             [::b/chile [5 5 5]]))]
+    (is (= 7 (teg/get-army game ::b/argentina)))
+    (is (= 8 (teg/get-army game ::b/chile)))))
+
+(deftest attack-should-involve-valid-countries
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5) teg/next-turn
+                 (teg/add-army ::b/chile 5) teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/chile 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [4 5 6]]
+                             [::b/chile [5 5 5]]))]
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/colombia [1 2 3]]
+                                      [::b/argentina [1 2 3]]))
+        "Attacking from a free country should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1 2 3]]
+                                      [::b/richopolis [1 2 3]]))
+        "Attacking a non existent country should throw error")))
+
+(deftest attack-should-involve-neighbour-countries
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/alaska])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5) teg/next-turn
+                 (teg/add-army ::b/alaska 5) teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/alaska 3) teg/next-turn
+                 (teg/next-phase ::teg/attack))]
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/alaska [1 2 3]]
+                                      [::b/argentina [1 2 3]]))
+        "Attacking from a distant country should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1 2 3]]
+                                      [::b/alaska [1 2 3]]))
+        "Attacking a distant country should throw error")))
+
+(deftest attack-should-originate-from-current-player
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5) teg/next-turn
+                 (teg/add-army ::b/chile 5) teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/chile 3) teg/next-turn
+                 (teg/next-phase ::teg/attack))]
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/chile [1 2 3]]
+                                      [::b/argentina [1 2 3]]))
+        "Attacking from a country that doesn't belong to current player should throw error")))
+
+(deftest attack-should-not-be-self-inflicted
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/uruguay
+                                            ::b/chile ::b/colombia])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5) teg/next-turn
+                 (teg/add-army ::b/uruguay 5) teg/next-turn
+                 (teg/add-army ::b/chile 3) teg/next-turn
+                 (teg/add-army ::b/colombia 3) teg/next-turn
+                 (teg/next-phase ::teg/attack))]
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1 2 3]]
+                                      [::b/argentina [1 2 3]]))
+        "Attacking the same country should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1 2 3]]
+                                      [::b/chile [1 2 3]]))
+        "Attacking a country that belongs to current player should throw error")))
+
+(deftest attack-throws-should-have-correct-number-of-dice
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/chile
+                                            ::b/colombia ::b/uruguay])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 1)
+                 (teg/add-army ::b/colombia 4)
+                 teg/next-turn
+                 (teg/add-army ::b/chile 1)
+                 (teg/add-army ::b/uruguay 4)
+                 teg/next-turn
+                 (teg/add-army ::b/colombia 3) teg/next-turn
+                 (teg/add-army ::b/uruguay 3) teg/next-turn
+                 (teg/next-phase ::teg/attack))]
+    (let [game-2 (teg/attack game
+                        [::b/argentina [4]]
+                        [::b/chile [5 5]])]
+      (is (= 1 (teg/get-army game-2 ::b/argentina))))
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [4 5]]
+                                      [::b/chile [5 5]]))
+        "Attacking with 1 more dice than allowed should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [4 5 6]]
+                                      [::b/chile [5 5]]))
+        "Attacking with 2 more dice than allowed should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1]]
+                                      [::b/chile [1 2 3]]))
+        "Defending with more dice than allowed should throw error")
+    (is (thrown? js/Error (teg/attack game
+                                      [::b/argentina [1]]
+                                      [::b/chile [1]]))
+        "Defending with less dice than allowed should throw error")))
 
 (comment
-  (teg/get-army game ::b/argentina)
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")
                 (teg/join-game ::p2 "Diego")
                 (teg/distribute-countries [::b/argentina ::b/chile])
                 (teg/add-army ::b/argentina 2)
                 (teg/add-army ::b/chile 2)))
+
+  (teg/get-army game ::b/argentina)
+
   (def country (first (teg/player-countries game ::p1)))
   (-> game (teg/get-player ::p1))
 
@@ -108,5 +239,4 @@
   (teg/get-player game ::p1)
   (group-by :id (game :players))
   (u/seek #(= (:id %) ::p1)
-          (game :players))
-  )
+          (game :players)))

@@ -82,26 +82,78 @@
 (defn country-owner [game country-id]
   (get-in game [:countries country-id :owner]))
 
-(defn add-army [game country army]
+(defn assert-valid-country [game country]
   (when-not (country-exists? game country)
     (throw (ex-info (u/format "Country %1 does not exist" country)
                     {:game game, :country-id country})))
   (when-not (country-owner game country)
     (throw (ex-info (u/format "Country %1 has no owner" country)
-                    {:game game, :country-id country})))
+                    {:game game, :country-id country}))))
+
+(defn add-army [game country army]
+  (assert-valid-country game country)
   (update-in game [:countries country :army] + army))
 
 (defn next-turn [game]
   (update game :turn inc))
 
-(defn get-defender-dice-count [game country-id]
-  (min 3 (get-army game country-id)))
+(defn next-phase [game phase]
+  ; TODO(Richo): Validation?
+  (assoc game :phase phase))
 
-(defn get-attacker-dice-count [game country-id]
-  (min 3 (dec (get-army game country-id))))
+(defn get-dice-count [game attacker-id defender-id]
+  [(min 3 (dec (get-army game attacker-id)))
+   (min 3 (get-army game defender-id))])
+
+(defn assert-neighbours [game country-1 country-2]
+  (when-not (contains? (get-in board/countries [country-1 :neighbours])
+                       country-2)
+    (throw (ex-info (u/format "Countries %1 and %2 are not neighbours" country-1 country-2)
+                    {:game game, :countries [country-1 country-2]}))))
+
+(defn assert-country-owner [game country-id players]
+  (when-not (contains? players (country-owner game country-id))
+    (throw (ex-info (u/format "Country %1 doesn't belong to any of the following players: %2" country-id (keys players))
+                    {:game game, :country country-id, :players players}))))
+
+(defn assert-valid-throw [game country-id allowed throw]
+  (let [throw-count (count throw)]
+    (when-not (= allowed throw-count)
+      (throw (ex-info (u/format "Country %1 is allowed to throw %2 dice but threw %3"
+                                country-id allowed throw-count)
+                      {:game game, :country country-id, :allowed allowed, :throw throw})))))
+
+(defn assert-valid-phase [game expected-phase]
+  (let [actual-phase (game :phase)]
+    (when-not (= actual-phase expected-phase)
+      (throw (ex-info (u/format "Game should be in phase %1 but was %2" expected-phase actual-phase)
+                      {:game game, :expected expected-phase, :actual actual-phase})))))
+
+(defn attack [game [attacker-id attacker-throw] [defender-id defender-throw]]
+  (assert-valid-country game attacker-id)
+  (assert-valid-country game defender-id)
+  (assert-neighbours game attacker-id defender-id)
+  (let [current-player (get-current-player game)]
+    (assert-country-owner game attacker-id (select-keys (game :players) [current-player]))
+    (assert-country-owner game defender-id (dissoc (game :players) current-player)))
+  (let [[a-count d-count] (get-dice-count game attacker-id defender-id)]
+    (assert-valid-throw game attacker-id a-count attacker-throw)
+    (assert-valid-throw game defender-id d-count defender-throw))
+  (assert-valid-phase game ::attack)
+  (let [dice-count (min (count attacker-throw)
+                        (count defender-throw))
+        attacker-wins (map (fn [a d] (> a d))
+                           (take dice-count (sort > attacker-throw))
+                           (take dice-count (sort > defender-throw)))
+        defender-hits (count (filter true? attacker-wins))
+        attacker-hits (count (filter false? attacker-wins))]
+    (-> game
+        (update-in [:countries defender-id :army] - defender-hits)
+        (update-in [:countries attacker-id :army] - attacker-hits))))
 
 (comment
-
+(map (fn [a b] (> a b)) 
+     [1 2 3] [4 5 6])
   (u/deal (range 13) "ABC")
 
   (def game @game)
