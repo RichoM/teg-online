@@ -222,13 +222,211 @@
                                       [::b/chile [1]]))
         "Defending with less dice than allowed should throw error")))
 
+(deftest invade-should-move-army-and-change-owner
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1))]
+    (is (= 7 (teg/get-army game ::b/argentina)))
+    (is (= 1 (teg/get-army game ::b/peru)))
+    (is (= ::p1 (teg/country-owner game ::b/argentina)))
+    (is (= ::p1 (teg/country-owner game ::b/peru)))))
+
+(deftest invade-should-involve-valid-countries
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]]))]
+    (is (thrown? js/Error (teg/invade game ::b/richopolis ::b/peru 1))
+        "Invading from non-existent country should throw error")))
+
+(deftest invade-should-only-work-if-defender-army-is-zero
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]]))]
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 1))
+        "Attempting to invade country with more than 0 army should throw error")
+    (is (= 8 (teg/get-army game ::b/argentina)))
+    (is (= 1 (teg/get-army game ::b/peru)))
+    (is (= ::p1 (teg/country-owner game ::b/argentina)))
+    (is (= ::p2 (teg/country-owner game ::b/peru)))))
+
+(deftest invade-should-originate-from-country-owned-by-current-player
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 teg/next-turn)]
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 1))
+        "Invading from a country that is not owned by current player should throw error")))
+
+(deftest invade-cannot-be-self-inflicted
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 5)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 teg/next-turn
+                 (teg/attack [::b/brasil [6 6 6]]
+                             [::b/uruguay [1]])
+                 teg/next-turn)]
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/uruguay 1))
+        "Invading a country that is owned by current player should throw error")))
+
+(deftest invade-should-move-a-valid-number-of-troops
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]]))]
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 0))
+        "Attempting to invade moving less than 1 army should throw error")
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 4))
+        "Attempting to invade moving more than 3 army should throw error")))
+
+(deftest invade-should-never-leave-less-than-1-army-in-attacker-country
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/next-turn
+                 (teg/add-army ::b/brasil 5)
+                 teg/next-turn
+                 (teg/add-army ::b/argentina 3) teg/next-turn
+                 (teg/add-army ::b/peru 3) teg/next-turn
+                 (teg/next-phase ::teg/attack)
+                 (teg/attack [::b/argentina [5 5 5]]
+                             [::b/peru [5 5 5]])                 
+                 (teg/attack [::b/argentina [6 1 1]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6]]
+                             [::b/peru [6 5 5]])
+                 (teg/attack [::b/argentina [6]]
+                             [::b/peru [5 5]])
+                 (teg/attack [::b/argentina [6]]
+                             [::b/peru [5]]))]
+    (let [game' (teg/invade game ::b/argentina ::b/peru 1)]
+      (is (= 1 (teg/get-army game' ::b/argentina)))
+      (is (= 1 (teg/get-army game' ::b/peru)))
+      (is (= ::p1 (teg/country-owner game' ::b/argentina)))
+      (is (= ::p1 (teg/country-owner game' ::b/peru))))
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 2))
+        "Attempting to invade moving more troops than allowed should throw error")
+    (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 3))
+        "Attempting to invade moving more troops than allowed should throw error")))
+
 (comment
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")
                 (teg/join-game ::p2 "Diego")
-                (teg/distribute-countries [::b/argentina ::b/chile])
-                (teg/add-army ::b/argentina 2)
-                (teg/add-army ::b/chile 2)))
+                (teg/distribute-countries [::b/argentina ::b/peru
+                                           ::b/uruguay ::b/brasil])
+                teg/start-game
+                (teg/add-army ::b/argentina 4)
+                (teg/add-army ::b/uruguay 1)
+                teg/next-turn
+                (teg/add-army ::b/brasil 5)
+                teg/next-turn
+                (teg/add-army ::b/argentina 3) teg/next-turn
+                (teg/add-army ::b/peru 3) teg/next-turn
+                (teg/next-phase ::teg/attack)
+                (teg/attack [::b/argentina [5 5 5]]
+                            [::b/peru [5 5 5]])
+                (teg/attack [::b/argentina [6 1 1]]
+                            [::b/peru [5 5 5]])
+                (teg/attack [::b/argentina [6 6]]
+                            [::b/peru [6 5 5]])
+                (teg/attack [::b/argentina [6]]
+                            [::b/peru [5 5]])
+                (teg/attack [::b/argentina [6]]
+                            [::b/peru [5]])))
+  
+  (teg/get-army game ::b/peru)
 
   (teg/get-army game ::b/argentina)
 

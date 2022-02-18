@@ -111,7 +111,12 @@
     (throw (ex-info (u/format "Countries %1 and %2 are not neighbours" country-1 country-2)
                     {:game game, :countries [country-1 country-2]}))))
 
-(defn assert-country-owner [game country-id players]
+(defn assert-country-owner [game country-id player-id]
+  (when-not (= player-id (country-owner game country-id))
+    (throw (ex-info (u/format "Country %1 doesn't belong to player %2" country-id player-id)
+                    {:game game, :country country-id, :player player-id}))))
+
+(defn assert-country-owner-any [game country-id players]
   (when-not (contains? players (country-owner game country-id))
     (throw (ex-info (u/format "Country %1 doesn't belong to any of the following players: %2" country-id (keys players))
                     {:game game, :country country-id, :players players}))))
@@ -134,8 +139,8 @@
   (assert-valid-country game defender-id)
   (assert-neighbours game attacker-id defender-id)
   (let [current-player (get-current-player game)]
-    (assert-country-owner game attacker-id (select-keys (game :players) [current-player]))
-    (assert-country-owner game defender-id (dissoc (game :players) current-player)))
+    (assert-country-owner game attacker-id current-player)
+    (assert-country-owner-any game defender-id (dissoc (game :players) current-player)))
   (let [[a-count d-count] (get-dice-count game attacker-id defender-id)]
     (assert-valid-throw game attacker-id a-count attacker-throw)
     (assert-valid-throw game defender-id d-count defender-throw))
@@ -150,6 +155,35 @@
     (-> game
         (update-in [:countries defender-id :army] - defender-hits)
         (update-in [:countries attacker-id :army] - attacker-hits))))
+
+(defn assert-zero-army [game country-id]
+  (let [army (get-army game country-id)]
+    (when-not (zero? army)
+      (throw (ex-info (u/format "Country %1 should have 0 army but it had %2" country-id army)
+                      {:game game, :country country-id, :army army})))))
+
+(defn assert-valid-invading-army [game attacker-id moving-army]
+  (when (< moving-army 1)
+    (throw (ex-info (u/format "Country %1 should invade with at least 1 army" attacker-id)
+                      {:game game, :country attacker-id, :army moving-army})))
+  (let [max-army (min 3 (dec (get-army game attacker-id)))]
+    (when (> moving-army max-army)
+      (throw (ex-info (u/format "Country %1 should invade with at most %2 army" attacker-id max-army)
+                    {:game game, :country attacker-id, :army moving-army})))))
+
+(defn invade [game attacker-id defender-id moving-army]
+  (assert-valid-country game attacker-id)
+  (assert-valid-country game defender-id)
+  (assert-neighbours game attacker-id defender-id)
+  (assert-zero-army game defender-id)
+  (assert-valid-invading-army game attacker-id moving-army)
+  (let [current-player (get-current-player game)]
+    (assert-country-owner game attacker-id current-player)
+    (assert-country-owner-any game defender-id (dissoc (game :players) current-player))
+    (-> game
+        (update-in [:countries attacker-id :army] - moving-army)
+        (update-in [:countries defender-id :army] + moving-army)
+        (assoc-in [:countries defender-id :owner] current-player))))
 
 (comment
 (map (fn [a b] (> a b)) 
