@@ -191,12 +191,10 @@
     (when-let [current-player (teg/get-current-player game)]
       (case (game :phase)
         ::teg/add-army (= current-player (get-in game [:countries country-id :owner]))
-        ::teg/attack (if-let [selected-country (get-in @state [:user-data :selected-country])]
-                       (or (= selected-country country-id)
-                           (and (not= current-player (teg/country-owner game country-id))
-                                (contains? (get-in b/countries [selected-country :neighbours]) country-id)))
-                       (and (= current-player (teg/country-owner game country-id))
-                            (> (teg/get-army game country-id) 1)))))))
+        ::teg/attack (if (= current-player (teg/country-owner game country-id))
+                       (> (teg/get-army game country-id) 1)
+                       (when-let [selected-country (get-in @state [:user-data :selected-country])]
+                         (contains? (get-in b/countries [selected-country :neighbours]) country-id)))))))
 
 (defn click-country [country-id]
   (go (let [{:keys [phase] :as game} (get-game)]
@@ -236,10 +234,13 @@
           (if-let [selected-country (get-in @state [:user-data :selected-country])]
             (if (= selected-country country-id)
               (swap! state assoc-in [:user-data :selected-country] nil)
-              (do (<! (show-attack-dialog selected-country country-id))
-                  (print "ACAACA" (teg/get-army (get-game) selected-country))
-                  (when (<= (teg/get-army (get-game) selected-country) 1)
-                    (swap! state assoc-in [:user-data :selected-country] nil))))
+              (if (= (teg/country-owner game selected-country)
+                     (teg/country-owner game country-id))
+                (swap! state assoc-in [:user-data :selected-country] country-id)
+                (do (<! (show-attack-dialog selected-country country-id))
+                    (print "ACAACA" (teg/get-army (get-game) selected-country))
+                    (when (<= (teg/get-army (get-game) selected-country) 1)
+                      (swap! state assoc-in [:user-data :selected-country] nil)))))
             (swap! state assoc-in [:user-data :selected-country] country-id))))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
