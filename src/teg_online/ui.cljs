@@ -115,7 +115,8 @@
                              (oset! defender-army-span :innerText (str (teg/get-army game defender)))
                              (let [[a-count d-count] (teg/get-dice-count game attacker defender)
                                    class (if hide-dice? "d-none" "dice-disabled")]
-                               (oset! attack-btn :disabled (<= a-count 0))
+                               (oset! attack-btn :disabled (or (<= a-count 0)
+                                                               (<= d-count 0)))
                                (doseq [[idx [a-die d-die]] (map-indexed vector (get-dice-pairs))]
                                  (if (>= idx a-count)
                                    (.add (oget a-die :classList) class)
@@ -164,6 +165,7 @@
                             (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
                             (update-modal :hide-dice? false)
                             (when (= 0 (teg/get-army (get-game) defender))
+                              (<! (a/timeout 750)) ; Give user time to read the dice
                               (bs/hide-modal modal)))))
         (<! (bs/show-modal modal))
         (when (= 0 (teg/get-army (get-game) defender))
