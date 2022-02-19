@@ -53,7 +53,8 @@
   (swap! game teg/join-game ::p2 "Lechu")
   (swap! game teg/join-game ::p3 "Diego")
   (swap! game teg/distribute-countries)
-  (swap! game teg/add-army :teg-online.board/israel 10)
+  (swap! game teg/add-army :teg-online.board/chile 1)
+  
 
   (swap! game update-in [:turn] inc)
   (swap! game update-in [:players ::p1 :name] (constantly "Un nombre mucho muy muuuuy largo"))

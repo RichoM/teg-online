@@ -161,17 +161,14 @@
                                      [defender d-throw]))
                             (<! (a/timeout 200))
                             (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
-                            (update-modal :hide-dice? false))))
-        (<! (bs/show-modal modal)))))
-
-(comment
-  (def get-dice #(js/document.querySelectorAll ".dice"))
-
-(def get-dice-pairs #(partition-all 2 (get-dice)))
-  
-  (sort > (repeatedly 5 (partial rand-int 6)))
-  
-  )
+                            (update-modal :hide-dice? false)
+                            (when (= 0 (teg/get-army (get-game) defender))
+                              (bs/hide-modal modal)))))
+        (<! (bs/show-modal modal))
+        (when (= 0 (teg/get-army (get-game) defender))
+          (<! (bs/alert "Invasión exitosa")) ; TODO(Richo): Ask user how many troops to move
+          (swap! (@state :game-atom) teg/invade
+                 attacker defender 1)))))
 
 (defn finish-turn []
   (go
@@ -185,7 +182,7 @@
                              (when (> extra-army 0)
                                (swap! game-atom teg/add-army country-id extra-army)))
                            (swap! game-atom teg/next-turn)))
-        ::teg/attack (do
+        ::teg/attack (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
                        ;; TODO(Richo): The right thing to do is to keep the current player and regroup,
                        ;; but for now I'm just advancing the turn (just to test)
                        #_(swap! game-atom teg/next-phase ::teg/regroup)
@@ -241,7 +238,10 @@
           (if-let [selected-country (get-in @state [:user-data :selected-country])]
             (if (= selected-country country-id)
               (swap! state assoc-in [:user-data :selected-country] nil)
-              (<! (show-attack-dialog selected-country country-id)))
+              (do (<! (show-attack-dialog selected-country country-id))
+                  (print "ACAACA" (teg/get-army (get-game) selected-country))
+                  (when (<= (teg/get-army (get-game) selected-country) 1)
+                    (swap! state assoc-in [:user-data :selected-country] nil))))
             (swap! state assoc-in [:user-data :selected-country] country-id))))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
@@ -260,10 +260,9 @@
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
-        (mm/on-mouse-enter #(when (can-interact-with-country? country-id)
-                              (oset! morph :alpha selected-alpha)))
-        (mm/on-mouse-leave #(when (can-interact-with-country? country-id)
-                              (oset! morph :alpha 0.5)))
+        (mm/on-mouse-move #(if (can-interact-with-country? country-id)
+                             (oset! (js/document.querySelector "#board-panel") :style.cursor "pointer")
+                             (oset! (js/document.querySelector "#board-panel") :style.cursor "default")))
         (mm/on-mouse-down #(when (can-interact-with-country? country-id)
                              (oset! morph :alpha selected-alpha)))
         (mm/on-mouse-up #(go (when (can-interact-with-country? country-id)
@@ -273,6 +272,11 @@
              assoc-in [:countries country-id]
              {:morph morph
               :counter counter}))))
+
+(comment
+  
+  (oset! (js/document.querySelector "#board-panel") :style.cursor "default")
+  )
 
 (defn init-countries []
   (go (<! (a/map vector (map init-country (shuffle country-data))))))
@@ -322,7 +326,6 @@
                             original-form)
               additions (get-in @state [:user-data :additions id] 0)
               selected? (= id (get-in @state [:user-data :selected-country]))]
-          (print id selected?)
           (oset! morph :form tinted-form)
           (oset! morph :alpha (if player-idx 
                                 (if selected? 0.25 0.5)

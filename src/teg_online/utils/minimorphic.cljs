@@ -48,6 +48,9 @@
 (defn on-mouse-enter [^js/Morph morph callback]
   (doto morph (.on "mouseEnter" callback)))
 
+(defn on-mouse-move [^js/Morph morph callback]
+  (doto morph (.on "mouseMove" callback)))
+
 (defn on-mouse-leave [^js/Morph morph callback]
   (doto morph (.on "mouseLeave" callback)))
 
