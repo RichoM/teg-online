@@ -238,7 +238,6 @@
                      (teg/country-owner game country-id))
                 (swap! state assoc-in [:user-data :selected-country] country-id)
                 (do (<! (show-attack-dialog selected-country country-id))
-                    (print "ACAACA" (teg/get-army (get-game) selected-country))
                     (when (<= (teg/get-army (get-game) selected-country) 1)
                       (swap! state assoc-in [:user-data :selected-country] nil)))))
             (swap! state assoc-in [:user-data :selected-country] country-id))))))
