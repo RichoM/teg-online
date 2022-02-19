@@ -181,12 +181,9 @@
                            (doseq [[country-id extra-army] additions]
                              (when (> extra-army 0)
                                (swap! game-atom teg/add-army country-id extra-army)))
-                           (swap! game-atom teg/next-turn)))
+                           (swap! game-atom teg/finish-current-action)))
         ::teg/attack (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
-                       ;; TODO(Richo): The right thing to do is to keep the current player and regroup,
-                       ;; but for now I'm just advancing the turn (just to test)
-                       #_(swap! game-atom teg/next-phase ::teg/regroup)
-                       (swap! game-atom teg/next-turn))))))
+                       (swap! game-atom teg/finish-current-action))))))
 
 (defn can-interact-with-country? [country-id]
   (when-let [game (get-game)]
