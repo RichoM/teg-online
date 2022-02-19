@@ -150,11 +150,12 @@
                                       d (nth d-throw i nil)]
                                   (oset! a-die :src (if a (nth imgs a) (last imgs)))
                                   (oset! d-die :src (if d (nth imgs d) (last imgs)))
-                                  (if (> a d)
-                                    (do (.add (oget a-die :classList) "dice-winner")
-                                        (.add (oget d-die :classList) "dice-loser"))
-                                    (do (.add (oget d-die :classList) "dice-winner")
-                                        (.add (oget a-die :classList) "dice-loser")))))
+                                  (when (< i (min a-count d-count))
+                                    (if (> a d)
+                                      (do (.add (oget a-die :classList) "dice-winner")
+                                          (.add (oget d-die :classList) "dice-loser"))
+                                      (do (.add (oget d-die :classList) "dice-winner")
+                                          (.add (oget a-die :classList) "dice-loser"))))))
                               (swap! (@state :game-atom)
                                      teg/attack
                                      [attacker a-throw]
