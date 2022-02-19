@@ -400,31 +400,52 @@
     (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 3))
         "Attempting to invade moving more troops than allowed should throw error")))
 
+(deftest finish-current-action
+  (let [game-atom (atom (-> (teg/new-game)
+                            (teg/join-game ::p1 "Richo")
+                            (teg/join-game ::p2 "Diego")
+                            (teg/distribute-countries [::b/argentina ::b/peru
+                                                       ::b/uruguay ::b/brasil])
+                            teg/start-game))
+        get-current-state #(let [game @game-atom]
+                             [(teg/get-current-player game)
+                              (teg/get-current-phase game)])]
+    (is (= [::p1 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p2 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p1 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p2 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p1 ::teg/attack] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p2 ::teg/attack] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p1 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p2 ::teg/add-army] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p1 ::teg/attack] (get-current-state)))
+    (swap! game-atom teg/finish-current-action)
+    (is (= [::p2 ::teg/attack] (get-current-state)))))
+
 (comment
+  (def game-atom (atom (-> (teg/new-game)
+                           (teg/join-game ::p1 "Richo")
+                           (teg/join-game ::p2 "Diego")
+                           (teg/distribute-countries [::b/argentina ::b/peru
+                                                      ::b/uruguay ::b/brasil])
+                           teg/start-game)))
+  (def get-current-state #(let [game @game-atom]
+                            [(teg/get-current-player game)
+                             (teg/get-current-phase game)]))
   (def game (-> (teg/new-game)
                 (teg/join-game ::p1 "Richo")
                 (teg/join-game ::p2 "Diego")
                 (teg/distribute-countries [::b/argentina ::b/peru
                                            ::b/uruguay ::b/brasil])
-                teg/start-game
-                (teg/add-army ::b/argentina 4)
-                (teg/add-army ::b/uruguay 1)
-                teg/next-turn
-                (teg/add-army ::b/brasil 5)
-                teg/next-turn
-                (teg/add-army ::b/argentina 3) teg/next-turn
-                (teg/add-army ::b/peru 3) teg/next-turn
-                (teg/next-phase ::teg/attack)
-                (teg/attack [::b/argentina [5 5 5]]
-                            [::b/peru [5 5 5]])
-                (teg/attack [::b/argentina [6 1 1]]
-                            [::b/peru [5 5 5]])
-                (teg/attack [::b/argentina [6 6]]
-                            [::b/peru [6 5 5]])
-                (teg/attack [::b/argentina [6]]
-                            [::b/peru [5 5]])
-                (teg/attack [::b/argentina [6]]
-                            [::b/peru [5]])))
+                teg/start-game))
   
   (teg/get-army game ::b/peru)
 
