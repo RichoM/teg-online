@@ -394,8 +394,6 @@
                               ::teg/attack "Atacando..."
                               ::teg/regroup "Reagrupando..."
                               "")]]
-                          [:div.col-auto (bs/on-click (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} "TEST"])
-                                                      #(show-attack-dialog ::b/argentina ::b/chile))]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled?))}
