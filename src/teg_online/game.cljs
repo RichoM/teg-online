@@ -2,8 +2,11 @@
   (:require [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
-(derive ::add-army-1 ::add-army)
-(derive ::add-army-2 ::add-army)
+(derive ::attack ::game-phase)
+(derive ::regroup ::game-phase)
+(derive ::add-army ::game-phase)
+(derive ::add-army-1 ::add-army) ; Special case for first round
+(derive ::add-army-2 ::add-army) ; Special case for second round
 
 (defn new-game []
   {:players {}
