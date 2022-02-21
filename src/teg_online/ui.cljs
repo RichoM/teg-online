@@ -188,6 +188,10 @@
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
         (swap! game-atom teg/finish-action))))
 
+(defmethod finish-turn! ::teg/regroup [game-atom]
+  (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
+        (swap! game-atom teg/finish-action))))
+
 (defmulti can-interact-with-country? (fn [{:keys [phase]} _country _player] phase))
 
 (defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
@@ -198,6 +202,10 @@
     (> (teg/get-army game country-id) 1)
     (when-let [selected-country (get-in @state [:user-data :selected-country])]
       (contains? (get-in b/countries [selected-country :neighbours]) country-id))))
+
+(defmethod can-interact-with-country? ::teg/regroup [game country-id player-id]
+  ; TODO(Richo): Validate army > 0
+  (= player-id (teg/country-owner game country-id)))
 
 (defmulti click-country! (fn [game-atom _country-id] (@game-atom :phase)))
 
@@ -244,6 +252,16 @@
               (do (<! (show-attack-dialog selected-country country-id))
                   (when (<= (teg/get-army @game-atom selected-country) 1)
                     (swap! state assoc-in [:user-data :selected-country] nil))))))
+        (swap! state assoc-in [:user-data :selected-country] country-id))))
+
+(defmethod click-country! ::teg/regroup [game-atom country-id]
+  (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
+        (if (= selected-country country-id)
+          (swap! state assoc-in [:user-data :selected-country] nil)
+          (if (contains? (get-in b/countries [selected-country :neighbours]) country-id)
+            (do (print selected-country "->" country-id) ; TODO(Richo): Show regroup dialog
+                (swap! state assoc-in [:user-data :selected-country] nil))
+            (swap! state assoc-in [:user-data :selected-country] country-id)))
         (swap! state assoc-in [:user-data :selected-country] country-id))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
@@ -436,6 +454,7 @@
 (defmethod reset-user-data ::teg/add-army [game] {:remaining (teg/calculate-extra-army game)
                                                   :additions {}})
 (defmethod reset-user-data ::teg/attack [_] {:selected-country nil})
+(defmethod reset-user-data ::teg/regroup [_] {:selected-country nil})
 
 (defn initialize [game-atom]
   (go (reset! state {:game-atom game-atom
