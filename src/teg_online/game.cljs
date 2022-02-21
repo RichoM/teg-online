@@ -212,6 +212,27 @@
         (update-in [:countries defender-id :army] + moving-army)
         (assoc-in [:countries defender-id :owner] current-player))))
 
+(defn assert-valid-regrouping-army [game src-id moving-army]
+  (when (< moving-army 1)
+    (throw (ex-info (u/format "Country %1 should regroup with at least 1 army" src-id)
+                      {:game game, :country src-id, :army moving-army})))
+  (let [max-army (dec (get-army game src-id))]
+    (when (> moving-army max-army)
+      (throw (ex-info (u/format "Country %1 should regroup with at most %2 army" src-id max-army)
+                    {:game game, :country src-id, :army moving-army})))))
+
+(defn regroup [game src-id dst-id moving-army]
+  (assert-valid-country game src-id)
+  (assert-valid-country game dst-id)
+  (assert-neighbours game src-id dst-id)
+  (assert-valid-regrouping-army game src-id moving-army)
+  (let [current-player (get-current-player game)]
+    (assert-country-owner game src-id current-player)
+    (assert-country-owner game dst-id current-player))
+  (-> game
+      (update-in [:countries src-id :army] - moving-army)
+      (update-in [:countries dst-id :army] + moving-army)))
+
 (comment
 (map (fn [a b] (> a b)) 
      [1 2 3] [4 5 6])
