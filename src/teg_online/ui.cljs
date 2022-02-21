@@ -465,8 +465,8 @@
       (add-watch state :ui-change
                  #(a/put! (@state :updates) @game-atom))
       (let [state-change (fn [_key _atom old-state new-state]
-                           (when (not= (old-state :turn)
-                                       (new-state :turn))
+                           (when (not= [(old-state :phase) (old-state :turn)]
+                                       [(new-state :phase) (new-state :turn)])
                              (swap! state assoc :user-data
                                     (reset-user-data new-state)))
                            (a/put! (@state :updates) new-state))]
