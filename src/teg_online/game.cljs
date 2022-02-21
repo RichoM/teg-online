@@ -2,10 +2,8 @@
   (:require [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
-(def game-phases 
-  [::add-army
-   ::attack
-   ::regroup])
+(derive ::add-army-1 ::add-army)
+(derive ::add-army-2 ::add-army)
 
 (defn new-game []
   {:players {}
@@ -13,7 +11,7 @@
                          {}
                          board/countries)
    :turn-order []
-   :phase ::add-army
+   :phase nil
    :turn nil})
 
 (defn new-player [id name]
@@ -30,7 +28,9 @@
         (update :players assoc id (new-player id name)))))
 
 (defn start-game [game]
-  (assoc game :turn 0))
+  (assoc game
+         :turn 0
+         :phase ::add-army-1))
 
 (defn get-players [game]
   (map (game :players)
@@ -99,27 +99,31 @@
 (defn next-turn [game]
   (update game :turn inc))
 
-(defn next-phase [game phase]
-  ; TODO(Richo): Validation?
-  (assoc game :phase phase))
+(defmulti get-next-phase :phase)
+(defmethod get-next-phase ::add-army-1 [_] ::add-army-2)
+(defmethod get-next-phase ::add-army-2 [_] ::attack)
+(defmethod get-next-phase ::add-army [_] ::attack)
+(defmethod get-next-phase ::attack [_] ::regroup)
+(defmethod get-next-phase ::regroup [{:keys [turn players]}]
+  (if (zero? (mod (inc turn) (count players)))
+    ::add-army
+    ::attack))
+
+(defn next-phase [game]
+  (assoc game :phase (get-next-phase game)))
 
 (defmulti finish-current-action :phase)
 
 (defmethod finish-current-action ::add-army [{:keys [turn players] :as game}]
-  (let [player-count (count players)]
-    (if (zero? (mod (inc turn) player-count))
-      (if (>= (inc turn) (* 2 player-count))
-        (next-phase (next-turn game)
-                    ::attack)
-        (next-turn game))
-      (next-turn game))))
+  (if (zero? (mod (inc turn) (count players)))
+      (next-turn (next-phase game))
+      (next-turn game)))
 
-(defmethod finish-current-action ::attack [{:keys [turn players] :as game}]
-  (let [player-count (count players)]
-    (if (zero? (mod (inc turn) player-count)) ; TODO(Richo)
-      (next-phase (next-turn game)
-                  ::add-army)
-      (next-turn game))))
+(defmethod finish-current-action ::attack [game]
+  (next-phase game))
+
+(defmethod finish-current-action ::regroup [game]
+  (next-turn (next-phase game)))
 
 (defn get-dice-count [game attacker-id defender-id]
   [(min 3 (dec (get-army game attacker-id)))
