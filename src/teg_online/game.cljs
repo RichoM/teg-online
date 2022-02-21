@@ -103,20 +103,23 @@
   ; TODO(Richo): Validation?
   (assoc game :phase phase))
 
-(defn finish-current-action [{:keys [phase turn players] :as game}]
+(defmulti finish-current-action :phase)
+
+(defmethod finish-current-action ::add-army [{:keys [turn players] :as game}]
   (let [player-count (count players)]
-    (case phase
-      ::add-army (if (zero? (mod (inc turn) player-count))
-                   (if (>= (inc turn) (* 2 player-count))
-                     (next-phase (next-turn game)
-                                 ::attack)
-                     (next-turn game))
-                   (next-turn game))
-      
-      ::attack (if (zero? (mod (inc turn) player-count)) ; TODO(Richo)
-                 (next-phase (next-turn game)
-                             ::add-army)
-                 (next-turn game)))))
+    (if (zero? (mod (inc turn) player-count))
+      (if (>= (inc turn) (* 2 player-count))
+        (next-phase (next-turn game)
+                    ::attack)
+        (next-turn game))
+      (next-turn game))))
+
+(defmethod finish-current-action ::attack [{:keys [turn players] :as game}]
+  (let [player-count (count players)]
+    (if (zero? (mod (inc turn) player-count)) ; TODO(Richo)
+      (next-phase (next-turn game)
+                  ::add-army)
+      (next-turn game))))
 
 (defn get-dice-count [game attacker-id defender-id]
   [(min 3 (dec (get-army game attacker-id)))
