@@ -182,11 +182,11 @@
           (doseq [[country-id extra-army] additions]
             (when (> extra-army 0)
               (swap! game-atom teg/add-army country-id extra-army)))
-          (swap! game-atom teg/finish-current-action)))))
+          (swap! game-atom teg/finish-action)))))
 
 (defmethod finish-turn! ::teg/attack [game-atom]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
-        (swap! game-atom teg/finish-current-action))))
+        (swap! game-atom teg/finish-action))))
 
 (defmulti can-interact-with-country? (fn [{:keys [phase]} _country _player] phase))
 

@@ -112,17 +112,17 @@
 (defn next-phase [game]
   (assoc game :phase (get-next-phase game)))
 
-(defmulti finish-current-action :phase)
+(defmulti finish-action :phase)
 
-(defmethod finish-current-action ::add-army [{:keys [turn players] :as game}]
+(defmethod finish-action ::add-army [{:keys [turn players] :as game}]
   (if (zero? (mod (inc turn) (count players)))
       (next-turn (next-phase game))
       (next-turn game)))
 
-(defmethod finish-current-action ::attack [game]
+(defmethod finish-action ::attack [game]
   (next-phase game))
 
-(defmethod finish-current-action ::regroup [game]
+(defmethod finish-action ::regroup [game]
   (next-turn (next-phase game)))
 
 (defn get-dice-count [game attacker-id defender-id]

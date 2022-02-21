@@ -96,10 +96,10 @@
                  (teg/join-game ::p2 "Diego")
                  (teg/distribute-countries [::b/argentina ::b/chile])
                  teg/start-game
-                 (teg/add-army ::b/argentina 5) teg/finish-current-action
-                 (teg/add-army ::b/chile 5) teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/chile 3) teg/finish-current-action
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
                  (teg/attack [::b/argentina [4 5 6]] 
                              [::b/chile [5 5 5]]))]
     (is (= 7 (teg/get-army game ::b/argentina)))
@@ -112,10 +112,10 @@
                  (teg/join-game ::p2 "Diego")
                  (teg/distribute-countries [::b/argentina ::b/chile])
                  teg/start-game
-                 (teg/add-army ::b/argentina 5) teg/finish-current-action
-                 (teg/add-army ::b/chile 5) teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/chile 3) teg/finish-current-action
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
                  (teg/attack [::b/argentina [4 5 6]]
                              [::b/chile [5 5 5]]))]
     (is (thrown? js/Error (teg/attack game
@@ -133,10 +133,10 @@
                  (teg/join-game ::p2 "Diego")
                  (teg/distribute-countries [::b/argentina ::b/alaska])
                  teg/start-game
-                 (teg/add-army ::b/argentina 5) teg/finish-current-action
-                 (teg/add-army ::b/alaska 5) teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/alaska 3) teg/finish-current-action)]
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/alaska 5) teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/alaska 3) teg/finish-action)]
     (is (thrown? js/Error (teg/attack game
                                       [::b/alaska [1 2 3]]
                                       [::b/argentina [1 2 3]]))
@@ -152,10 +152,10 @@
                  (teg/join-game ::p2 "Diego")
                  (teg/distribute-countries [::b/argentina ::b/chile])
                  teg/start-game
-                 (teg/add-army ::b/argentina 5) teg/finish-current-action
-                 (teg/add-army ::b/chile 5) teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/chile 3) teg/finish-current-action)]
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action)]
     (is (thrown? js/Error (teg/attack game
                                       [::b/chile [1 2 3]]
                                       [::b/argentina [1 2 3]]))
@@ -168,10 +168,10 @@
                  (teg/distribute-countries [::b/argentina ::b/uruguay
                                             ::b/chile ::b/colombia])
                  teg/start-game
-                 (teg/add-army ::b/argentina 5) teg/finish-current-action
-                 (teg/add-army ::b/uruguay 5) teg/finish-current-action
-                 (teg/add-army ::b/chile 3) teg/finish-current-action
-                 (teg/add-army ::b/colombia 3) teg/finish-current-action)]
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/uruguay 5) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+                 (teg/add-army ::b/colombia 3) teg/finish-action)]
     (is (thrown? js/Error (teg/attack game
                                       [::b/argentina [1 2 3]]
                                       [::b/argentina [1 2 3]]))
@@ -190,12 +190,12 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 1)
                  (teg/add-army ::b/colombia 4)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/chile 1)
                  (teg/add-army ::b/uruguay 4)
-                 teg/finish-current-action
-                 (teg/add-army ::b/colombia 3) teg/finish-current-action
-                 (teg/add-army ::b/uruguay 3) teg/finish-current-action)]
+                 teg/finish-action
+                 (teg/add-army ::b/colombia 3) teg/finish-action
+                 (teg/add-army ::b/uruguay 3) teg/finish-action)]
     (let [game-2 (teg/attack game
                         [::b/argentina [4]]
                         [::b/chile [5 5]])]
@@ -226,11 +226,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]])
                  (teg/attack [::b/argentina [6 6 6]]
@@ -250,11 +250,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]])
                  (teg/attack [::b/argentina [6 6 6]]
@@ -271,11 +271,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]]))]
     (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 1))
@@ -294,11 +294,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]])
                  (teg/attack [::b/argentina [6 6 6]]
@@ -315,21 +315,21 @@
                                             ::b/uruguay ::b/brasil])
                  teg/start-game
                  (teg/add-army ::b/argentina 5)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]])
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5]])
-                 teg/finish-current-action
-                 teg/finish-current-action
+                 teg/finish-action
+                 teg/finish-action
                  (teg/attack [::b/brasil [6 6 6]]
                              [::b/uruguay [1]])
-                 teg/finish-current-action
-                 teg/finish-current-action)]
+                 teg/finish-action
+                 teg/finish-action)]
     (print (game :phase))
     (is (thrown? js/Error (teg/invade game ::b/argentina ::b/uruguay 1))
         "Invading a country that is owned by current player should throw error")))
@@ -343,11 +343,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [6 6 6]]
                              [::b/peru [5 5 5]])
                  (teg/attack [::b/argentina [6 6 6]]
@@ -366,11 +366,11 @@
                  teg/start-game
                  (teg/add-army ::b/argentina 4)
                  (teg/add-army ::b/uruguay 1)
-                 teg/finish-current-action
+                 teg/finish-action
                  (teg/add-army ::b/brasil 5)
-                 teg/finish-current-action
-                 (teg/add-army ::b/argentina 3) teg/finish-current-action
-                 (teg/add-army ::b/peru 3) teg/finish-current-action
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
                  (teg/attack [::b/argentina [5 5 5]]
                              [::b/peru [5 5 5]])                 
                  (teg/attack [::b/argentina [6 1 1]]
@@ -391,7 +391,7 @@
     (is (thrown? js/Error (teg/invade game ::b/argentina ::b/peru 3))
         "Attempting to invade moving more troops than allowed should throw error")))
 
-(deftest finish-current-action
+(deftest finish-action
   (let [game-atom (atom (-> (teg/new-game)
                             (teg/join-game ::p1 "Richo")
                             (teg/join-game ::p2 "Diego")
@@ -402,31 +402,31 @@
                              [(teg/get-current-player game)
                               (teg/get-current-phase game)])]
     (is (= (get-current-state) [::p1 ::teg/add-army-1]) "T: 0")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/add-army-1]) "T: 1")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/add-army-2]) "T: 2")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/add-army-2]) "T: 3")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/attack]) "T: 4")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/regroup]) "T: 5")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/attack]) "T: 6")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/regroup]) "T: 7")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/add-army]) "T: 8")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/add-army]) "T: 9")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/attack]) "T: A")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p1 ::teg/regroup]) "T: B")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/attack]) "T: C")
-    (swap! game-atom teg/finish-current-action)
+    (swap! game-atom teg/finish-action)
     (is (= (get-current-state) [::p2 ::teg/regroup]) "T: D")))
 
 (comment
@@ -441,7 +441,7 @@
                (print {:current-player (teg/get-current-player game)
                        :phase (teg/get-current-phase game)
                        :turn (game :turn)})))
-  (do (swap! game-atom teg/finish-current-action)
+  (do (swap! game-atom teg/finish-action)
       nil)
 
   
