@@ -80,10 +80,8 @@
             (<! (a/timeout delay))
             (recur (inc i)))))))
 
-(defn show-attack-dialog [attacker defender] ; TODO(Richo): This function is a mess!
+(defn show-attack-dialog [& {:keys [attacker defender on-dice-roll]}] ; TODO(Richo): This function is a mess!
   (go (let [imgs dice-images
-            attacker-name (get-in b/countries [attacker :name])
-            defender-name (get-in b/countries [defender :name])
             attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
             finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
             attacker-army-span (crate/html [:span])
@@ -92,8 +90,8 @@
                    :header bs/close-modal-btn
                    :body [:div.container
                           [:div.row
-                           [:div.col-6.text-center [:h1.text-truncate attacker-name]]
-                           [:div.col-6.text-center [:h1.text-truncate defender-name]]]
+                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [attacker :name])]]
+                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [defender :name])]]]
                           [:div.row
                            [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
@@ -161,10 +159,8 @@
                                           (.add (oget d-die :classList) "dice-loser"))
                                       (do (.add (oget d-die :classList) "dice-winner")
                                           (.add (oget a-die :classList) "dice-loser"))))))
-                              (swap! (@state :game-atom)
-                                     teg/attack
-                                     [attacker a-throw]
-                                     [defender d-throw]))
+                              (when on-dice-roll
+                                (on-dice-roll a-throw d-throw)))
                             (<! (a/timeout 200))
                             (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
                             (update-modal :hide-dice? false)
@@ -176,21 +172,9 @@
         (<! (bs/show-modal modal))
         (let [game (get-game)]
           (cond
-            (= 0 (teg/get-army game defender))
-            (let [army (<! (show-add-army-dialog
-                            :title (list [:span.fw-bolder.text-nowrap attacker-name]
-                                         [:span " invadió "]
-                                         [:span.fw-bolder.text-nowrap defender-name])
-                            :message "¿Cuántas tropas enviar?"
-                            :show-cancel? false
-                            :default-value 1
-                            :min-value 1
-                            :max-value (min 3 (dec (teg/get-army game attacker)))))]
-              (swap! (@state :game-atom) teg/invade
-                     attacker defender army))
-
-            (= 1 (teg/get-army game attacker))
-            (<! (bs/alert "Invasión fallida")))))))
+            (= 0 (teg/get-army game defender)) :success
+            (= 1 (teg/get-army game attacker)) :failure
+            :else :cancel)))))
 
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
@@ -271,6 +255,34 @@
           (when (zero? (-> @state :user-data :remaining))
             (<! (finish-turn! game-atom)))))))
 
+(defn attack! [game-atom attacker defender]
+  (go (case (<! (show-attack-dialog
+                 :attacker attacker
+                 :defender defender
+                 :on-dice-roll (fn [a-throw d-throw]
+                                     ; TODO(Richo): Maybe add the army effect here?
+                                 (swap! game-atom
+                                        teg/attack
+                                        [attacker a-throw]
+                                        [defender d-throw]))))
+        :success (let [army (<! (show-add-army-dialog
+                                 :title (list [:span.fw-bolder.text-nowrap
+                                               (get-in b/countries [attacker :name])]
+                                              [:span " invadió "]
+                                              [:span.fw-bolder.text-nowrap
+                                               (get-in b/countries [defender :name])])
+                                 :message "¿Cuántas tropas enviar?"
+                                 :show-cancel? false
+                                 :default-value 1
+                                 :min-value 1
+                                 :max-value (min 3 (dec (teg/get-army @game-atom attacker)))))]
+                   (swap! game-atom teg/invade attacker defender army))
+        :failure (<! (bs/alert "Invasión fallida"))
+        :cancel :nop)
+      (let [new-attacker-army (teg/get-army @game-atom attacker)]
+        (when (<= new-attacker-army 1)
+          (swap! state assoc-in [:user-data :selected-country] nil)))))
+
 (defmethod click-country! ::teg/attack [game-atom country-id]
   (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
         (if (= selected-country country-id)
@@ -279,19 +291,7 @@
             (if (= (teg/country-owner game selected-country)
                    (teg/country-owner game country-id))
               (swap! state assoc-in [:user-data :selected-country] country-id)
-              (let [attacker-army (teg/get-army game selected-country)
-                    defender-army (teg/get-army game country-id)]
-                (<! (show-attack-dialog selected-country country-id))
-                (let [game @game-atom
-                      new-attacker-army (teg/get-army game selected-country)
-                      new-defender-army (teg/get-army game country-id)]
-                  #_(when (not= attacker-army new-attacker-army)
-                    (moved-army-effect selected-country (- attacker-army new-attacker-army)))
-                  #_(when (not= defender-army new-defender-army)
-                    (moved-army-effect country-id (- defender-army new-defender-army)))
-                  (when (<= new-attacker-army 1)
-                    (swap! state assoc-in [:user-data :selected-country] nil)))
-                ))))
+              (attack! game-atom selected-country country-id))))
         (swap! state assoc-in [:user-data :selected-country] country-id))))
 
 (defmethod click-country! ::teg/regroup [game-atom country-id]
