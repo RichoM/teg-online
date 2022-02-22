@@ -82,18 +82,18 @@
   (show-modal (apply make-modal args)))
 
 (defn alert [title & message]
-  (-> (make-modal :header (list [:h4
+  (-> (make-modal :header (list [:h2
                                  [:i.fas.fa-exclamation-circle]
                                  [:span.ms-2 title]]
                                 close-modal-btn)
-                  :body (when message [:h5 message])
+                  :body (when message [:h3 message])
                   :footer accept-modal-btn)
       (on-modal-keypress-enter hide-modal)
       show-modal))
 
 (comment
   (go (print "HOLA")
-      (<! (alert "CUIDADO!"))
+      (<! (alert "CUIDADO!" "Hombre radioactivo!"))
       (print "CHAU"))
   )
 
@@ -103,11 +103,11 @@
                               #(reset! result true))
             no-btn (on-click (crate/html cancel-modal-btn)
                              #(reset! result false))]
-        (<! (-> (make-modal :header (list [:h4
+        (<! (-> (make-modal :header (list [:h2
                                            [:i.fas.fa-question-circle]
                                            [:span.ms-2 title]]
                                           close-modal-btn)
-                            :body (when message [:h5 message])
+                            :body (when message [:h3 message])
                             :footer (list yes-btn no-btn))
                 (on-modal-keypress-enter (fn [modal]
                                            (reset! result true)
@@ -129,12 +129,12 @@
                               #(reset! result (.-value input)))
             no-btn (on-click (crate/html cancel-modal-btn)
                              #(reset! result nil))]
-        (<! (-> (make-modal :header (list [:h4
+        (<! (-> (make-modal :header (list [:h2
                                            [:i.fas.fa-question-circle]
                                            [:span.ms-2 title]]
                                           close-modal-btn)
                             :body [:div.container-fluid
-                                   [:div.row [:h5 message]]
+                                   [:div.row [:h3 message]]
                                    [:div.row input]]
                             :footer (list yes-btn no-btn))
                 (on-modal-keypress-enter (fn [modal]
@@ -145,7 +145,7 @@
 
 (comment
   (go (print 1)
-      (if-let [val (<! (prompt "Richo capo?" "" 5))]
+      (if-let [val (<! (prompt "Richo capo?" "AAAH" 5))]
         (print val)
         (print false)))
   
