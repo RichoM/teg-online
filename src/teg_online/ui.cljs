@@ -26,8 +26,8 @@
   (when-let [game-atom (@state :game-atom)]
     @game-atom))
 
-(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value]
-                              :or {title nil, message nil, default-value 0}}]
+(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
+                              :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
             counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span.text-black-50])
@@ -63,14 +63,16 @@
                                       [:div.row.py-3
                                        [:div.col-6 [:div.d-grid minus-btn]]
                                        [:div.col-6 [:div.d-grid plus-btn]]]]
-                               :footer (list accept-button cancel-button))
+                               :footer (if show-cancel?
+                                         (list accept-button cancel-button)
+                                         accept-button))
                 (bs/on-modal-keypress-enter (fn [modal]
                                               (reset! result-value @counter-value)
                                               (bs/hide-modal modal)))
                 bs/show-modal))
         @result-value)))
 
-(defn show-attack-dialog [attacker defender]
+(defn show-attack-dialog [attacker defender] ; TODO(Richo): This function is a mess!
   (go (let [imgs dice-images
             attacker-name (get-in b/countries [attacker :name])
             defender-name (get-in b/countries [defender :name])
@@ -177,6 +179,7 @@
                                          [:span " invadió "]
                                          [:span.fw-bolder.text-nowrap defender-name])
                             :message "¿Cuántas tropas enviar?"
+                            :show-cancel? false
                             :default-value 1
                             :min-value 1
                             :max-value (min 3 (dec (teg/get-army game attacker)))))]
