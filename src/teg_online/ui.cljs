@@ -228,6 +228,21 @@
   ; TODO(Richo): Validate army > 0
   (= player-id (teg/country-owner game country-id)))
 
+(defn moved-army-effect [country-id value]
+  (let [{:strs [x y]} (-> @state
+                          (get-in [:countries country-id :counter])
+                          (oget :center)
+                          js->clj)
+        label (-> (mm/make-label (u/format "%1%2"
+                                           (if (pos? value) "+" "-")
+                                           (js/Math.abs value))
+                                 :font "bold 30px Arial"
+                                 :color (if (pos? value) "lawngreen" "darkred")
+                                 :center (clj->js {:x x, :y (- y 30)}))
+                  (mm/translate 0 -100 2)
+                  (mm/vanish 2))]
+    (.addMorph world label)))
+
 (defmulti click-country! (fn [game-atom _country-id] (@game-atom :phase)))
 
 (defmethod click-country! ::teg/add-army [game-atom country-id]
@@ -245,20 +260,7 @@
                           :max-value remaining))]
         (print addition)
         (when-not (zero? addition)
-          ; TODO(Richo): Army moved effect?
-          (let [{:strs [x y]} (-> @state
-                                  (get-in [:countries country-id :counter])
-                                  (oget :center)
-                                  js->clj)
-                label (-> (mm/make-label (u/format "%1%2"
-                                                   (if (pos? addition) "+" "-")
-                                                   (js/Math.abs addition))
-                                         :font "bold 30px Arial"
-                                         :color (if (pos? addition) "lawngreen" "darkred")
-                                         :center (clj->js {:x x, :y (- y 30)}))
-                          (mm/translate 0 -100 2)
-                          (mm/vanish 2))]
-            (.addMorph world label))
+          (moved-army-effect country-id addition)
           (swap! state #(-> %
                             (update-in [:user-data :remaining] - addition)
                             (update-in [:user-data :additions country-id] + addition)))
@@ -273,9 +275,19 @@
             (if (= (teg/country-owner game selected-country)
                    (teg/country-owner game country-id))
               (swap! state assoc-in [:user-data :selected-country] country-id)
-              (do (<! (show-attack-dialog selected-country country-id))
-                  (when (<= (teg/get-army @game-atom selected-country) 1)
-                    (swap! state assoc-in [:user-data :selected-country] nil))))))
+              (let [attacker-army (teg/get-army game selected-country)
+                    defender-army (teg/get-army game country-id)]
+                (<! (show-attack-dialog selected-country country-id))
+                (let [game @game-atom
+                      new-attacker-army (teg/get-army game selected-country)
+                      new-defender-army (teg/get-army game country-id)]
+                  #_(when (not= attacker-army new-attacker-army)
+                    (moved-army-effect selected-country (- attacker-army new-attacker-army)))
+                  #_(when (not= defender-army new-defender-army)
+                    (moved-army-effect country-id (- defender-army new-defender-army)))
+                  (when (<= new-attacker-army 1)
+                    (swap! state assoc-in [:user-data :selected-country] nil)))
+                ))))
         (swap! state assoc-in [:user-data :selected-country] country-id))))
 
 (defmethod click-country! ::teg/regroup [game-atom country-id]
@@ -307,6 +319,8 @@
                                          max-out
                                          (dec max-out))))]
               (when (> army 0)
+                (moved-army-effect selected-country (* -1 army))
+                (moved-army-effect country-id army)
                 (swap! state update-in [:user-data :regroups] conj [selected-country country-id army]))
               (swap! state assoc-in [:user-data :selected-country] nil))
             (swap! state assoc-in [:user-data :selected-country] country-id)))
