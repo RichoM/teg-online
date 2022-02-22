@@ -228,8 +228,9 @@
       (contains? (get-in b/countries [selected-country :neighbours]) country-id))))
 
 (defmethod can-interact-with-country? ::teg/regroup [game country-id player-id]
-  ; TODO(Richo): Validate army > 0
   (= player-id (teg/country-owner game country-id)))
+
+(defmethod can-interact-with-country? :default [_] false)
 
 (defn moved-army-effect [country-id value]
   (let [{:strs [x y]} (-> @state
