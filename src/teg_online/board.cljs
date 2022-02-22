@@ -74,7 +74,7 @@
                              :neighbours #{::zaire ::etiopia}}
                 ::egipto {:name "Egipto"
                           :continent ::africa
-                          :neighbours #{::sahara ::etiopia ::madagascar ::polonia ::israel}}
+                          :neighbours #{::sahara ::etiopia ::madagascar ::polonia ::israel ::turquia}}
                 ::madagascar {:name "Madagascar"
                               :continent ::africa
                               :neighbours #{::egipto ::zaire}}
@@ -147,7 +147,7 @@
                            :neighbours #{::india ::china ::borneo}}
                 ::turquia {:name "Turquía"
                            :continent ::asia
-                           :neighbours #{::polonia ::rusia ::iran ::arabia ::israel}}
+                           :neighbours #{::polonia ::rusia ::iran ::arabia ::israel ::egipto}}
                 ::israel {:name "Israel"
                           :continent ::asia
                           :neighbours #{::turquia ::arabia ::egipto}}
