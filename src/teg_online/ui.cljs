@@ -206,6 +206,11 @@
 
 (defmethod finish-turn! ::teg/regroup [game-atom]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
+        (let [regroups (get-in @state [:user-data :regroups] [])]
+          (swap! state dissoc :user-data)
+          (doseq [[country-a country-b moving-army] regroups]
+            (when (> moving-army 0)
+              (swap! game-atom teg/regroup country-a country-b moving-army))))
         (swap! game-atom teg/finish-action))))
 
 (defmulti can-interact-with-country? (fn [{:keys [phase]} _country _player] phase))
@@ -240,6 +245,7 @@
                           :max-value remaining))]
         (print addition)
         (when-not (zero? addition)
+          ; TODO(Richo): Army moved effect?
           (let [{:strs [x y]} (-> @state
                                   (get-in [:countries country-id :counter])
                                   (oget :center)
@@ -277,17 +283,31 @@
         (if (= selected-country country-id)
           (swap! state assoc-in [:user-data :selected-country] nil)
           (if (contains? (get-in b/countries [selected-country :neighbours]) country-id)
-            (let [army (<! (show-add-army-dialog
+            (let [initial-army (teg/get-army @game-atom selected-country)
+                  substractions (reduce + (map (fn [[_ _ v]] v)
+                                               (filter (fn [[c]] (= c selected-country))
+                                                       (get-in @state [:user-data :regroups]))))
+                  additions (reduce + (map (fn [[_ _ v]] v)
+                                           (filter (fn [[_ c]] (= c selected-country))
+                                                   (get-in @state [:user-data :regroups]))))
+                  current-army (+ (- initial-army substractions) additions)
+                  max-out (- initial-army substractions)
+                  army (<! (show-add-army-dialog
                             :title (list [:span "Mover tropas de "]
                                          [:span.fw-bolder.text-nowrap (get-in b/countries [selected-country :name])]
                                          [:span " a "]
                                          [:span.fw-bolder.text-nowrap (get-in b/countries [country-id :name])])
                             :default-value 0
                             :min-value 0
-                            :max-value (dec (teg/get-army @game-atom selected-country))))]
-              ; TODO(Richo): The following is wrong, we should register the move in a separate data structure and only 
-              ; apply the changes after the user clicks the finish-turn button!
-              (swap! game-atom teg/regroup selected-country country-id army)
+                            ; TODO(Richo): I'm not sure this max-out calculation is correct. I *think* I'm allowed
+                            ; to move the entire initial-army as long as I leave at least one army behind. So if I
+                            ; want to be able to move the full initial-army I need to have received more additions
+                            ; than substractions, right? But anyway, I don't remember the exact rules here anyway. 
+                            :max-value (if (> current-army initial-army)
+                                         max-out
+                                         (dec max-out))))]
+              (when (> army 0)
+                (swap! state update-in [:user-data :regroups] conj [selected-country country-id army]))
               (swap! state assoc-in [:user-data :selected-country] nil))
             (swap! state assoc-in [:user-data :selected-country] country-id)))
         (swap! state assoc-in [:user-data :selected-country] country-id))))
@@ -326,11 +346,6 @@
              assoc-in [:countries country-id]
              {:morph morph
               :counter counter}))))
-
-(comment
-  
-  (oset! (js/document.querySelector "#board-panel") :style.cursor "default")
-  )
 
 (defn init-countries []
   (go (<! (a/map vector (map init-country (shuffle country-data))))))
@@ -378,7 +393,13 @@
               tinted-form (if player-idx
                             (<! (mm/tint original-form color))
                             original-form)
-              additions (get-in @state [:user-data :additions id] 0)
+              additions (+ (get-in @state [:user-data :additions id] 0)
+                           (reduce + (map (fn [[_ _ v]] v)
+                                          (filter (fn [[_ c]] (= c id))
+                                                  (get-in @state [:user-data :regroups] [])))))
+              substractions (reduce + (map (fn [[_ _ v]] v)
+                                           (filter (fn [[c]] (= c id))
+                                                   (get-in @state [:user-data :regroups] []))))
               selected? (= id (get-in @state [:user-data :selected-country]))]
           (oset! morph :form tinted-form)
           (oset! morph :alpha (if player-idx 
@@ -386,7 +407,10 @@
                                 0))
           (oset! counter :alpha (if player-idx 1 0))
           (update-army-counter counter color 
-                               (if player-idx (+ army additions) 0)
+                               (if player-idx
+                                 (- (+ army additions)
+                                    substractions)
+                                 0)
                                (> additions 0))))))
 
 (defn update-countries [{:keys [turn-order countries]}]
@@ -479,10 +503,17 @@
           (recur)))))
 
 (defmulti reset-user-data :phase)
-(defmethod reset-user-data ::teg/add-army [game] {:remaining (teg/calculate-extra-army game)
-                                                  :additions {}})
-(defmethod reset-user-data ::teg/attack [_] {:selected-country nil})
-(defmethod reset-user-data ::teg/regroup [_] {:selected-country nil})
+
+(defmethod reset-user-data ::teg/add-army [game]
+  {:remaining (teg/calculate-extra-army game)
+   :additions {}})
+
+(defmethod reset-user-data ::teg/attack [_] 
+  {:selected-country nil})
+
+(defmethod reset-user-data ::teg/regroup [_]
+  {:selected-country nil
+   :regroups []})
 
 (defn initialize [game-atom]
   (go (reset! state {:game-atom game-atom
