@@ -72,6 +72,8 @@
 
 (defn show-attack-dialog [attacker defender]
   (go (let [imgs dice-images
+            attacker-name (get-in b/countries [attacker :name])
+            defender-name (get-in b/countries [defender :name])
             attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
             finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
             attacker-army-span (crate/html [:span])
@@ -80,8 +82,8 @@
                    :header bs/close-modal-btn
                    :body [:div.container
                           [:div.row
-                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [attacker :name])]]
-                           [:div.col-6.text-center [:h1.text-truncate (get-in b/countries [defender :name])]]]
+                           [:div.col-6.text-center [:h1.text-truncate attacker-name]]
+                           [:div.col-6.text-center [:h1.text-truncate defender-name]]]
                           [:div.row
                            [:div.col-6.text-center.fa-2x
                             [:i.fas.fa-shield-alt.pe-3]
@@ -161,14 +163,26 @@
                             (<! (a/timeout 200))
                             (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
                             (update-modal :hide-dice? false)
-                            (when (= 0 (teg/get-army (get-game) defender))
-                              (<! (a/timeout 750)) ; Give user time to read the dice
-                              (bs/hide-modal modal)))))
+                            (let [game (get-game)]
+                              (when (or (= 0 (teg/get-army game defender))
+                                        (= 1 (teg/get-army game attacker)))
+                                (<! (a/timeout 750)) ; Give user time to read the dice
+                                (bs/hide-modal modal))))))
         (<! (bs/show-modal modal))
-        (when (= 0 (teg/get-army (get-game) defender))
-          (<! (bs/alert "Invasión exitosa")) ; TODO(Richo): Ask user how many troops to move
-          (swap! (@state :game-atom) teg/invade
-                 attacker defender 1)))))
+        (let [game (get-game)]
+          (if (= 0 (teg/get-army game defender))
+            (let [army (<! (show-add-army-dialog
+                            :title (list [:span.fw-bolder.text-nowrap attacker-name]
+                                         [:span " invadió "]
+                                         [:span.fw-bolder.text-nowrap defender-name])
+                            :message "¿Cuántas tropas enviar?"
+                            :default-value 1
+                            :min-value 1
+                            :max-value (min 3 (dec (teg/get-army game attacker)))))]
+              (swap! (@state :game-atom) teg/invade
+                     attacker defender army))
+            (when (= 1 (teg/get-army game attacker))
+              (<! (bs/alert "Invasión fallida"))))))))
 
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
