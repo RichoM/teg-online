@@ -72,6 +72,14 @@
                 bs/show-modal))
         @result-value)))
 
+(defn dice-roll-effect [dice imgs]
+  (go (let [delay 15]
+        (loop [i 0]
+          (when (<= (* i delay) 200)
+            (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
+            (<! (a/timeout delay))
+            (recur (inc i)))))))
+
 (defn show-attack-dialog [attacker defender] ; TODO(Richo): This function is a mess!
   (go (let [imgs dice-images
             attacker-name (get-in b/countries [attacker :name])
@@ -138,12 +146,7 @@
                                 (.remove "dice-disabled")
                                 (.add "rotate-center")))
                             (<! (a/timeout 200))
-                            (let [delay 15]
-                              (loop [i 0]
-                                (when (<= (* i delay) 200)
-                                  (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
-                                  (<! (a/timeout delay))
-                                  (recur (inc i)))))
+                            (<! (dice-roll-effect dice imgs))
                             (let [[a-count d-count] (teg/get-dice-count (get-game) attacker defender)
                                   a-throw (sort > (repeatedly a-count (partial rand-int 6)))
                                   d-throw (sort > (repeatedly d-count (partial rand-int 6)))]
