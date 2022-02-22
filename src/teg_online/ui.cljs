@@ -274,8 +274,18 @@
         (if (= selected-country country-id)
           (swap! state assoc-in [:user-data :selected-country] nil)
           (if (contains? (get-in b/countries [selected-country :neighbours]) country-id)
-            (do (print selected-country "->" country-id) ; TODO(Richo): Show regroup dialog
-                (swap! state assoc-in [:user-data :selected-country] nil))
+            (let [army (<! (show-add-army-dialog
+                            :title (list [:span "Mover tropas de "]
+                                         [:span.fw-bolder.text-nowrap (get-in b/countries [selected-country :name])]
+                                         [:span " a "]
+                                         [:span.fw-bolder.text-nowrap (get-in b/countries [country-id :name])])
+                            :default-value 0
+                            :min-value 0
+                            :max-value (dec (teg/get-army @game-atom selected-country))))]
+              ; TODO(Richo): The following is wrong, we should register the move in a separate data structure and only 
+              ; apply the changes after the user clicks the finish-turn button!
+              (swap! game-atom teg/regroup selected-country country-id army)
+              (swap! state assoc-in [:user-data :selected-country] nil))
             (swap! state assoc-in [:user-data :selected-country] country-id)))
         (swap! state assoc-in [:user-data :selected-country] country-id))))
 
