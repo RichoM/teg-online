@@ -170,7 +170,8 @@
                                 (bs/hide-modal modal))))))
         (<! (bs/show-modal modal))
         (let [game (get-game)]
-          (if (= 0 (teg/get-army game defender))
+          (cond
+            (= 0 (teg/get-army game defender))
             (let [army (<! (show-add-army-dialog
                             :title (list [:span.fw-bolder.text-nowrap attacker-name]
                                          [:span " invadió "]
@@ -181,8 +182,9 @@
                             :max-value (min 3 (dec (teg/get-army game attacker)))))]
               (swap! (@state :game-atom) teg/invade
                      attacker defender army))
-            (when (= 1 (teg/get-army game attacker))
-              (<! (bs/alert "Invasión fallida"))))))))
+
+            (= 1 (teg/get-army game attacker))
+            (<! (bs/alert "Invasión fallida")))))))
 
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
