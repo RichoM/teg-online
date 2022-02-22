@@ -26,12 +26,11 @@
   (when-let [game-atom (@state :game-atom)]
     @game-atom))
 
-(defn show-add-army-dialog [country-name initial-value min-value max-value]
-  (go (let [result-value (atom 0)
-            counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
-            counter-span (crate/html [:span @counter-value])
-            get-delta #(- @counter-value initial-value)
-            delta-span (crate/html [:span.ps-5.text-black-50 ""])
+(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value]
+                              :or {title nil, message nil, default-value 0}}]
+  (go (let [result-value (atom default-value)
+            counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
+            counter-span (crate/html [:span.text-black-50])
             minus-btn (bs/on-click
                        (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
                        #(swap! counter-value dec))
@@ -40,35 +39,33 @@
                       #(swap! counter-value inc))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
-                           #(reset! result-value (get-delta)))
+                           #(reset! result-value @counter-value))
             cancel-button (bs/on-click
                            (crate/html bs/cancel-modal-btn)
-                           #(reset! result-value 0))]
+                           #(reset! result-value default-value))]
         (add-watch counter-value :update
-                   (fn [_ _ _ val] 
+                   (fn [_ _ _ val]
                      (oset! minus-btn :disabled (<= val min-value))
                      (oset! plus-btn :disabled (>= val max-value))
-                     (oset! counter-span :innerText val)
-                     (let [delta (get-delta)]
-                       (oset! delta-span :innerText
-                              (u/format "(%1%2)"
-                                        (if (neg? delta) "-" "+")
-                                        (js/Math.abs delta))))))
-        (reset! counter-value initial-value)
-        (<! (-> (bs/make-modal :header (list [:h1 country-name]
+                     (oset! counter-span :innerText
+                            (u/format "%1%2"
+                                      (if (neg? val) "-" "+")
+                                      (js/Math.abs val)))))
+        (reset! counter-value default-value) ; Just to force the GUI update
+        (<! (-> (bs/make-modal :header (list [:h2 title]
                                              bs/close-modal-btn)
                                :body [:div.container
+                                      (when message [:div.row [:h3 message]])
                                       [:div.row
                                        [:div.col-12.text-center.fa-4x
                                         [:i.fas.fa-shield-alt.pe-3]
-                                        counter-span
-                                        delta-span]]
+                                        counter-span]]
                                       [:div.row.py-3
                                        [:div.col-6 [:div.d-grid minus-btn]]
                                        [:div.col-6 [:div.d-grid plus-btn]]]]
                                :footer (list accept-button cancel-button))
                 (bs/on-modal-keypress-enter (fn [modal]
-                                              (reset! result-value (get-delta))
+                                              (reset! result-value @counter-value)
                                               (bs/hide-modal modal)))
                 bs/show-modal))
         @result-value)))
@@ -216,10 +213,12 @@
             current-army (+ initial-army
                             (get-in @state [:user-data :additions country-id] 0))
             remaining (get-in @state [:user-data :remaining] 0)
-            addition (<! (show-add-army-dialog country-name
-                                               current-army
-                                               initial-army
-                                               (+ current-army remaining)))]
+            addition (<! (show-add-army-dialog
+                          :title (list [:span "Incorporar ejércitos a "]
+                                       [:span.fw-bolder.text-nowrap country-name])
+                          :default-value 0
+                          :min-value (- initial-army current-army)
+                          :max-value remaining))]
         (print addition)
         (when-not (zero? addition)
           (let [{:strs [x y]} (-> @state
