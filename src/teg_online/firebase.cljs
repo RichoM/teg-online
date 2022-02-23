@@ -1,5 +1,6 @@
 (ns teg-online.firebase
-  (:require [teg-online.game :as teg]
+  (:require [oops.core :refer [oget oset!]]
+            [teg-online.game :as teg]
             [teg-online.board :as b]))
 
 
@@ -11,30 +12,26 @@
 (def unsubscribe (atom []))
 
 (defn game->doc [game]
-  (assoc game 
-         :countries
-         (mapv (fn [country]
-                (let [{:keys [army owner]} (get-in game [:countries country])]
-                  {:army army, :owner owner}))
-              sorted-countries)))
+  (assoc (select-keys game [:phase :turn :turn-order :players])
+         :countries (mapv (fn [country]
+                            (let [{:keys [army owner]} (get-in game [:countries country])]
+                              {:army army, :owner owner}))
+                          sorted-countries)))
 
 (defn doc->game [{:keys [phase turn turn-order players countries]}]
   {:phase (keyword (namespace ::teg/*) phase)
    :turn turn
    :turn-order (mapv keyword turn-order)
-   :players (reduce-kv (fn [m k {:keys [cards id] :as player}]
-                         (assoc m k
-                                (assoc player
-                                       :cards (set cards)
-                                       :id (keyword id))))
-                       {}
-                       players)
+   :players (into {} (map (fn [[id {:keys [cards name]}]]
+                            [id {:id id
+                                 :cards (set cards)
+                                 :name name}])
+                          players))
    :countries (into {} (map-indexed (fn [idx {:keys [army owner]}]
                                       (let [id (nth sorted-countries idx)]
-                                        [id
-                                         {:id id
-                                          :army army
-                                          :owner (keyword owner)}]))
+                                        [id {:id id
+                                             :army army
+                                             :owner (keyword owner)}]))
                                     countries))})
 
 (defn initialize [game-atom]
@@ -50,11 +47,12 @@
            (-> js/db
                (.collection collection-id)
                (.doc doc-id)
-               (.onSnapshot (fn [snapshot]
-                              (let [game (doc->game (js->clj (.data snapshot)
-                                                             :keywordize-keys true))]
-                                (reset! last-update game)
-                                (reset! game-atom game))))))))
+               (.onSnapshot (fn [doc]
+                              (when-not (oget doc :metadata.hasPendingWrites)
+                                (let [game (doc->game (js->clj (.data doc)
+                                                               :keywordize-keys true))]
+                                  (reset! last-update game)
+                                  (reset! game-atom game)))))))))
 
 (defn terminate []
   (doseq [unsub @unsubscribe]
