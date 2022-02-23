@@ -533,6 +533,8 @@
   {:selected-country nil
    :regroups []})
 
+(defmethod reset-user-data :default [_] {})
+
 (defn initialize [game-atom]
   (go (reset! state {:game-atom game-atom
                      :updates (a/chan (a/sliding-buffer 1))})
