@@ -1,104 +1,25 @@
 (ns teg-online.main
   (:require [clojure.core.async :as a :refer [go <!]]
-            [teg-online.utils.firebase :as fb]
+            [teg-online.firebase :as fb]
             [teg-online.game :as teg]
             [teg-online.ui :as ui]))
 
 (defonce game (atom (teg/new-game)))
-(defonce game-fb (atom nil))
-(def sorted-countries (-> @game :countries keys sort vec))
-
-(defn game->doc [game]
-  (assoc game 
-         :countries
-         (mapv (fn [country]
-                (let [{:keys [army owner]} (get-in game [:countries country])]
-                  {:army army, :owner owner}))
-              sorted-countries)))
-
-(defn doc->game [{:keys [phase turn turn-order players countries]}]
-  {:phase (keyword (namespace ::teg/*) phase)
-   :turn turn
-   :turn-order (mapv keyword turn-order)
-   :players (reduce-kv (fn [m k {:keys [cards id] :as player}]
-                         (assoc m k
-                                (assoc player
-                                       :cards (set cards)
-                                       :id (keyword id))))
-                       {}
-                       players)
-   :countries (into {} (map-indexed (fn [idx {:keys [army owner]}]
-                                      (let [id (nth sorted-countries idx)]
-                                        [id
-                                         {:id id
-                                          :army army
-                                          :owner (keyword owner)}]))
-                                    countries))})
-
-
-
-(comment
-
-  (def foo (atom nil))
-  (reset! foo 12)
-  (keyword (str (random-uuid)))
-  (clojure.data/diff @game-fb @game)
-  (= @game-fb
-     @game)
-
-  (let [game @game]
-    (into {} (map-indexed (fn [i p] [p i]) (game :turn-order))))
-
-  )
-
-
-(def collection-id "games_dev")
-(def doc-id "YkUz0FC4XJC4qKKNmViE")
-
-(defn init-firebase [game-atom]
-  (let [last-update (atom nil)]
-    (add-watch game-atom :firebase
-               (fn [_ _ _ game]
-                 (when (not= game @last-update)
-                   (-> js/db
-                       (.collection collection-id)
-                       (.doc doc-id)
-                       (.set (clj->js (game->doc game)))))))
-    (-> js/db
-        (.collection collection-id)
-        (.doc doc-id)
-        (.onSnapshot (fn [snapshot]
-                       (reset! game-atom
-                               (reset! last-update (doc->game (js->clj (.data snapshot)
-                                                                       :keywordize-keys true)))))))))
-
 
 (defn init []
   (go
     (print "HELLO!")
-    (init-firebase game)
+    (fb/initialize game)
     (<! (ui/initialize game))
-    #_(do
-      (reset! game (teg/new-game))
-      (swap! game teg/join-game :p1 "Richo")
-      (swap! game teg/join-game :p2 "Diego")
-      (swap! game teg/join-game :p3 "Sofi")
-      ;(swap! game teg/join-game :p4 "Lechu")
-      ;(swap! game teg/join-game :p5 "Santi")
-      ;(swap! game teg/join-game :p6 "Papa")
-      ;(swap! game teg/join-game :p7 "Tera")
-      ;(swap! game teg/join-game :p8 "Maxi")
-      (swap! game teg/distribute-countries)
-      (swap! game teg/start-game)
-      )
     (print "BYE!")))
 
 (defn ^:dev/before-load-async reload-begin* [done]
   (go (<! (ui/terminate))
+      (fb/terminate)
       (done)))
 
 (defn ^:dev/after-load-async reload-end* [done]
-  (go (init-firebase game)
+  (go (fb/initialize game)
       (<! (ui/initialize game))
       (done)))
 
