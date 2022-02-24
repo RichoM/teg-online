@@ -59,27 +59,26 @@
 (defn on-modal-hidden [modal callback]
   (doto modal (.addEventListener "hidden.bs.modal" (partial callback modal))))
 
-(defn show-modal [modal]
-  (hide-modals)
-  (let [result (a/chan)
-        container (find-container "#modal-dialogs")
-        html-modal modal
-        bs-modal (js/bootstrap.Modal. html-modal)
-        ready-chan (a/chan)
-        current {:modal bs-modal
-                 :ready ready-chan}]
-    (reset! current-modal current)
-    (.appendChild container html-modal)
-    (.show bs-modal)
-    (doto html-modal
-      (on-modal-shown #(a/close! ready-chan))
-      (on-modal-hidden #(do (.remove html-modal)
-                            (compare-and-set! current-modal current nil)
-                            (a/close! result))))
-    result))
-
-(defn make-and-show-modal [& args]
-  (show-modal (apply make-modal args)))
+(defn show-modal
+  ([modal] (show-modal modal {}))
+  ([modal options]
+   (hide-modals)
+   (let [result (a/chan)
+         container (find-container "#modal-dialogs")
+         html-modal modal
+         bs-modal (js/bootstrap.Modal. html-modal (clj->js options))
+         ready-chan (a/chan)
+         current {:modal bs-modal
+                  :ready ready-chan}]
+     (reset! current-modal current)
+     (.appendChild container html-modal)
+     (.show bs-modal)
+     (doto html-modal
+       (on-modal-shown #(a/close! ready-chan))
+       (on-modal-hidden #(do (.remove html-modal)
+                             (compare-and-set! current-modal current nil)
+                             (a/close! result))))
+     result)))
 
 (defn alert [title & message]
   (-> (make-modal :header (list [:h2
