@@ -1,6 +1,9 @@
 body {
   background-color: #be9773;
   font-family: 'AndadaSCRegular';
+}
+
+.unselectable {  
   user-select: none;
   -moz-user-select: none;
   -webkit-user-select: none;
