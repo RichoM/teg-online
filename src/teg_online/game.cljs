@@ -2,10 +2,11 @@
   (:require [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
-(def game-phases 
-  [::add-army
-   ::attack
-   ::regroup])
+(derive ::attack ::game-phase)
+(derive ::regroup ::game-phase)
+(derive ::add-army ::game-phase)
+(derive ::add-army-1 ::add-army) ; Special case for first round
+(derive ::add-army-2 ::add-army) ; Special case for second round
 
 (defn new-game []
   {:players {}
@@ -13,7 +14,7 @@
                          {}
                          board/countries)
    :turn-order []
-   :phase ::add-army
+   :phase nil
    :turn nil})
 
 (defn new-player [id name]
@@ -30,7 +31,12 @@
         (update :players assoc id (new-player id name)))))
 
 (defn start-game [game]
-  (assoc game :turn 0))
+  (assoc game
+         :turn 0
+         :phase ::add-army-1))
+
+(defn game-started? [game]
+  (some? (game :turn)))
 
 (defn get-players [game]
   (map (game :players)
@@ -99,24 +105,31 @@
 (defn next-turn [game]
   (update game :turn inc))
 
-(defn next-phase [game phase]
-  ; TODO(Richo): Validation?
-  (assoc game :phase phase))
+(defmulti get-next-phase :phase)
+(defmethod get-next-phase ::add-army-1 [_] ::add-army-2)
+(defmethod get-next-phase ::add-army-2 [_] ::attack)
+(defmethod get-next-phase ::add-army [_] ::attack)
+(defmethod get-next-phase ::attack [_] ::regroup)
+(defmethod get-next-phase ::regroup [{:keys [turn players]}]
+  (if (zero? (mod (inc turn) (count players)))
+    ::add-army
+    ::attack))
 
-(defn finish-current-action [{:keys [phase turn players] :as game}]
-  (let [player-count (count players)]
-    (case phase
-      ::add-army (if (zero? (mod (inc turn) player-count))
-                   (if (>= (inc turn) (* 2 player-count))
-                     (next-phase (next-turn game)
-                                 ::attack)
-                     (next-turn game))
-                   (next-turn game))
-      
-      ::attack (if (zero? (mod (inc turn) player-count)) ; TODO(Richo)
-                 (next-phase (next-turn game)
-                             ::add-army)
-                 (next-turn game)))))
+(defn next-phase [game]
+  (assoc game :phase (get-next-phase game)))
+
+(defmulti finish-action :phase)
+
+(defmethod finish-action ::add-army [{:keys [turn players] :as game}]
+  (if (zero? (mod (inc turn) (count players)))
+      (next-turn (next-phase game))
+      (next-turn game)))
+
+(defmethod finish-action ::attack [game]
+  (next-phase game))
+
+(defmethod finish-action ::regroup [game]
+  (next-turn (next-phase game)))
 
 (defn get-dice-count [game attacker-id defender-id]
   [(min 3 (dec (get-army game attacker-id)))
@@ -201,6 +214,27 @@
         (update-in [:countries attacker-id :army] - moving-army)
         (update-in [:countries defender-id :army] + moving-army)
         (assoc-in [:countries defender-id :owner] current-player))))
+
+(defn assert-valid-regrouping-army [game src-id moving-army]
+  (when (< moving-army 1)
+    (throw (ex-info (u/format "Country %1 should regroup with at least 1 army" src-id)
+                      {:game game, :country src-id, :army moving-army})))
+  (let [max-army (dec (get-army game src-id))]
+    (when (> moving-army max-army)
+      (throw (ex-info (u/format "Country %1 should regroup with at most %2 army" src-id max-army)
+                    {:game game, :country src-id, :army moving-army})))))
+
+(defn regroup [game src-id dst-id moving-army]
+  (assert-valid-country game src-id)
+  (assert-valid-country game dst-id)
+  (assert-neighbours game src-id dst-id)
+  (assert-valid-regrouping-army game src-id moving-army)
+  (let [current-player (get-current-player game)]
+    (assert-country-owner game src-id current-player)
+    (assert-country-owner game dst-id current-player))
+  (-> game
+      (update-in [:countries src-id :army] - moving-army)
+      (update-in [:countries dst-id :army] + moving-army)))
 
 (comment
 (map (fn [a b] (> a b)) 

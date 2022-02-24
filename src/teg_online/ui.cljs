@@ -26,12 +26,15 @@
   (when-let [game-atom (@state :game-atom)]
     @game-atom))
 
-(defn show-add-army-dialog [country-name initial-value min-value max-value]
-  (go (let [result-value (atom 0)
-            counter-value (atom initial-value :validator #(and (>= % min-value) (<= % max-value)))
-            counter-span (crate/html [:span @counter-value])
-            get-delta #(- @counter-value initial-value)
-            delta-span (crate/html [:span.ps-5.text-black-50 ""])
+(defn get-user []
+  (when-let [user-atom (@state :user-atom)]
+    @user-atom))
+
+(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
+                              :or {title nil, message nil, default-value 0, show-cancel? true}}]
+  (go (let [result-value (atom default-value)
+            counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
+            counter-span (crate/html [:span.text-black-50])
             minus-btn (bs/on-click
                        (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
                        #(swap! counter-value dec))
@@ -40,40 +43,48 @@
                       #(swap! counter-value inc))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
-                           #(reset! result-value (get-delta)))
+                           #(reset! result-value @counter-value))
             cancel-button (bs/on-click
                            (crate/html bs/cancel-modal-btn)
-                           #(reset! result-value 0))]
+                           #(reset! result-value default-value))]
         (add-watch counter-value :update
-                   (fn [_ _ _ val] 
+                   (fn [_ _ _ val]
                      (oset! minus-btn :disabled (<= val min-value))
                      (oset! plus-btn :disabled (>= val max-value))
-                     (oset! counter-span :innerText val)
-                     (let [delta (get-delta)]
-                       (oset! delta-span :innerText
-                              (u/format "(%1%2)"
-                                        (if (neg? delta) "-" "+")
-                                        (js/Math.abs delta))))))
-        (reset! counter-value initial-value)
-        (<! (-> (bs/make-modal :header (list [:h1 country-name]
+                     (oset! counter-span :innerText
+                            (u/format "%1%2"
+                                      (if (neg? val) "-" "+")
+                                      (js/Math.abs val)))))
+        (reset! counter-value default-value) ; Just to force the GUI update
+        (<! (-> (bs/make-modal :header (list [:h2 title]
                                              bs/close-modal-btn)
                                :body [:div.container
+                                      (when message [:div.row [:h3 message]])
                                       [:div.row
                                        [:div.col-12.text-center.fa-4x
                                         [:i.fas.fa-shield-alt.pe-3]
-                                        counter-span
-                                        delta-span]]
+                                        counter-span]]
                                       [:div.row.py-3
                                        [:div.col-6 [:div.d-grid minus-btn]]
                                        [:div.col-6 [:div.d-grid plus-btn]]]]
-                               :footer (list accept-button cancel-button))
+                               :footer (if show-cancel?
+                                         (list accept-button cancel-button)
+                                         accept-button))
                 (bs/on-modal-keypress-enter (fn [modal]
-                                              (reset! result-value (get-delta))
+                                              (reset! result-value @counter-value)
                                               (bs/hide-modal modal)))
                 bs/show-modal))
         @result-value)))
 
-(defn show-attack-dialog [attacker defender]
+(defn dice-roll-effect [dice imgs]
+  (go (let [delay 15]
+        (loop [i 0]
+          (when (<= (* i delay) 200)
+            (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
+            (<! (a/timeout delay))
+            (recur (inc i)))))))
+
+(defn show-attack-dialog [& {:keys [attacker defender on-dice-roll]}] ; TODO(Richo): This function is a mess!
   (go (let [imgs dice-images
             attack-btn (crate/html [:button.btn.btn-primary.btn-lg {:type "button"} "Atacar"])
             finish-btn (crate/html [:button.btn.btn-secondary.btn-lg {:type "button"} "Finalizar"])
@@ -137,12 +148,7 @@
                                 (.remove "dice-disabled")
                                 (.add "rotate-center")))
                             (<! (a/timeout 200))
-                            (let [delay 15]
-                              (loop [i 0]
-                                (when (<= (* i delay) 200)
-                                  (oset! (aget dice (mod i 6)) :src (rand-nth imgs))
-                                  (<! (a/timeout delay))
-                                  (recur (inc i)))))
+                            (<! (dice-roll-effect dice imgs))
                             (let [[a-count d-count] (teg/get-dice-count (get-game) attacker defender)
                                   a-throw (sort > (repeatedly a-count (partial rand-int 6)))
                                   d-throw (sort > (repeatedly d-count (partial rand-int 6)))]
@@ -157,92 +163,177 @@
                                           (.add (oget d-die :classList) "dice-loser"))
                                       (do (.add (oget d-die :classList) "dice-winner")
                                           (.add (oget a-die :classList) "dice-loser"))))))
-                              (swap! (@state :game-atom)
-                                     teg/attack
-                                     [attacker a-throw]
-                                     [defender d-throw]))
+                              (when on-dice-roll
+                                (on-dice-roll a-throw d-throw)))
                             (<! (a/timeout 200))
                             (doseq [die dice] (.remove (oget die :classList) "rotate-center"))
                             (update-modal :hide-dice? false)
-                            (when (= 0 (teg/get-army (get-game) defender))
-                              (<! (a/timeout 750)) ; Give user time to read the dice
-                              (bs/hide-modal modal)))))
+                            (let [game (get-game)]
+                              (when (or (= 0 (teg/get-army game defender))
+                                        (= 1 (teg/get-army game attacker)))
+                                (<! (a/timeout 750)) ; Give user time to read the dice
+                                (bs/hide-modal modal))))))
         (<! (bs/show-modal modal))
-        (when (= 0 (teg/get-army (get-game) defender))
-          (<! (bs/alert "Invasión exitosa")) ; TODO(Richo): Ask user how many troops to move
-          (swap! (@state :game-atom) teg/invade
-                 attacker defender 1)))))
+        (let [game (get-game)]
+          (cond
+            (= 0 (teg/get-army game defender)) :success
+            (= 1 (teg/get-army game attacker)) :failure
+            :else :cancel)))))
 
-(defn finish-turn []
-  (go
-    (let [game-atom (@state :game-atom)
-          {:keys [phase]} @game-atom]
-      (case phase
-        ::teg/add-army (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
-                         (let [additions (get-in @state [:user-data :additions] {})]
-                           (swap! state dissoc :user-data)
-                           (doseq [[country-id extra-army] additions]
-                             (when (> extra-army 0)
-                               (swap! game-atom teg/add-army country-id extra-army)))
-                           (swap! game-atom teg/finish-current-action)))
-        ::teg/attack (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
-                       (swap! game-atom teg/finish-current-action))))))
+(defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
-(defn can-interact-with-country? [country-id]
-  (when-let [game (get-game)]
-    (when-let [current-player (teg/get-current-player game)]
-      (case (game :phase)
-        ::teg/add-army (= current-player (get-in game [:countries country-id :owner]))
-        ::teg/attack (if (= current-player (teg/country-owner game country-id))
-                       (> (teg/get-army game country-id) 1)
-                       (when-let [selected-country (get-in @state [:user-data :selected-country])]
-                         (contains? (get-in b/countries [selected-country :neighbours]) country-id)))))))
+(defmethod finish-turn! ::teg/add-army [game-atom]
+  (go (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
+        (let [additions (get-in @state [:user-data :additions] {})]
+          (swap! state dissoc :user-data)
+          (doseq [[country-id extra-army] additions]
+            (when (> extra-army 0)
+              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom teg/finish-action)))))
 
-(defn click-country [country-id]
-  (go (let [{:keys [phase] :as game} (get-game)]
-        (case phase
-          ::teg/add-army
-          (let [country-name (:name (b/countries country-id))
-                initial-army (teg/get-army game country-id)
-                current-army (+ initial-army
-                                (get-in @state [:user-data :additions country-id] 0))
-                remaining (get-in @state [:user-data :remaining] 0)
-                addition (<! (show-add-army-dialog country-name
-                                                   current-army
-                                                   initial-army
-                                                   (+ current-army remaining)))]
-            (print addition)
-            (when (not (zero? addition))
-              (let [{:strs [x y]} (-> @state
-                                      (get-in [:countries country-id :counter])
-                                      (oget :center)
-                                      js->clj)
-                    label (-> (mm/make-label (u/format "%1%2"
-                                                       (if (pos? addition) "+" "-")
-                                                       (js/Math.abs addition))
-                                             :font "bold 30px Arial"
-                                             :color (if (pos? addition) "lawngreen" "darkred")
-                                             :center (clj->js {:x x, :y (- y 30)}))
-                              (mm/translate 0 -100 2)
-                              (mm/vanish 2))]
-                (.addMorph world label))
-              (swap! state #(-> %
-                                (update-in [:user-data :remaining] - addition)
-                                (update-in [:user-data :additions country-id] + addition)))
-              (when (zero? (-> @state :user-data :remaining))
-                (<! (finish-turn)))))
+(defmethod finish-turn! ::teg/attack [game-atom]
+  (go (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
+        (swap! game-atom teg/finish-action))))
 
-          ::teg/attack
-          (if-let [selected-country (get-in @state [:user-data :selected-country])]
-            (if (= selected-country country-id)
-              (swap! state assoc-in [:user-data :selected-country] nil)
-              (if (= (teg/country-owner game selected-country)
-                     (teg/country-owner game country-id))
-                (swap! state assoc-in [:user-data :selected-country] country-id)
-                (do (<! (show-attack-dialog selected-country country-id))
-                    (when (<= (teg/get-army (get-game) selected-country) 1)
-                      (swap! state assoc-in [:user-data :selected-country] nil)))))
-            (swap! state assoc-in [:user-data :selected-country] country-id))))))
+(defmethod finish-turn! ::teg/regroup [game-atom]
+  (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
+        (let [regroups (get-in @state [:user-data :regroups] [])]
+          (swap! state dissoc :user-data)
+          (doseq [[country-a country-b moving-army] regroups]
+            (when (> moving-army 0)
+              (swap! game-atom teg/regroup country-a country-b moving-army))))
+        (swap! game-atom teg/finish-action))))
+
+(defmulti can-interact-with-country? 
+  (fn [{:keys [phase] :as game} _country _player]
+    (when (= (:id (get-user))
+             (teg/get-current-player game))
+      phase)))
+
+(defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
+  (= player-id (teg/country-owner game country-id)))
+
+(defmethod can-interact-with-country? ::teg/attack [game country-id player-id]
+  (if (= player-id (teg/country-owner game country-id))
+    (> (teg/get-army game country-id) 1)
+    (when-let [selected-country (get-in @state [:user-data :selected-country])]
+      (contains? (get-in b/countries [selected-country :neighbours]) country-id))))
+
+(defmethod can-interact-with-country? ::teg/regroup [game country-id player-id]
+  (= player-id (teg/country-owner game country-id)))
+
+(defmethod can-interact-with-country? :default [_] false)
+
+(defn moved-army-effect [country-id value]
+  (let [{:strs [x y]} (-> @state
+                          (get-in [:countries country-id :counter])
+                          (oget :center)
+                          js->clj)
+        label (-> (mm/make-label (u/format "%1%2"
+                                           (if (pos? value) "+" "-")
+                                           (js/Math.abs value))
+                                 :font "bold 30px Arial"
+                                 :color (if (pos? value) "lawngreen" "darkred")
+                                 :center (clj->js {:x x, :y (- y 30)}))
+                  (mm/translate 0 -100 2)
+                  (mm/vanish 2))]
+    (.addMorph world label)))
+
+(defmulti click-country! (fn [game-atom _country-id] (@game-atom :phase)))
+
+(defmethod click-country! ::teg/add-army [game-atom country-id]
+  (go (let [game @game-atom
+            country-name (:name (b/countries country-id))
+            initial-army (teg/get-army game country-id)
+            current-army (+ initial-army
+                            (get-in @state [:user-data :additions country-id] 0))
+            remaining (get-in @state [:user-data :remaining] 0)
+            addition (<! (show-add-army-dialog
+                          :title (list [:span "Incorporar ejércitos a "]
+                                       [:span.fw-bolder.text-nowrap country-name])
+                          :default-value 0
+                          :min-value (- initial-army current-army)
+                          :max-value remaining))]
+        (print addition)
+        (when-not (zero? addition)
+          (swap! state #(-> %
+                            (update-in [:user-data :remaining] - addition)
+                            (update-in [:user-data :additions country-id] + addition)))
+          (when (zero? (-> @state :user-data :remaining))
+            (<! (finish-turn! game-atom)))))))
+
+(defn attack! [game-atom attacker defender]
+  (go (case (<! (show-attack-dialog
+                 :attacker attacker
+                 :defender defender
+                 :on-dice-roll (fn [a-throw d-throw]
+                                     ; TODO(Richo): Maybe add the army effect here?
+                                 (swap! game-atom
+                                        teg/attack
+                                        [attacker a-throw]
+                                        [defender d-throw]))))
+        :success (let [army (<! (show-add-army-dialog
+                                 :title (list [:span.fw-bolder.text-nowrap
+                                               (get-in b/countries [attacker :name])]
+                                              [:span " invadió "]
+                                              [:span.fw-bolder.text-nowrap
+                                               (get-in b/countries [defender :name])])
+                                 :message "¿Cuántas tropas enviar?"
+                                 :show-cancel? false
+                                 :default-value 1
+                                 :min-value 1
+                                 :max-value (min 3 (dec (teg/get-army @game-atom attacker)))))]
+                   (swap! game-atom teg/invade attacker defender army))
+        :failure (<! (bs/alert "Invasión fallida"))
+        :cancel :nop)
+      (let [new-attacker-army (teg/get-army @game-atom attacker)]
+        (when (<= new-attacker-army 1)
+          (swap! state assoc-in [:user-data :selected-country] nil)))))
+
+(defmethod click-country! ::teg/attack [game-atom country-id]
+  (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
+        (if (= selected-country country-id)
+          (swap! state assoc-in [:user-data :selected-country] nil)
+          (let [game @game-atom]
+            (if (= (teg/country-owner game selected-country)
+                   (teg/country-owner game country-id))
+              (swap! state assoc-in [:user-data :selected-country] country-id)
+              (attack! game-atom selected-country country-id))))
+        (swap! state assoc-in [:user-data :selected-country] country-id))))
+
+(defmethod click-country! ::teg/regroup [game-atom country-id]
+  (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
+        (if (= selected-country country-id)
+          (swap! state assoc-in [:user-data :selected-country] nil)
+          (if (contains? (get-in b/countries [selected-country :neighbours]) country-id)
+            (let [initial-army (teg/get-army @game-atom selected-country)
+                  substractions (reduce + (map (fn [[_ _ v]] v)
+                                               (filter (fn [[c]] (= c selected-country))
+                                                       (get-in @state [:user-data :regroups]))))
+                  additions (reduce + (map (fn [[_ _ v]] v)
+                                           (filter (fn [[_ c]] (= c selected-country))
+                                                   (get-in @state [:user-data :regroups]))))
+                  current-army (+ (- initial-army substractions) additions)
+                  max-out (- initial-army substractions)
+                  army (<! (show-add-army-dialog
+                            :title (list [:span "Mover tropas de "]
+                                         [:span.fw-bolder.text-nowrap (get-in b/countries [selected-country :name])]
+                                         [:span " a "]
+                                         [:span.fw-bolder.text-nowrap (get-in b/countries [country-id :name])])
+                            :default-value 0
+                            :min-value 0
+                            ; TODO(Richo): I'm not sure this max-out calculation is correct. I *think* I'm allowed
+                            ; to move the entire initial-army as long as I leave at least one army behind. So if I
+                            ; want to be able to move the full initial-army I need to have received more additions
+                            ; than substractions, right? But anyway, I don't remember the exact rules here anyway. 
+                            :max-value (if (> current-army initial-army)
+                                         max-out
+                                         (dec max-out))))]
+              (when (> army 0)
+                (swap! state update-in [:user-data :regroups] conj [selected-country country-id army]))
+              (swap! state assoc-in [:user-data :selected-country] nil))
+            (swap! state assoc-in [:user-data :selected-country] country-id)))
+        (swap! state assoc-in [:user-data :selected-country] country-id))))
 
 (defn init-country [[country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
   (go
@@ -260,23 +351,24 @@
       (.addMorph world morph)
       (.addMorph world counter)
       (doto morph
-        (mm/on-mouse-move #(if (can-interact-with-country? country-id)
-                             (oset! (js/document.querySelector "#board-panel") :style.cursor "pointer")
-                             (oset! (js/document.querySelector "#board-panel") :style.cursor "default")))
-        (mm/on-mouse-down #(when (can-interact-with-country? country-id)
-                             (oset! morph :alpha selected-alpha)))
-        (mm/on-mouse-up #(go (when (can-interact-with-country? country-id)
-                               (<! (click-country country-id))
-                               (oset! morph :alpha 0.5)))))
+        (mm/on-mouse-move #(let [game (get-game)
+                                 current-player (teg/get-current-player game)]
+                             (if (can-interact-with-country? game country-id current-player)
+                               (oset! (js/document.querySelector "#board-panel") :style.cursor "pointer")
+                               (oset! (js/document.querySelector "#board-panel") :style.cursor "default"))))
+        (mm/on-mouse-down #(let [game (get-game)
+                                 current-player (teg/get-current-player game)]
+                             (when (can-interact-with-country? game country-id current-player)
+                               (oset! morph :alpha selected-alpha))))
+        (mm/on-mouse-up #(go (let [game (get-game)
+                                   current-player (teg/get-current-player game)]
+                               (when (can-interact-with-country? game country-id current-player)
+                                 (<! (click-country! (@state :game-atom) country-id))
+                                 (oset! morph :alpha 0.5))))))
       (swap! state
              assoc-in [:countries country-id]
              {:morph morph
               :counter counter}))))
-
-(comment
-  
-  (oset! (js/document.querySelector "#board-panel") :style.cursor "default")
-  )
 
 (defn init-countries []
   (go (<! (a/map vector (map init-country (shuffle country-data))))))
@@ -324,7 +416,13 @@
               tinted-form (if player-idx
                             (<! (mm/tint original-form color))
                             original-form)
-              additions (get-in @state [:user-data :additions id] 0)
+              additions (+ (get-in @state [:user-data :additions id] 0)
+                           (reduce + (map (fn [[_ _ v]] v)
+                                          (filter (fn [[_ c]] (= c id))
+                                                  (get-in @state [:user-data :regroups] [])))))
+              substractions (reduce + (map (fn [[_ _ v]] v)
+                                           (filter (fn [[c]] (= c id))
+                                                   (get-in @state [:user-data :regroups] []))))
               selected? (= id (get-in @state [:user-data :selected-country]))]
           (oset! morph :form tinted-form)
           (oset! morph :alpha (if player-idx 
@@ -332,7 +430,10 @@
                                 0))
           (oset! counter :alpha (if player-idx 1 0))
           (update-army-counter counter color 
-                               (if player-idx (+ army additions) 0)
+                               (if player-idx
+                                 (- (+ army additions)
+                                    substractions)
+                                 0)
                                (> additions 0))))))
 
 (defn update-countries [{:keys [turn-order countries]}]
@@ -370,15 +471,36 @@
                               [:i.fas.fa-shield-alt {:style icon-style}]
                               [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
 
-(defn finish-turn-enabled? []
-  (let [game-atom (@state :game-atom)
-        {:keys [phase]} @game-atom]
-    (case phase
-      ::teg/add-army (= 0 (get-in @state [:user-data :remaining] 0))
-      true)))
+(defmulti finish-turn-enabled? :phase)
 
-(defn update-status-panel [{:keys [phase turn]}]
-  (go (let [status-bar (js/document.querySelector "#status-bar")]
+(defmethod finish-turn-enabled? ::teg/add-army [game]
+  (and (= (:id (get-user))
+          (teg/get-current-player game))
+       (= 0 (get-in @state [:user-data :remaining] 0))))
+
+(defmethod finish-turn-enabled? :default [game]
+  (= (:id (get-user))
+          (teg/get-current-player game)))
+
+(defmulti status-panel-title :phase)
+
+(defmethod status-panel-title ::teg/add-army [_]
+  (let [remaining (get-in @state [:user-data :remaining] 0)]
+    (u/format "Incorporando ejércitos (%1 %2)"
+              remaining
+              (if (= 1 remaining) "restante" "restantes"))))
+
+(defmethod status-panel-title ::teg/attack [_] "Atacando...")
+(defmethod status-panel-title ::teg/regroup [_] "Reagrupando...")
+
+(defmulti finish-btn-label :phase)
+(defmethod finish-btn-label ::teg/add-army [_] "Confirmar")
+(defmethod finish-btn-label ::teg/attack [_] "Reagrupar")
+(defmethod finish-btn-label ::teg/regroup [_] "Finalizar turno")
+
+(defn update-status-panel [{:keys [turn]}]
+  (go (let [game (get-game)
+            status-bar (js/document.querySelector "#status-bar")]
         (oset! status-bar :innerHTML "")
         (when turn
           (.appendChild status-bar
@@ -386,24 +508,14 @@
                          [:div.row.align-items-center.p-1
                           [:div.col.text-truncate
                            [:h4.text-truncate
-                            (case phase
-                              ::teg/add-army (let [remaining (get-in @state [:user-data :remaining] 0)]
-                                               (u/format "Incorporando ejércitos (%1 %2)"
-                                                         remaining
-                                                         (if (= 1 remaining) "restante" "restantes")))
-                              ::teg/attack "Atacando..."
-                              ::teg/regroup "Reagrupando..."
-                              "")]]
+                            (status-panel-title game)]]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
-                            {:type "button" :disabled (not (finish-turn-enabled?))}
-                            (case phase
-                              ::teg/add-army "Confirmar"
-                              ::teg/attack "Reagrupar"
-                              ::teg/regroup "Finalizar turno")]]]))
+                            {:type "button" :disabled (not (finish-turn-enabled? game))}
+                            (finish-btn-label game)]]]))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
-                             finish-turn)))))
+                             #(finish-turn! (@state :game-atom)))))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
@@ -417,16 +529,24 @@
           (<! (update-ui update))
           (recur)))))
 
-(defn reset-user-data [{:keys [phase] :as game}]
-  (case phase
-    ::teg/add-army {:remaining (teg/calculate-extra-army game)
-                    :additions {}}
-    ::teg/attack {:selected-country nil}
-    nil))
+(defmulti reset-user-data :phase)
 
+(defmethod reset-user-data ::teg/add-army [game]
+  {:remaining (teg/calculate-extra-army game)
+   :additions {}})
 
-(defn initialize [game-atom]
+(defmethod reset-user-data ::teg/attack [_] 
+  {:selected-country nil})
+
+(defmethod reset-user-data ::teg/regroup [_]
+  {:selected-country nil
+   :regroups []})
+
+(defmethod reset-user-data :default [_] {})
+
+(defn initialize [game-atom user-atom]
   (go (reset! state {:game-atom game-atom
+                     :user-atom user-atom
                      :updates (a/chan (a/sliding-buffer 1))})
       (.removeAllSubmorphs world)
       (<! (init-map))
@@ -434,10 +554,15 @@
       (add-watch state :ui-change
                  #(a/put! (@state :updates) @game-atom))
       (let [state-change (fn [_key _atom old-state new-state]
-                           (when (not= (old-state :turn)
-                                       (new-state :turn))
+                           (when (not= [(old-state :phase) (old-state :turn)]
+                                       [(new-state :phase) (new-state :turn)])
                              (swap! state assoc :user-data
                                     (reset-user-data new-state)))
+                           (doseq [country (keys b/countries)]
+                             (let [delta-army (- (teg/get-army new-state country)
+                                                 (teg/get-army old-state country))]
+                               (when-not (zero? delta-army)
+                                 (moved-army-effect country delta-army))))
                            (a/put! (@state :updates) new-state))]
         (add-watch game-atom :state-change state-change)
         (state-change :state-change game-atom {} @game-atom))

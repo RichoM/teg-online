@@ -46,7 +46,8 @@
     (a/take! ready #(.hide modal) true)))
 
 (defn hide-modal [modal]
-  (.hide (js/bootstrap.Modal.getInstance modal)))
+  (when-let [bs-modal (js/bootstrap.Modal.getInstance modal)]
+    (.hide bs-modal)))
 
 (defn on-modal-keypress-enter [modal callback]
   (on-keypress modal 13
@@ -59,41 +60,40 @@
 (defn on-modal-hidden [modal callback]
   (doto modal (.addEventListener "hidden.bs.modal" (partial callback modal))))
 
-(defn show-modal [modal]
-  (hide-modals)
-  (let [result (a/chan)
-        container (find-container "#modal-dialogs")
-        html-modal modal
-        bs-modal (js/bootstrap.Modal. html-modal)
-        ready-chan (a/chan)
-        current {:modal bs-modal
-                 :ready ready-chan}]
-    (reset! current-modal current)
-    (.appendChild container html-modal)
-    (.show bs-modal)
-    (doto html-modal
-      (on-modal-shown #(a/close! ready-chan))
-      (on-modal-hidden #(do (.remove html-modal)
-                            (compare-and-set! current-modal current nil)
-                            (a/close! result))))
-    result))
-
-(defn make-and-show-modal [& args]
-  (show-modal (apply make-modal args)))
+(defn show-modal
+  ([modal] (show-modal modal {}))
+  ([modal options]
+   (hide-modals)
+   (let [result (a/chan)
+         container (find-container "#modal-dialogs")
+         html-modal modal
+         bs-modal (js/bootstrap.Modal. html-modal (clj->js options))
+         ready-chan (a/chan)
+         current {:modal bs-modal
+                  :ready ready-chan}]
+     (reset! current-modal current)
+     (.appendChild container html-modal)
+     (.show bs-modal)
+     (doto html-modal
+       (on-modal-shown #(a/close! ready-chan))
+       (on-modal-hidden #(do (.remove html-modal)
+                             (compare-and-set! current-modal current nil)
+                             (a/close! result))))
+     result)))
 
 (defn alert [title & message]
-  (-> (make-modal :header (list [:h4
+  (-> (make-modal :header (list [:h2
                                  [:i.fas.fa-exclamation-circle]
                                  [:span.ms-2 title]]
                                 close-modal-btn)
-                  :body (when message [:h5 message])
+                  :body (when message [:h3 message])
                   :footer accept-modal-btn)
       (on-modal-keypress-enter hide-modal)
       show-modal))
 
 (comment
   (go (print "HOLA")
-      (<! (alert "CUIDADO!"))
+      (<! (alert "CUIDADO!" "Hombre radioactivo!"))
       (print "CHAU"))
   )
 
@@ -103,11 +103,11 @@
                               #(reset! result true))
             no-btn (on-click (crate/html cancel-modal-btn)
                              #(reset! result false))]
-        (<! (-> (make-modal :header (list [:h4
+        (<! (-> (make-modal :header (list [:h2
                                            [:i.fas.fa-question-circle]
                                            [:span.ms-2 title]]
                                           close-modal-btn)
-                            :body (when message [:h5 message])
+                            :body (when message [:h3 message])
                             :footer (list yes-btn no-btn))
                 (on-modal-keypress-enter (fn [modal]
                                            (reset! result true)
@@ -129,12 +129,12 @@
                               #(reset! result (.-value input)))
             no-btn (on-click (crate/html cancel-modal-btn)
                              #(reset! result nil))]
-        (<! (-> (make-modal :header (list [:h4
+        (<! (-> (make-modal :header (list [:h2
                                            [:i.fas.fa-question-circle]
                                            [:span.ms-2 title]]
                                           close-modal-btn)
                             :body [:div.container-fluid
-                                   [:div.row [:h5 message]]
+                                   [:div.row [:h3 message]]
                                    [:div.row input]]
                             :footer (list yes-btn no-btn))
                 (on-modal-keypress-enter (fn [modal]
@@ -145,7 +145,7 @@
 
 (comment
   (go (print 1)
-      (if-let [val (<! (prompt "Richo capo?" "" 5))]
+      (if-let [val (<! (prompt "Richo capo?" "AAAH" 5))]
         (print val)
         (print false)))
   
