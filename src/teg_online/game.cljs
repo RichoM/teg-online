@@ -35,6 +35,9 @@
          :turn 0
          :phase ::add-army-1))
 
+(defn game-started? [game]
+  (some? (game :turn)))
+
 (defn get-players [game]
   (map (game :players)
        (game :turn-order)))
