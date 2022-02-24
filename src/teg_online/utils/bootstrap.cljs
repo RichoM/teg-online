@@ -46,7 +46,8 @@
     (a/take! ready #(.hide modal) true)))
 
 (defn hide-modal [modal]
-  (.hide (js/bootstrap.Modal.getInstance modal)))
+  (when-let [bs-modal (js/bootstrap.Modal.getInstance modal)]
+    (.hide bs-modal)))
 
 (defn on-modal-keypress-enter [modal callback]
   (on-keypress modal 13
