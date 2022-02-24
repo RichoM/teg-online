@@ -256,7 +256,6 @@
                           :max-value remaining))]
         (print addition)
         (when-not (zero? addition)
-          (moved-army-effect country-id addition)
           (swap! state #(-> %
                             (update-in [:user-data :remaining] - addition)
                             (update-in [:user-data :additions country-id] + addition)))
@@ -331,8 +330,6 @@
                                          max-out
                                          (dec max-out))))]
               (when (> army 0)
-                (moved-army-effect selected-country (* -1 army))
-                (moved-army-effect country-id army)
                 (swap! state update-in [:user-data :regroups] conj [selected-country country-id army]))
               (swap! state assoc-in [:user-data :selected-country] nil))
             (swap! state assoc-in [:user-data :selected-country] country-id)))
@@ -561,6 +558,11 @@
                                        [(new-state :phase) (new-state :turn)])
                              (swap! state assoc :user-data
                                     (reset-user-data new-state)))
+                           (doseq [country (keys b/countries)]
+                             (let [delta-army (- (teg/get-army new-state country)
+                                                 (teg/get-army old-state country))]
+                               (when-not (zero? delta-army)
+                                 (moved-army-effect country delta-army))))
                            (a/put! (@state :updates) new-state))]
         (add-watch game-atom :state-change state-change)
         (state-change :state-change game-atom {} @game-atom))
