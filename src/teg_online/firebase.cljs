@@ -1,12 +1,12 @@
 (ns teg-online.firebase
-  (:require [oops.core :refer [oget oset!]]
+  (:require [clojure.core.async :as a :refer [go <!]]
+            [cljs.core.async.interop :refer-macros [<p!]]
+            [oops.core :refer [oget oset!]]
             [teg-online.game :as teg]
             [teg-online.board :as b]))
 
 
 (def collection-id "games_dev")
-(def doc-id "YkUz0FC4XJC4qKKNmViE") ; TODO(Richo): Let the user create/join a game
-
 (def sorted-countries (-> b/countries keys sort vec))
 
 (def unsubscribe (atom []))
@@ -34,8 +34,9 @@
                                              :owner (keyword owner)}]))
                                     countries))})
 
-(defn initialize [game-atom]
-  (let [last-update (atom nil)]
+(defn connect [doc-id game-atom]
+  (let [result (a/chan)
+        last-update (atom nil)]
     (add-watch game-atom :firebase
                (fn [_ _ _ game]
                  (when (not= game @last-update)
@@ -52,8 +53,39 @@
                                 (let [game (doc->game (js->clj (.data doc)
                                                                :keywordize-keys true))]
                                   (reset! last-update game)
-                                  (reset! game-atom game)))))))))
+                                  (reset! game-atom game)
+                                  (a/close! result)))))))
+    result))
 
-(defn terminate []
+(comment
+  
+  
+  ,,,)
+
+(defn disconnect []
   (doseq [unsub @unsubscribe]
     (unsub)))
+
+
+(defn create-game! []
+  (go (let [game (-> (teg/new-game))
+            doc (<p! (-> js/db
+                         (.collection collection-id)
+                         (.add (-> game
+                                   game->doc
+                                   clj->js))))]
+        (oget doc :id))))
+
+(defn join-game! [game-id]
+  (go (<p! (-> js/db))
+      game-id))
+
+(comment
+  (<p! (-> js/db
+           (.collection collection-id)
+           (.doc "lobby")))
+
+  (-> js/db
+      (.collection collection-id)
+      (.doc "fail"))
+  )
