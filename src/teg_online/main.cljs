@@ -1,17 +1,36 @@
 (ns teg-online.main
   (:require [clojure.core.async :as a :refer [go <!]]
+            [clojure.string :as str]
+            [oops.core :refer [oget oget+ oset!]]
+            [teg-online.utils.bootstrap :as bs]
             [teg-online.firebase :as fb]
             [teg-online.game :as teg]
             [teg-online.ui :as ui]))
 
 (defonce game (atom (teg/new-game)))
+(defonce this-user (atom nil))
+
+(defn ask-user-name []
+  (go (let [user-name (str/trim (or (<! (bs/prompt "User name:" "")) ""))]
+        (if-not (empty? user-name)
+          user-name
+          (<! (ask-user-name))))))
+
+(defn get-this-user []
+  (go (if-let [this-user (oget js/localStorage "?teg-online\\.this-user")]
+        (js->clj (js/JSON.parse this-user))
+        (let [user-name (<! (ask-user-name))
+              this-user {:id (str (random-uuid))
+                         :name user-name}]
+          (oset! js/localStorage "!teg-online\\.this-user"
+                 (js/JSON.stringify (clj->js this-user)))
+          this-user))))
 
 (defn init []
   (go
-    (print "HELLO!")
     (fb/initialize game)
-    (<! (ui/initialize game))
-    (print "BYE!")))
+    (ui/initialize game)
+    (reset! this-user (<! (get-this-user)))))
 
 (defn ^:dev/before-load-async reload-begin* [done]
   (go (<! (ui/terminate))
