@@ -10,7 +10,7 @@
 
 (defonce game-atom (atom (teg/new-game)))
 (defonce game-id (atom nil))
-(defonce this-user (atom nil))
+(defonce user-atom (atom nil))
 
 (defn ask-user-name []
   (go (let [user-name (str/trim (or (<! (bs/prompt "Nombre de usuario:" "")) ""))]
@@ -20,10 +20,11 @@
 
 (defn get-this-user []
   (go (if-let [this-user (oget js/localStorage "?teg-online\\.this-user")]
-        (js->clj (js/JSON.parse this-user)
+        (update (js->clj (js/JSON.parse this-user)
                  :keywordize-keys true)
+                :id keyword)
         (let [user-name (<! (ask-user-name))
-              this-user {:id (str (random-uuid))
+              this-user {:id (keyword (str (random-uuid)))
                          :name user-name}]
           (oset! js/localStorage "!teg-online\\.this-user"
                  (js/JSON.stringify (clj->js this-user)))
@@ -101,17 +102,17 @@
                              :join-game (<! (bs/prompt "Código:" ""))))]
         (<! (fb/connect doc-id game-atom))
         (let [game @game-atom
-              {user-id :id, user-name :name} @this-user]
+              {user-id :id, user-name :name} @user-atom]
           (when-not (teg/game-started? game)
             (when-not (contains? (game :players) user-id)
-              (swap! game-atom teg/join-game user-id user-name))))
-        (<! (show-waiting-dialog (= :new-game action))))))
+              (swap! game-atom teg/join-game user-id user-name))
+            (<! (show-waiting-dialog (= :new-game action))))))))
 
 (defn init []
   (go
     (print "HELLO")
-    (ui/initialize game-atom)
-    (reset! this-user (<! (get-this-user)))
+    (ui/initialize game-atom user-atom)
+    (reset! user-atom (<! (get-this-user)))
     (<! (initialize-network))
     (print "BYE")))
 
@@ -124,12 +125,12 @@
 (defn ^:dev/after-load-async reload-end* [done]
   (go (when-let [id @game-id]
         (fb/connect id game-atom))
-      (<! (ui/initialize game-atom))
+      (<! (ui/initialize game-atom user-atom))
       (done)))
 
 (comment
   @game-id
-  @this-user
+  @user-atom
 
   (go (print (<! (show-main-menu))))
 

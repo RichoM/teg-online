@@ -26,6 +26,10 @@
   (when-let [game-atom (@state :game-atom)]
     @game-atom))
 
+(defn get-user []
+  (when-let [user-atom (@state :user-atom)]
+    @user-atom))
+
 (defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
                               :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
@@ -200,7 +204,11 @@
               (swap! game-atom teg/regroup country-a country-b moving-army))))
         (swap! game-atom teg/finish-action))))
 
-(defmulti can-interact-with-country? (fn [{:keys [phase]} _country _player] phase))
+(defmulti can-interact-with-country? 
+  (fn [{:keys [phase] :as game} _country _player]
+    (when (= (:id (get-user))
+             (teg/get-current-player game))
+      phase)))
 
 (defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
   (= player-id (teg/country-owner game country-id)))
@@ -468,10 +476,14 @@
 
 (defmulti finish-turn-enabled? :phase)
 
-(defmethod finish-turn-enabled? ::teg/add-army [_game]
-  (= 0 (get-in @state [:user-data :remaining] 0)))
+(defmethod finish-turn-enabled? ::teg/add-army [game]
+  (and (= (:id (get-user))
+          (teg/get-current-player game))
+       (= 0 (get-in @state [:user-data :remaining] 0))))
 
-(defmethod finish-turn-enabled? :default [_] true)
+(defmethod finish-turn-enabled? :default [game]
+  (= (:id (get-user))
+          (teg/get-current-player game)))
 
 (defmulti status-panel-title :phase)
 
@@ -535,8 +547,9 @@
 
 (defmethod reset-user-data :default [_] {})
 
-(defn initialize [game-atom]
+(defn initialize [game-atom user-atom]
   (go (reset! state {:game-atom game-atom
+                     :user-atom user-atom
                      :updates (a/chan (a/sliding-buffer 1))})
       (.removeAllSubmorphs world)
       (<! (init-map))
