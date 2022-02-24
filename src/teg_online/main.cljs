@@ -11,7 +11,7 @@
 (defonce this-user (atom nil))
 
 (defn ask-user-name []
-  (go (let [user-name (str/trim (or (<! (bs/prompt "User name:" "")) ""))]
+  (go (let [user-name (str/trim (or (<! (bs/prompt "Nombre de usuario:" "")) ""))]
         (if-not (empty? user-name)
           user-name
           (<! (ask-user-name))))))
@@ -26,11 +26,23 @@
                  (js/JSON.stringify (clj->js this-user)))
           this-user))))
 
+(defn show-main-menu []
+  (go (<! (-> (bs/make-modal
+               :body [:div.container-fluid
+                      [:div.row
+                       [:button.btn.btn-primary.btn-lg {:type "button"} "Crear partida"]]
+                      [:div.row.m-1]
+                      [:div.row
+                       [:button.btn.btn-secondary.btn-lg {:type "button"} "Entrar a partida existente"]]])
+              (bs/show-modal {:backdrop "static"
+                              :keyboard false})))))
+
 (defn init []
   (go
     (fb/initialize game)
     (ui/initialize game)
-    (reset! this-user (<! (get-this-user)))))
+    (reset! this-user (<! (get-this-user)))
+    (show-main-menu)))
 
 (defn ^:dev/before-load-async reload-begin* [done]
   (go (<! (ui/terminate))
