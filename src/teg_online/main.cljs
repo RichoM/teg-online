@@ -50,17 +50,10 @@
                             :keyboard false}))
         @action)))
 
-(comment
-  (.get (js/URLSearchParams. (oget js/location :search)) "id")
-  (oset! js/location :search "?id=RICHO")
-  ; window.history.pushState('page2', 'Title', '/page2.php');
-  (js/history.pushState "main" "Title" "/main?id=RICHO")
-  )
-
-(defn show-waiting-dialog [host?]
-  ; TODO(Richo): Maybe we can create a url that will enter the appropriate game id
-  ; (.get (js/URLSearchParams. (oget js/location :search)) "id")
-  (go (let [start-game-btn (crate/html [:button.btn.btn-primary.btn-lg
+(defn show-waiting-dialog []
+  (go (let [host? (= (:id @user-atom)
+                     (:id (first (teg/get-players @game-atom))))
+            start-game-btn (crate/html [:button.btn.btn-primary.btn-lg
                                         {:type "button" :data-bs-dismiss "modal"}
                                         "Iniciar partida"])
             player-list (crate/html [:ol.list-group])
@@ -70,7 +63,8 @@
                                                  [:span "Código de la partida: "]
                                                  [:span.fw-bolder.text-nowrap 
                                                   {:style "user-select: all;"}
-                                                  (str @game-id)]]]
+                                                  [:a {:href (oget js/location :href)} 
+                                                   (str @game-id)]]]]
                           [:div.row.m-2]
                           [:div.row.text-center [:h3 "Esperando jugadores..."]]
                           [:div.row.fs-3
@@ -95,18 +89,23 @@
         (remove-watch game-atom ::waiting-for-players))))
 
 (defn initialize-network []
-  (go (let [action (<! (show-main-menu))
+  (go (let [hash (subs (or (oget js/location :?hash) "") 1)
+            action (if (empty? hash)
+                     (<! (show-main-menu))
+                     :hash-game)
             doc-id (reset! game-id
                            (case action
                              :new-game (<! (fb/create-game!))
-                             :join-game (<! (bs/prompt "Código:" ""))))]
+                             :join-game (<! (bs/prompt "Código:" ""))
+                             :hash-game hash))]
         (<! (fb/connect doc-id game-atom))
+        (oset! js/location :!hash doc-id)
         (let [game @game-atom
               {user-id :id, user-name :name} @user-atom]
           (when-not (teg/game-started? game)
             (when-not (contains? (game :players) user-id)
               (swap! game-atom teg/join-game user-id user-name))
-            (<! (show-waiting-dialog (= :new-game action))))))))
+            (<! (show-waiting-dialog)))))))
 
 (defn init []
   (go
