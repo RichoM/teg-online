@@ -95,7 +95,14 @@
                      :hash-game)
             doc-id (reset! game-id
                            (case action
-                             :new-game (<! (fb/create-game!))
+                             :new-game (do (-> (bs/make-modal
+                                                :body [:div.container
+                                                       [:div.row.text-center [:h3 "Creando partida..."]]
+                                                       [:div.row.m-1]
+                                                       [:div.row.text-center [:i.fas.fa-circle-notch.fa-spin.fa-4x]]])
+                                               (bs/show-modal {:backdrop "static"
+                                                               :keyboard false}))
+                                           (<! (fb/create-game!)))
                              :join-game (<! (bs/prompt "Código:" ""))
                              :hash-game hash))]
         (if (<! (fb/connect doc-id game-atom))
