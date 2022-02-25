@@ -1,10 +1,10 @@
 (ns teg-online.firebase
+  (:refer-clojure :exclude [exists?])
   (:require [clojure.core.async :as a :refer [go <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [oops.core :refer [oget oset!]]
+            [oops.core :refer [oget oset! ocall!]]
             [teg-online.game :as teg]
             [teg-online.board :as b]))
-
 
 (def collection-id "games_dev")
 (def sorted-countries (-> b/countries keys sort vec))
@@ -42,31 +42,45 @@
                                    clj->js))))]
         (oget doc :id))))
 
+(defn exists? [doc-ref]
+  (go (let [doc (<p! (.get doc-ref))]
+        (oget doc :exists))))
+
+(defn on-snapshot [doc-ref callback]
+  (go (let [wait (a/chan)
+            unsub (ocall! doc-ref :onSnapshot
+                          (fn [doc]
+                            (callback doc)
+                            (a/close! wait)))]
+        (<! wait)
+        unsub)))
+
 (defn connect [doc-id game-atom]
-  (let [result (a/chan)
-        last-update (atom nil)]
-    (add-watch game-atom ::firebase-connection
-               (fn [_ _ _ game]
-                 (when (not= game @last-update)
-                   (-> js/db
-                       (.collection collection-id)
-                       (.doc doc-id)
-                       (.set (clj->js (game->doc game)))))))
-    (swap! destructors conj 
-           #(remove-watch game-atom ::firebase-connection))
-    (swap! destructors conj
-           (-> js/db
-               (.collection collection-id)
-               (.doc doc-id)
-               (.onSnapshot (fn [doc]
-                              (when-not (oget doc :metadata.hasPendingWrites)
-                                (let [game (doc->game (js->clj (.data doc)
-                                                               :keywordize-keys true))]
-                                  (reset! last-update game)
-                                  (reset! game-atom game)
-                                  (a/close! result)))))))
-    result))
+  (go (let [doc-ref (-> js/db
+                        (.collection collection-id)
+                        (.doc doc-id))]
+        (when (<! (exists? doc-ref))
+          (let [last-update (atom nil)]
+            (add-watch game-atom ::firebase-connection
+                       (fn [_ _ _ game]
+                         (when (not= game @last-update)
+                           (-> js/db
+                               (.collection collection-id)
+                               (.doc doc-id)
+                               (.set (clj->js (game->doc game)))))))
+            (swap! destructors conj
+                   #(remove-watch game-atom ::firebase-connection))
+            (swap! destructors conj
+                   (<! (on-snapshot doc-ref
+                                    (fn [doc]
+                                      (print "CHANGES!" (js/Date.now))
+                                      (when-not (oget doc :metadata.hasPendingWrites)
+                                        (let [game (doc->game (js->clj (.data doc)
+                                                                       :keywordize-keys true))]
+                                          (reset! last-update game)
+                                          (reset! game-atom game)))))))
+            true)))))
 
 (defn disconnect []
-  (doseq [destructor @destructors]
+  (doseq [destructor (first (reset-vals! destructors []))]
     (destructor)))
