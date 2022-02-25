@@ -150,3 +150,63 @@
         (print false)))
   
   )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Toasts
+
+(defn make-toast [& {:keys [header body]}]
+  (crate/html
+   [:div.toast {:role "alert" :aria-live "assertive" :aria-atomic "true"}
+    (when header [:div.toast-header header])
+    (when body [:div.toast-body body])]))
+
+(def close-toast-btn
+  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}])
+
+
+(defn on-toast-shown [toast callback]
+  (doto toast (.addEventListener "shown.bs.toast" (partial callback toast))))
+
+(defn on-toast-hidden [toast callback]
+  (doto toast (.addEventListener "hidden.bs.toast" (partial callback toast))))
+
+(defn show-toast 
+  ([toast] (show-toast toast {}))
+  ([toast options]
+   (let [result (a/chan)
+         container (find-container "#toast-container")
+         html-toast toast
+         bs-toast (js/bootstrap.Toast. toast (clj->js options))]
+     (.appendChild container html-toast)
+     (.show bs-toast)
+     (doto html-toast
+       (on-toast-shown #(a/close! result))
+       (on-toast-hidden #(do (.remove html-toast))))
+     result)))
+
+(comment
+  (hide-modals)
+
+  (go (loop [i 1]
+        (when (<= i 20)
+          (<! (-> (make-toast :header (list [:h5
+                                             [:span i ". "]
+                                             [:span.fw-bolder.text-nowrap "España"]
+                                             [:span " ataca a "]
+                                             [:span.fw-bolder.text-nowrap "Sahara"]]
+                                            [:span.me-auto] close-toast-btn))
+                  (show-toast {:delay 2500})))
+          (<! (a/timeout 50))
+          (recur (inc i)))))
+
+  (let [toast (crate/html
+               [:div.toast {:role "alert" :aria-live "assertive" :aria-atomic "true"}
+                [:div.toast-header
+                 [:strong.me-auto "Bootstrap"]
+                 [:small "11 mins ago"]
+                 [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}]]
+                [:div.toast-body "Hello, world! This is a toast message."]])
+        container (find-container "#toast-container")]
+    (.appendChild container toast)
+    (.show (js/bootstrap.Toast. toast)))
+  )
