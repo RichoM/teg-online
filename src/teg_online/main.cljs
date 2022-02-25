@@ -98,14 +98,20 @@
                              :new-game (<! (fb/create-game!))
                              :join-game (<! (bs/prompt "Código:" ""))
                              :hash-game hash))]
-        (<! (fb/connect doc-id game-atom))
-        (oset! js/location :!hash doc-id)
-        (let [game @game-atom
-              {user-id :id, user-name :name} @user-atom]
-          (when-not (teg/game-started? game)
-            (when-not (contains? (game :players) user-id)
-              (swap! game-atom teg/join-game user-id user-name))
-            (<! (show-waiting-dialog)))))))
+        (if (<! (fb/connect doc-id game-atom))
+          (do (oset! js/location :!hash doc-id)
+              (let [game @game-atom
+                    {user-id :id, user-name :name} @user-atom]
+                (when-not (teg/game-started? game)
+                  (when-not (contains? (game :players) user-id)
+                    (swap! game-atom teg/join-game user-id user-name))
+                  (<! (show-waiting-dialog)))))
+          (do (<! (bs/alert "ERROR" 
+                            (list [:span "La partida "]
+                                  [:span.fw-bolder.text-nowrap doc-id]
+                                  [:span " NO existe"])))
+              (oset! js/location :hash "")
+              (<! (initialize-network)))))))
 
 (defn init []
   (go
