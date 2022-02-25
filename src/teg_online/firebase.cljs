@@ -37,7 +37,7 @@
 (defn create-game! []
   (go (let [doc (<p! (-> js/db
                          (.collection collection-id)
-                         (.add (-> (-> (teg/new-game))
+                         (.add (-> (teg/new-game)
                                    game->doc
                                    clj->js))))]
         (oget doc :id))))
@@ -64,16 +64,12 @@
             (add-watch game-atom ::firebase-connection
                        (fn [_ _ _ game]
                          (when (not= game @last-update)
-                           (-> js/db
-                               (.collection collection-id)
-                               (.doc doc-id)
-                               (.set (clj->js (game->doc game)))))))
+                           (.set doc-ref (clj->js (game->doc game))))))
             (swap! destructors conj
                    #(remove-watch game-atom ::firebase-connection))
             (swap! destructors conj
                    (<! (on-snapshot doc-ref
                                     (fn [doc]
-                                      (print "CHANGES!" (js/Date.now))
                                       (when-not (oget doc :metadata.hasPendingWrites)
                                         (let [game (doc->game (js->clj (.data doc)
                                                                        :keywordize-keys true))]
