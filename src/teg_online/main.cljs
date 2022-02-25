@@ -71,6 +71,7 @@
                            [:div.col player-list]]
                           (when host? [:div.row.mt-3 start-game-btn])])
             update-modal (fn [game]
+                           (oset! start-game-btn :disabled (<= (count (game :players)) 1))
                            (oset! player-list :innerHTML "")
                            (doseq [[idx {:keys [name]}] (map-indexed vector (teg/get-players game))]
                              (.appendChild player-list
