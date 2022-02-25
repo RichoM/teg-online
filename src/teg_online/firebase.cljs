@@ -55,7 +55,7 @@
         (<! wait)
         unsub)))
 
-(defn connect [doc-id game-atom]
+(defn connect! [doc-id game-atom]
   (go (let [doc-ref (-> js/db
                         (.collection collection-id)
                         (.doc doc-id))]
@@ -77,6 +77,6 @@
                                           (reset! game-atom game)))))))
             true)))))
 
-(defn disconnect []
+(defn disconnect! []
   (doseq [destructor (first (reset-vals! destructors []))]
     (destructor)))

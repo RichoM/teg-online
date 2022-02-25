@@ -106,7 +106,7 @@
                                            (<! (fb/create-game!)))
                              :join-game (<! (bs/prompt "Código:" ""))
                              :hash-game hash))]
-        (if (<! (fb/connect doc-id game-atom))
+        (if (<! (fb/connect! doc-id game-atom))
           (do (oset! js/location :!hash doc-id)
               (let [game @game-atom
                     {user-id :id, user-name :name} @user-atom]
@@ -132,12 +132,12 @@
 
 (defn ^:dev/before-load-async reload-begin* [done]
   (go (<! (ui/terminate))
-      (fb/disconnect)
+      (fb/disconnect!)
       (done)))
 
 (defn ^:dev/after-load-async reload-end* [done]
   (go (when-let [id @game-id]
-        (fb/connect id game-atom))
+        (fb/connect! id game-atom))
       (<! (ui/initialize game-atom user-atom))
       (done)))
 
