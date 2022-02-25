@@ -71,6 +71,7 @@
                            [:div.col player-list]]
                           (when host? [:div.row.mt-3 start-game-btn])])
             update-modal (fn [game]
+                           (oset! start-game-btn :disabled (<= (count (game :players)) 1))
                            (oset! player-list :innerHTML "")
                            (doseq [[idx {:keys [name]}] (map-indexed vector (teg/get-players game))]
                              (.appendChild player-list
@@ -95,17 +96,30 @@
                      :hash-game)
             doc-id (reset! game-id
                            (case action
-                             :new-game (<! (fb/create-game!))
+                             :new-game (do (-> (bs/make-modal
+                                                :body [:div.container
+                                                       [:div.row.text-center [:h3 "Creando partida..."]]
+                                                       [:div.row.m-1]
+                                                       [:div.row.text-center [:i.fas.fa-circle-notch.fa-spin.fa-4x]]])
+                                               (bs/show-modal {:backdrop "static"
+                                                               :keyboard false}))
+                                           (<! (fb/create-game!)))
                              :join-game (<! (bs/prompt "Código:" ""))
                              :hash-game hash))]
-        (<! (fb/connect doc-id game-atom))
-        (oset! js/location :!hash doc-id)
-        (let [game @game-atom
-              {user-id :id, user-name :name} @user-atom]
-          (when-not (teg/game-started? game)
-            (when-not (contains? (game :players) user-id)
-              (swap! game-atom teg/join-game user-id user-name))
-            (<! (show-waiting-dialog)))))))
+        (if (<! (fb/connect! doc-id game-atom))
+          (do (oset! js/location :!hash doc-id)
+              (let [game @game-atom
+                    {user-id :id, user-name :name} @user-atom]
+                (when-not (teg/game-started? game)
+                  (when-not (contains? (game :players) user-id)
+                    (swap! game-atom teg/join-game user-id user-name))
+                  (<! (show-waiting-dialog)))))
+          (do (<! (bs/alert "ERROR" 
+                            (list [:span "La partida "]
+                                  [:span.fw-bolder.text-nowrap doc-id]
+                                  [:span " NO existe"])))
+              (oset! js/location :hash "")
+              (<! (initialize-network)))))))
 
 (defn init []
   (go
@@ -118,12 +132,12 @@
 
 (defn ^:dev/before-load-async reload-begin* [done]
   (go (<! (ui/terminate))
-      (fb/disconnect)
+      (fb/disconnect!)
       (done)))
 
 (defn ^:dev/after-load-async reload-end* [done]
   (go (when-let [id @game-id]
-        (fb/connect id game-atom))
+        (fb/connect! id game-atom))
       (<! (ui/initialize game-atom user-atom))
       (done)))
 

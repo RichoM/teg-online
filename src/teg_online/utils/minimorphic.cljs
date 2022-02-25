@@ -105,3 +105,14 @@
   (translate (first (oget js/World.current :submorphs))
              100 100 1)
   )
+
+(defn appear [^js/Morph morph seconds]
+  (let [effect (make-morph :alpha 0)]
+    (on-step effect (fn [_ delta]
+                      (let [alpha (+ (oget morph :alpha)
+                                     (/ delta seconds))]
+                        (oset! morph :alpha alpha)
+                        (when (>= alpha 1)
+                          (.remove effect)))))
+    (.addMorph js/World.current effect)
+    morph))

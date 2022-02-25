@@ -376,7 +376,8 @@
 (defn init-map []
   (go
     (let [form (<! (mm/load-form "imgs/teg_board.png"))
-          map (mm/make-sprite form)]
+          map (-> (mm/make-sprite form :alpha 0)
+                  (mm/appear 2))]
       (.addMorph world map)
       (let [canvas (oget world :canvas.html)]
         (oset! canvas :width (oget map :width))
