@@ -116,6 +116,9 @@
 (defn next-turn [game]
   (update game :turn inc))
 
+(defn is-next-player-the-first-player? [{:keys [turn players]}]
+  (zero? (mod (inc turn) (count players))))
+
 (defn player-continents [game player-id]
   (let [countries (set (player-countries game player-id))]
     (filter (fn [continent]
@@ -143,12 +146,26 @@
     ::add-army)))
 
 (defmulti get-next-phase :phase)
-(defmethod get-next-phase ::add-army-1 [_] ::add-army-2)
-(defmethod get-next-phase ::add-army-2 [_] ::attack)
-(defmethod get-next-phase ::add-army [_] ::attack)
+
+(defmethod get-next-phase ::add-army-1 [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    ::add-army-2
+    ::add-army-1))
+
+(defmethod get-next-phase ::add-army-2 [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    ::attack
+    ::add-army-2))
+
+(defmethod get-next-phase ::add-army [{:keys [turn players] :as game}] 
+  (if (is-next-player-the-first-player? game)
+    ::attack
+    (get-next-phase-add-army game (get-current-player (next-turn game)))))
+
 (defmethod get-next-phase ::attack [_] ::regroup)
+
 (defmethod get-next-phase ::regroup [{:keys [turn players] :as game}]
-  (if (zero? (mod (inc turn) (count players)))
+  (if (is-next-player-the-first-player? game)
     (get-next-phase-add-army game (get-current-player (next-turn game)))
     ::attack))
 
@@ -168,17 +185,15 @@
   (get-next-phase-add-army game (get-current-player game) ::board/africa))
 
 (defmethod get-next-phase ::add-army-oceania [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/south-america))
+  (get-next-phase-add-army game (get-current-player game) ::board/oceania))
 
 (defn next-phase [game]
   (assoc game :phase (get-next-phase game)))
 
 (defmulti finish-action* :phase)
 
-(defmethod finish-action* ::add-army [{:keys [turn players] :as game}]
-  (if (zero? (mod (inc turn) (count players)))
-      (next-turn (next-phase game))
-      (next-turn game)))
+(defmethod finish-action* ::add-army [game]
+  (next-turn (next-phase game)))
 
 (defmethod finish-action* ::add-army-continent [game]
   (next-phase game))

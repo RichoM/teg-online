@@ -105,7 +105,6 @@
     (is (= 7 (teg/get-army game ::b/argentina)))
     (is (= 8 (teg/get-army game ::b/chile)))))
 
-
 (deftest attack-should-involve-valid-countries
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
@@ -671,7 +670,6 @@
                  teg/finish-action teg/finish-action)]
     (is (= ::teg/add-army-oceania (teg/get-current-phase game)))))
 
-
 (deftest add-army-continent-ACAACA-2
   (let [game-atom (atom (-> (teg/new-game)
                             (teg/join-game ::p1 "Richo")
@@ -714,6 +712,52 @@
                           (teg/add-army ::b/sahara 3)
                           teg/finish-action))
     (is (= ::teg/add-army (teg/get-current-phase @game-atom)))))
+
+(deftest add-army-continent-ACAACA-3
+  (let [game-atom (atom (-> (teg/new-game)
+                            (teg/join-game ::p1 "Richo")
+                            (teg/join-game ::p2 "Diego")
+                            (teg/join-game ::p3 "Sofía")
+                            (teg/distribute-countries (sort (keys b/countries)))
+                            teg/start-game))]
+    ; HACK(Richo): I'm changing the ownership of africa and south-america because 
+    ; invading them seems to much work.
+    (doseq [country (b/get-countries-by-continent ::b/africa)]
+      (swap! game-atom assoc-in [:countries country :owner] ::p1))
+    (doseq [country (b/get-countries-by-continent ::b/south-america)]
+      (swap! game-atom assoc-in [:countries country :owner] ::p2))
+    (swap! game-atom
+           #(-> %
+                ; add-army-1
+                (teg/add-army ::b/alaska 5) teg/finish-action
+                (teg/add-army ::b/alemania 5) teg/finish-action
+                (teg/add-army ::b/arabia 5) teg/finish-action
+
+                ; add-army-2
+                (teg/add-army ::b/alaska 3) teg/finish-action
+                (teg/add-army ::b/alemania 3) teg/finish-action
+                (teg/add-army ::b/arabia 3) teg/finish-action
+
+                ; attack/regroup (Richo)
+                teg/finish-action teg/finish-action
+
+                ; attack/regroup (Diego)
+                teg/finish-action teg/finish-action
+
+                ; attack/regroup (Sofía)
+                teg/finish-action teg/finish-action))
+    (is (= ::teg/add-army-africa (teg/get-current-phase @game-atom)))
+    (is (= ::p1 (teg/get-current-player @game-atom)))
+    (swap! game-atom #(-> %
+                          (teg/add-army ::b/sahara 3)
+                          teg/finish-action))
+    (is (= ::teg/add-army (teg/get-current-phase @game-atom)))
+    (is (= ::p1 (teg/get-current-player @game-atom)))
+    (swap! game-atom #(-> %
+                          (teg/add-army ::b/sahara (teg/calculate-extra-army @game-atom))
+                          teg/finish-action))
+    (is (= ::teg/add-army-south-america (teg/get-current-phase @game-atom)))
+    (is (= ::p2 (teg/get-current-player @game-atom)))))
 
 (comment
   (require '[teg-online.board :as board])
