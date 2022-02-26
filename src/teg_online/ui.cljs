@@ -560,8 +560,30 @@
 
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
-                                [:span.me-auto] bs/close-toast-btn))
+                                   [:span.me-auto] 
+                                   bs/close-toast-btn))
       (bs/show-toast {:delay 2500})))
+
+(defn on-game-change
+  [_key _ref
+   {old-turn :turn, old-phase :phase, :as old-game}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (= old-turn new-turn)
+    (show-toast (if (is-my-turn? new-game)
+                  "¡Es tu turno!"
+                  (list [:span "Es el turno de "]
+                        [:span.fw-bolder.text-nowrap
+                         (teg/get-current-player-name new-game)]))))
+  (when-not (= [old-phase old-turn]
+               [new-phase new-turn])
+    (swap! state assoc :user-data
+           (reset-user-data new-game)))
+  (doseq [country (keys b/countries)]
+    (let [delta-army (- (teg/get-army new-game country)
+                        (teg/get-army old-game country))]
+      (when-not (zero? delta-army)
+        (moved-army-effect country delta-army))))
+  (a/put! (@state :updates) new-game))
 
 (defn initialize [game-atom user-atom]
   (go (reset! state {:game-atom game-atom
@@ -570,28 +592,9 @@
       (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries))
-      (add-watch state :ui-change
-                 #(a/put! (@state :updates) @game-atom))
-      (let [state-change (fn [_key _atom old-state new-state]
-                           (when-not (= (old-state :turn)
-                                        (new-state :turn))
-                             (show-toast (if (is-my-turn? new-state)
-                                           "¡Es tu turno!"
-                                           (list [:span "Es el turno de "]
-                                                 [:span.fw-bolder.text-nowrap
-                                                  (teg/get-current-player-name new-state)]))))
-                           (when (not= [(old-state :phase) (old-state :turn)]
-                                       [(new-state :phase) (new-state :turn)])
-                             (swap! state assoc :user-data
-                                    (reset-user-data new-state)))
-                           (doseq [country (keys b/countries)]
-                             (let [delta-army (- (teg/get-army new-state country)
-                                                 (teg/get-army old-state country))]
-                               (when-not (zero? delta-army)
-                                 (moved-army-effect country delta-army))))
-                           (a/put! (@state :updates) new-state))]
-        (add-watch game-atom :state-change state-change)
-        (state-change :state-change game-atom {} @game-atom))
+      (add-watch state :ui-change #(a/put! (@state :updates) @game-atom))
+      (add-watch game-atom :state-change on-game-change)
+      (on-game-change :state-change game-atom {} @game-atom) ; Force update now
       (start-update-loop)))
 
 (defn terminate []
