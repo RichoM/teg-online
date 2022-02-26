@@ -7,6 +7,12 @@
                  ::africa {:name "África" :bonus 3}
                  ::oceania {:name "Oceanía" :bonus 2}})
 
+(defn get-continent-name [continent-id]
+  (get-in continents [continent-id :name]))
+
+(defn get-continent-bonus [continent-id]
+  (get-in continents [continent-id :bonus]))
+
 (def countries {; South America
                 ::argentina {:name "Argentina"
                              :continent ::south-america
