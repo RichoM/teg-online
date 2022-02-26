@@ -633,7 +633,7 @@
     (is (zero? (count (teg/player-countries game ::p3))))
     (is (= ::p1 (teg/get-current-player game)))))
 
-(deftest add-army-continent-ACAACA
+(deftest finish-action-after-regroup-should-consider-continent-ownership
   (let [game (-> (teg/new-game)
                  (teg/join-game ::p1 "Richo")
                  (teg/join-game ::p2 "Diego")
@@ -670,15 +670,15 @@
                  teg/finish-action teg/finish-action)]
     (is (= ::teg/add-army-oceania (teg/get-current-phase game)))))
 
-(deftest add-army-continent-ACAACA-2
+(deftest finish-action-after-add-army-should-consider-same-player-continent-ownership
   (let [game-atom (atom (-> (teg/new-game)
                             (teg/join-game ::p1 "Richo")
                             (teg/join-game ::p2 "Diego")
                             (teg/join-game ::p3 "Sofía")
                             (teg/distribute-countries (sort (keys b/countries)))
                             teg/start-game))]
-    ; HACK(Richo): I'm changing the ownership of africa and south-america because 
-    ; invading them seems to much work.
+    ; HACK(Richo): I'm changing the ownership of africa and south-america by hand 
+    ; because invading each country seems too much work.
     (doseq [country (b/get-countries-by-continent ::b/africa)]
       (swap! game-atom assoc-in [:countries country :owner] ::p1))
     (doseq [country (b/get-countries-by-continent ::b/south-america)]
@@ -713,15 +713,15 @@
                           teg/finish-action))
     (is (= ::teg/add-army (teg/get-current-phase @game-atom)))))
 
-(deftest add-army-continent-ACAACA-3
+(deftest finish-action-after-add-army-should-consider-different-player-continent-ownership
   (let [game-atom (atom (-> (teg/new-game)
                             (teg/join-game ::p1 "Richo")
                             (teg/join-game ::p2 "Diego")
                             (teg/join-game ::p3 "Sofía")
                             (teg/distribute-countries (sort (keys b/countries)))
                             teg/start-game))]
-    ; HACK(Richo): I'm changing the ownership of africa and south-america because 
-    ; invading them seems to much work.
+    ; HACK(Richo): I'm changing the ownership of africa and south-america by hand 
+    ; because invading each country seems too much work.
     (doseq [country (b/get-countries-by-continent ::b/africa)]
       (swap! game-atom assoc-in [:countries country :owner] ::p1))
     (doseq [country (b/get-countries-by-continent ::b/south-america)]
@@ -758,69 +758,3 @@
                           teg/finish-action))
     (is (= ::teg/add-army-south-america (teg/get-current-phase @game-atom)))
     (is (= ::p2 (teg/get-current-player @game-atom)))))
-
-(comment
-  (require '[teg-online.board :as board])
-  (def game @game-atom)
-
-  (teg/get-next-phase game)
-  (teg/get-current-phase (teg/finish-action game))
-
-  (def game-atom (atom (-> (teg/new-game)
-                           (teg/join-game ::p1 "Richo")
-                           (teg/join-game ::p2 "Diego")
-                           (teg/join-game ::p3 "Sofía")
-                           (teg/distribute-countries (sort (keys b/countries)))
-                           teg/start-game)))
-
-  (teg-online.board/get-countries-by-continent :teg-online.board/africa)
-  (first (teg/player-continents game ::p1))
-
-  (def game (-> (teg/new-game)
-                (teg/join-game ::p1 "Richo")
-                (teg/join-game ::p2 "Diego")
-                (teg/join-game ::p3 "Sofía")
-                (teg/distribute-countries (sort (keys b/countries)))
-                teg/start-game))
-  
-  (teg/player-countries game ::p3)
-
-
-  (def game-atom (atom (-> (teg/new-game)
-                           (teg/join-game ::p1 "Richo")
-                           (teg/join-game ::p2 "Diego")
-                           (teg/distribute-countries [::b/argentina ::b/peru
-                                                      ::b/uruguay ::b/brasil])
-                           teg/start-game)))
-  (add-watch game-atom :p
-             (fn [_ _ _ game]
-               (print {:current-player (teg/get-current-player game)
-                       :phase (teg/get-current-phase game)
-                       :turn (game :turn)})))
-  (do (swap! game-atom teg/finish-action)
-      nil)
-
-
-  (def get-current-state #(let [game @game-atom]
-                            [(teg/get-current-player game)
-                             (teg/get-current-phase game)]))
-  (def game (-> (teg/new-game)
-                (teg/join-game ::p1 "Richo")
-                (teg/join-game ::p2 "Diego")
-                (teg/distribute-countries [::b/argentina ::b/peru
-                                           ::b/uruguay ::b/brasil])
-                teg/start-game))
-
-  (teg/get-army game ::b/peru)
-
-  (teg/get-army game ::b/argentina)
-
-  (def country (first (teg/player-countries game ::p1)))
-  (-> game (teg/get-player ::p1))
-
-  country
-  (teg/get-player game ::p1)
-  (group-by :id (game :players))
-  (u/seek #(= (:id %) ::p1)
-          (game :players))
-  )
