@@ -516,17 +516,22 @@
 
 (defmethod status-panel-title ::teg/add-army [_]
   (let [remaining (get-in @state [:user-data :remaining] 0)]
-    (u/format "Incorporando ejércitos (%1 %2)"
-              remaining
-              (if (= 1 remaining) "restante" "restantes"))))
+    (list [:span "Incorporando ejércitos "]
+          [:span.text-nowrap
+           (u/format "(%1 %2)" 
+                     remaining 
+                     (if (= 1 remaining) "restante" "restantes"))])))
 
 (defmethod status-panel-title ::teg/add-army-continent [_]
   (let [remaining (get-in @state [:user-data :remaining] 0)
         continent (get-in @state [:user-data :continent])]
-    (u/format "Incorporando ejércitos en %3 (%1 %2)"
-              remaining
-              (if (= 1 remaining) "restante" "restantes")
-              (b/get-continent-name continent))))
+    (list [:span "Incorporando ejércitos en "]
+          [:span.fw-bolder.text-nowrap (b/get-continent-name continent)]
+          [:span " "]
+          [:span.text-nowrap
+           (u/format "(%1 %2)"
+                     remaining
+                     (if (= 1 remaining) "restante" "restantes"))])))
 
 (defmethod status-panel-title ::teg/attack [_] "Atacando...")
 (defmethod status-panel-title ::teg/regroup [_] "Reagrupando...")
@@ -544,9 +549,7 @@
           (.appendChild status-bar
                         (crate/html
                          [:div.row.align-items-center.p-1
-                          [:div.col.text-truncate
-                           [:h4.text-truncate
-                            (status-panel-title game)]]
+                          [:div.col [:h4 (status-panel-title game)]]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
