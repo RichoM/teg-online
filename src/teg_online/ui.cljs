@@ -30,17 +30,27 @@
   (when-let [user-atom (@state :user-atom)]
     @user-atom))
 
+(defn is-my-turn? [game]
+  (= (:id (get-user))
+     (teg/get-current-player game)))
+
 (defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
                               :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
             counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span.text-black-50])
-            minus-btn (bs/on-click
-                       (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
-                       #(swap! counter-value dec))
-            plus-btn (bs/on-click
-                      (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
-                      #(swap! counter-value inc))
+            minus-10-btn (bs/on-click
+                          (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus.pe-1] "10"])
+                          #(swap! counter-value - 10))
+            minus-1-btn (bs/on-click
+                         (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
+                         #(swap! counter-value dec))
+            plus-1-btn (bs/on-click
+                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
+                        #(swap! counter-value inc))
+            plus-10-btn (bs/on-click
+                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
+                        #(swap! counter-value + 10))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
                            #(reset! result-value @counter-value))
@@ -49,8 +59,10 @@
                            #(reset! result-value default-value))]
         (add-watch counter-value :update
                    (fn [_ _ _ val]
-                     (oset! minus-btn :disabled (<= val min-value))
-                     (oset! plus-btn :disabled (>= val max-value))
+                     (oset! minus-10-btn :disabled (<= (- val 9) min-value))
+                     (oset! minus-1-btn :disabled (<= val min-value))
+                     (oset! plus-1-btn :disabled (>= val max-value))
+                     (oset! plus-10-btn :disabled (>= (+ val 9) max-value))
                      (oset! counter-span :innerText
                             (u/format "%1%2"
                                       (if (neg? val) "-" "+")
@@ -65,8 +77,12 @@
                                         [:i.fas.fa-shield-alt.pe-3]
                                         counter-span]]
                                       [:div.row.py-3
-                                       [:div.col-6 [:div.d-grid minus-btn]]
-                                       [:div.col-6 [:div.d-grid plus-btn]]]]
+                                       (when (>= (- max-value min-value) 10)
+                                         [:div.col [:div.d-grid minus-10-btn]])
+                                       [:div.col [:div.d-grid minus-1-btn]]
+                                       [:div.col [:div.d-grid plus-1-btn]]
+                                       (when (>= (- max-value min-value) 10)
+                                         [:div.col [:div.d-grid plus-10-btn]])]]
                                :footer (if show-cancel?
                                          (list accept-button cancel-button)
                                          accept-button))
@@ -206,8 +222,7 @@
 
 (defmulti can-interact-with-country? 
   (fn [{:keys [phase] :as game} _country _player]
-    (when (= (:id (get-user))
-             (teg/get-current-player game))
+    (when (is-my-turn? game)
       phase)))
 
 (defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
@@ -475,13 +490,11 @@
 (defmulti finish-turn-enabled? :phase)
 
 (defmethod finish-turn-enabled? ::teg/add-army [game]
-  (and (= (:id (get-user))
-          (teg/get-current-player game))
+  (and (is-my-turn? game)
        (= 0 (get-in @state [:user-data :remaining] 0))))
 
 (defmethod finish-turn-enabled? :default [game]
-  (= (:id (get-user))
-          (teg/get-current-player game)))
+  (is-my-turn? game))
 
 (defmulti status-panel-title :phase)
 
@@ -545,6 +558,33 @@
 
 (defmethod reset-user-data :default [_] {})
 
+(defn show-toast [msg]
+  (-> (bs/make-toast :header (list [:h5 msg]
+                                   [:span.me-auto] 
+                                   bs/close-toast-btn))
+      (bs/show-toast {:delay 2500})))
+
+(defn on-game-change
+  [_key _ref
+   {old-turn :turn, old-phase :phase, :as old-game}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (= old-turn new-turn)
+    (show-toast (if (is-my-turn? new-game)
+                  "¡Es tu turno!"
+                  (list [:span "Es el turno de "]
+                        [:span.fw-bolder.text-nowrap
+                         (teg/get-current-player-name new-game)]))))
+  (when-not (= [old-phase old-turn]
+               [new-phase new-turn])
+    (swap! state assoc :user-data
+           (reset-user-data new-game)))
+  (doseq [country (keys b/countries)]
+    (let [delta-army (- (teg/get-army new-game country)
+                        (teg/get-army old-game country))]
+      (when-not (zero? delta-army)
+        (moved-army-effect country delta-army))))
+  (a/put! (@state :updates) new-game))
+
 (defn initialize [game-atom user-atom]
   (go (reset! state {:game-atom game-atom
                      :user-atom user-atom
@@ -552,21 +592,9 @@
       (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries))
-      (add-watch state :ui-change
-                 #(a/put! (@state :updates) @game-atom))
-      (let [state-change (fn [_key _atom old-state new-state]
-                           (when (not= [(old-state :phase) (old-state :turn)]
-                                       [(new-state :phase) (new-state :turn)])
-                             (swap! state assoc :user-data
-                                    (reset-user-data new-state)))
-                           (doseq [country (keys b/countries)]
-                             (let [delta-army (- (teg/get-army new-state country)
-                                                 (teg/get-army old-state country))]
-                               (when-not (zero? delta-army)
-                                 (moved-army-effect country delta-army))))
-                           (a/put! (@state :updates) new-state))]
-        (add-watch game-atom :state-change state-change)
-        (state-change :state-change game-atom {} @game-atom))
+      (add-watch state :ui-change #(a/put! (@state :updates) @game-atom))
+      (add-watch game-atom :state-change on-game-change)
+      (on-game-change :state-change game-atom {} @game-atom) ; Force update now
       (start-update-loop)))
 
 (defn terminate []

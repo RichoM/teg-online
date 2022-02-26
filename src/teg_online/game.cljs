@@ -48,6 +48,9 @@
 (defn get-current-player [{:keys [turn turn-order]}]
   (when turn (nth turn-order (mod turn (count turn-order)))))
 
+(defn get-current-player-name [game]
+  (:name (get-player game (get-current-player game))))
+
 (defn get-current-phase [{:keys [phase]}] phase)
 
 (defn get-army [game country-id]
@@ -118,18 +121,25 @@
 (defn next-phase [game]
   (assoc game :phase (get-next-phase game)))
 
-(defmulti finish-action :phase)
+(defmulti finish-action* :phase)
 
-(defmethod finish-action ::add-army [{:keys [turn players] :as game}]
+(defmethod finish-action* ::add-army [{:keys [turn players] :as game}]
   (if (zero? (mod (inc turn) (count players)))
       (next-turn (next-phase game))
       (next-turn game)))
 
-(defmethod finish-action ::attack [game]
+(defmethod finish-action* ::attack [game]
   (next-phase game))
 
-(defmethod finish-action ::regroup [game]
+(defmethod finish-action* ::regroup [game]
   (next-turn (next-phase game)))
+
+(defn finish-action [game]
+  (let [game' (finish-action* game)
+        current-player (get-current-player game')]
+    (if-not (seq (player-countries game' current-player))
+      (finish-action game')
+      game')))
 
 (defn get-dice-count [game attacker-id defender-id]
   [(min 3 (dec (get-army game attacker-id)))

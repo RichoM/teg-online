@@ -156,7 +156,7 @@
     (swap! game-atom teg/distribute-countries)
     (swap! game-atom teg/start-game)
     (swap! game-atom teg/add-army :teg-online.board/argentina 4)
-    (swap! game-atom teg/add-army :teg-online.board/chile 4)    
+    (swap! game-atom teg/add-army :teg-online.board/chile 4)
     (swap! game-atom assoc-in [:countries :teg-online.board/argentina :owner] :p1)
     (swap! game-atom assoc-in [:countries :teg-online.board/chile :owner] :p2)
     (swap! game-atom teg/next-phase ::teg/attack))
@@ -168,7 +168,16 @@
   (get-in @game-atom [:players :p1 :army])
 
   (get-in @game-atom [:countries :teg-online.board/alaska :owner])
-  (swap! game-atom assoc-in [:countries :teg-online.board/siberia :owner] :p1)
+  (swap! game-atom assoc-in [:countries :teg-online.board/sahara :owner]
+         (teg/get-current-player @game-atom))
+
+
+  (let [game @game-atom
+        winner (second (@game-atom :turn-order))
+        loser (first (@game-atom :turn-order))]
+    (doseq [country (keys teg-online.board/countries)]
+      (when (= loser (teg/country-owner game country))
+        (swap! game-atom assoc-in [:countries country :owner] winner))))
 
   (swap! game-atom assoc-in [:phase] ::teg/regroup)
 
