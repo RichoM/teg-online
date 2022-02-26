@@ -634,8 +634,114 @@
     (is (zero? (count (teg/player-countries game ::p3))))
     (is (= ::p1 (teg/get-current-player game)))))
 
+(deftest add-army-continent-ACAACA
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries
+                  [::b/australia ::b/india  ::b/malasia
+                   ::b/sumatra   ::b/china  ::b/gobi
+                   ::b/borneo    ::b/java   ::b/iran])
+                 teg/start-game
+
+                 ; add-army-1
+                 (teg/add-army ::b/australia 5) teg/finish-action
+                 (teg/add-army ::b/india 5) teg/finish-action
+                 (teg/add-army ::b/malasia 5) teg/finish-action
+
+                 ; add-army-2
+                 (teg/add-army ::b/australia 3) teg/finish-action
+                 (teg/add-army ::b/china 3) teg/finish-action
+                 (teg/add-army ::b/gobi 3) teg/finish-action
+
+                 ; attack (Richo)
+                 (teg/attack [::b/australia [6 6 6]]
+                             [::b/java [1]])
+                 (teg/invade ::b/australia ::b/java 1)
+                 teg/finish-action
+
+                 ; regroup (Richo)
+                 teg/finish-action
+
+                 ; attack/regroup (Diego)
+                 teg/finish-action teg/finish-action
+
+                 ; attack/regroup (Sofía)
+                 teg/finish-action teg/finish-action)]
+    (is (= ::teg/add-army-oceania (teg/get-current-phase game)))))
+
+
+(deftest add-army-continent-ACAACA-2
+  (let [game-atom (atom (-> (teg/new-game)
+                            (teg/join-game ::p1 "Richo")
+                            (teg/join-game ::p2 "Diego")
+                            (teg/join-game ::p3 "Sofía")
+                            (teg/distribute-countries (sort (keys b/countries)))
+                            teg/start-game))]
+    ; HACK(Richo): I'm changing the ownership of africa and south-america because 
+    ; invading them seems to much work.
+    (doseq [country (b/get-countries-by-continent ::b/africa)]
+      (swap! game-atom assoc-in [:countries country :owner] ::p1))
+    (doseq [country (b/get-countries-by-continent ::b/south-america)]
+      (swap! game-atom assoc-in [:countries country :owner] ::p1))
+    (swap! game-atom
+           #(-> %
+                ; add-army-1
+                (teg/add-army ::b/alaska 5) teg/finish-action
+                (teg/add-army ::b/alemania 5) teg/finish-action
+                (teg/add-army ::b/arabia 5) teg/finish-action
+
+                ; add-army-2
+                (teg/add-army ::b/alaska 3) teg/finish-action
+                (teg/add-army ::b/alemania 3) teg/finish-action
+                (teg/add-army ::b/arabia 3) teg/finish-action
+
+                ; attack/regroup (Richo)
+                teg/finish-action teg/finish-action
+
+                ; attack/regroup (Diego)
+                teg/finish-action teg/finish-action
+
+                ; attack/regroup (Sofía)
+                teg/finish-action teg/finish-action))
+    (is (= ::teg/add-army-south-america (teg/get-current-phase @game-atom)))
+    (swap! game-atom #(-> %
+                          (teg/add-army ::b/argentina 3)
+                          teg/finish-action))
+    (is (= ::teg/add-army-africa (teg/get-current-phase @game-atom)))
+    (swap! game-atom #(-> %
+                          (teg/add-army ::b/sahara 3)
+                          teg/finish-action))
+    (is (= ::teg/add-army (teg/get-current-phase @game-atom)))))
 
 (comment
+  (require '[teg-online.board :as board])
+  (def game @game-atom)
+
+  (teg/get-next-phase game)
+  (teg/get-current-phase (teg/finish-action game))
+
+  (def game-atom (atom (-> (teg/new-game)
+                           (teg/join-game ::p1 "Richo")
+                           (teg/join-game ::p2 "Diego")
+                           (teg/join-game ::p3 "Sofía")
+                           (teg/distribute-countries (sort (keys b/countries)))
+                           teg/start-game)))
+
+  (teg-online.board/get-countries-by-continent :teg-online.board/africa)
+  (first (teg/player-continents game ::p1))
+
+  (def game (-> (teg/new-game)
+                (teg/join-game ::p1 "Richo")
+                (teg/join-game ::p2 "Diego")
+                (teg/join-game ::p3 "Sofía")
+                (teg/distribute-countries (sort (keys b/countries)))
+                teg/start-game))
+  
+  (teg/player-countries game ::p3)
+
+
   (def game-atom (atom (-> (teg/new-game)
                            (teg/join-game ::p1 "Richo")
                            (teg/join-game ::p2 "Diego")
@@ -650,7 +756,7 @@
   (do (swap! game-atom teg/finish-action)
       nil)
 
-  
+
   (def get-current-state #(let [game @game-atom]
                             [(teg/get-current-player game)
                              (teg/get-current-phase game)]))
@@ -660,7 +766,7 @@
                 (teg/distribute-countries [::b/argentina ::b/peru
                                            ::b/uruguay ::b/brasil])
                 teg/start-game))
-  
+
   (teg/get-army game ::b/peru)
 
   (teg/get-army game ::b/argentina)
@@ -672,4 +778,5 @@
   (teg/get-player game ::p1)
   (group-by :id (game :players))
   (u/seek #(= (:id %) ::p1)
-          (game :players)))
+          (game :players))
+  )

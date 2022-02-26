@@ -1,5 +1,6 @@
 (ns teg-online.game
-  (:require [teg-online.board :as board]
+  (:require [clojure.set :as set]
+            [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
 (derive ::attack ::game-phase)
@@ -7,6 +8,13 @@
 (derive ::add-army ::game-phase)
 (derive ::add-army-1 ::add-army) ; Special case for first round
 (derive ::add-army-2 ::add-army) ; Special case for second round
+(derive ::add-army-continent ::add-army)
+(derive ::add-army-asia ::add-army-continent)
+(derive ::add-army-europa ::add-army-continent)
+(derive ::add-army-north-america ::add-army-continent)
+(derive ::add-army-south-america ::add-army-continent)
+(derive ::add-army-africa ::add-army-continent)
+(derive ::add-army-oceania ::add-army-continent)
 
 (defn new-game []
   {:players {}
@@ -108,15 +116,59 @@
 (defn next-turn [game]
   (update game :turn inc))
 
+(defn player-continents [game player-id]
+  (let [countries (set (player-countries game player-id))]
+    (filter (fn [continent]
+              (set/subset? (board/get-countries-by-continent continent)
+                           countries))
+            [::board/asia
+             ::board/europa
+             ::board/north-america
+             ::board/south-america
+             ::board/africa
+             ::board/oceania])))
+
+(defn get-next-phase-add-army [game next-player & [begin-continent]]
+  (let [continents (player-continents game next-player)]
+    (case (if begin-continent
+            (fnext (drop-while #(not= % begin-continent)
+                               continents))
+            (first continents))
+    ::board/asia ::add-army-asia
+    ::board/europa ::add-army-europa
+    ::board/north-america ::add-army-north-america
+    ::board/south-america ::add-army-south-america
+    ::board/africa ::add-army-africa
+    ::board/oceania ::add-army-oceania
+    ::add-army)))
+
 (defmulti get-next-phase :phase)
 (defmethod get-next-phase ::add-army-1 [_] ::add-army-2)
 (defmethod get-next-phase ::add-army-2 [_] ::attack)
 (defmethod get-next-phase ::add-army [_] ::attack)
 (defmethod get-next-phase ::attack [_] ::regroup)
-(defmethod get-next-phase ::regroup [{:keys [turn players]}]
+(defmethod get-next-phase ::regroup [{:keys [turn players] :as game}]
   (if (zero? (mod (inc turn) (count players)))
-    ::add-army
+    (get-next-phase-add-army game (get-current-player (next-turn game)))
     ::attack))
+
+(defmethod get-next-phase ::add-army-asia [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/asia))
+
+(defmethod get-next-phase ::add-army-europa [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/europa))
+
+(defmethod get-next-phase ::add-army-north-america [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/north-america))
+
+(defmethod get-next-phase ::add-army-south-america [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/south-america))
+
+(defmethod get-next-phase ::add-army-africa [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/africa))
+
+(defmethod get-next-phase ::add-army-oceania [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/south-america))
 
 (defn next-phase [game]
   (assoc game :phase (get-next-phase game)))
@@ -127,6 +179,9 @@
   (if (zero? (mod (inc turn) (count players)))
       (next-turn (next-phase game))
       (next-turn game)))
+
+(defmethod finish-action* ::add-army-continent [game]
+  (next-phase game))
 
 (defmethod finish-action* ::attack [game]
   (next-phase game))
@@ -245,6 +300,8 @@
   (-> game
       (update-in [:countries src-id :army] - moving-army)
       (update-in [:countries dst-id :army] + moving-army)))
+
+
 
 (comment
 (map (fn [a b] (> a b)) 
