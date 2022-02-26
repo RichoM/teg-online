@@ -39,12 +39,18 @@
   (go (let [result-value (atom default-value)
             counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span.text-black-50])
-            minus-btn (bs/on-click
-                       (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
-                       #(swap! counter-value dec))
-            plus-btn (bs/on-click
-                      (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
-                      #(swap! counter-value inc))
+            minus-10-btn (bs/on-click
+                          (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus.pe-1] "10"])
+                          #(swap! counter-value - 10))
+            minus-1-btn (bs/on-click
+                         (crate/html [:button.btn.btn-danger.btn-lg {:type "button"} [:i.fas.fa-minus]])
+                         #(swap! counter-value dec))
+            plus-1-btn (bs/on-click
+                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
+                        #(swap! counter-value inc))
+            plus-10-btn (bs/on-click
+                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
+                        #(swap! counter-value + 10))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
                            #(reset! result-value @counter-value))
@@ -53,8 +59,10 @@
                            #(reset! result-value default-value))]
         (add-watch counter-value :update
                    (fn [_ _ _ val]
-                     (oset! minus-btn :disabled (<= val min-value))
-                     (oset! plus-btn :disabled (>= val max-value))
+                     (oset! minus-10-btn :disabled (<= (- val 9) min-value))
+                     (oset! minus-1-btn :disabled (<= val min-value))
+                     (oset! plus-1-btn :disabled (>= val max-value))
+                     (oset! plus-10-btn :disabled (>= (+ val 9) max-value))
                      (oset! counter-span :innerText
                             (u/format "%1%2"
                                       (if (neg? val) "-" "+")
@@ -69,8 +77,12 @@
                                         [:i.fas.fa-shield-alt.pe-3]
                                         counter-span]]
                                       [:div.row.py-3
-                                       [:div.col-6 [:div.d-grid minus-btn]]
-                                       [:div.col-6 [:div.d-grid plus-btn]]]]
+                                       (when (>= (- max-value min-value) 10)
+                                         [:div.col [:div.d-grid minus-10-btn]])
+                                       [:div.col [:div.d-grid minus-1-btn]]
+                                       [:div.col [:div.d-grid plus-1-btn]]
+                                       (when (>= (- max-value min-value) 10)
+                                         [:div.col [:div.d-grid plus-10-btn]])]]
                                :footer (if show-cancel?
                                          (list accept-button cancel-button)
                                          accept-button))
