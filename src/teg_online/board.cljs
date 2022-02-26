@@ -169,6 +169,14 @@
                              :continent ::oceania
                              :neighbours #{::sumatra ::borneo ::java ::chile}}})
 
+(def get-countries-by-continent
+ (memoize
+  (fn [continent]
+    (->> countries
+         (filter (fn [[_ v]] (= (v :continent) continent)))
+         (map first)
+         set))))
+
 (def card-symbols #{::balloon ::cannon ::ship ::all})
 
 (def cards #{[::argentina ::all]
