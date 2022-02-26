@@ -207,6 +207,17 @@
               (swap! game-atom teg/add-army country-id extra-army)))
           (swap! game-atom teg/finish-action)))))
 
+(defmethod finish-turn! ::teg/add-army-continent [game-atom]
+  (go (when (<! (bs/confirm "Confirmar" 
+                            (u/format "¿Terminar incorporación de ejércitos en %1?"
+                                      (b/get-continent-name (get-in @state [:user-data :continent])))))
+        (let [additions (get-in @state [:user-data :additions] {})]
+          (swap! state dissoc :user-data)
+          (doseq [[country-id extra-army] additions]
+            (when (> extra-army 0)
+              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom teg/finish-action)))))
+
 (defmethod finish-turn! ::teg/attack [game-atom]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar ataque?"))
         (swap! game-atom teg/finish-action))))
@@ -227,6 +238,11 @@
 
 (defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
   (= player-id (teg/country-owner game country-id)))
+
+(defmethod can-interact-with-country? ::teg/add-army-continent [game country-id player-id]
+  (and (= (get-in @state [:user-data :continent])
+          (-> b/countries country-id :continent))
+       (= player-id (teg/country-owner game country-id))))
 
 (defmethod can-interact-with-country? ::teg/attack [game country-id player-id]
   (if (= player-id (teg/country-owner game country-id))
@@ -500,9 +516,22 @@
 
 (defmethod status-panel-title ::teg/add-army [_]
   (let [remaining (get-in @state [:user-data :remaining] 0)]
-    (u/format "Incorporando ejércitos (%1 %2)"
-              remaining
-              (if (= 1 remaining) "restante" "restantes"))))
+    (list [:span "Incorporando ejércitos "]
+          [:span.text-nowrap
+           (u/format "(%1 %2)" 
+                     remaining 
+                     (if (= 1 remaining) "restante" "restantes"))])))
+
+(defmethod status-panel-title ::teg/add-army-continent [_]
+  (let [remaining (get-in @state [:user-data :remaining] 0)
+        continent (get-in @state [:user-data :continent])]
+    (list [:span "Incorporando ejércitos en "]
+          [:span.fw-bolder.text-nowrap (b/get-continent-name continent)]
+          [:span " "]
+          [:span.text-nowrap
+           (u/format "(%1 %2)"
+                     remaining
+                     (if (= 1 remaining) "restante" "restantes"))])))
 
 (defmethod status-panel-title ::teg/attack [_] "Atacando...")
 (defmethod status-panel-title ::teg/regroup [_] "Reagrupando...")
@@ -520,9 +549,7 @@
           (.appendChild status-bar
                         (crate/html
                          [:div.row.align-items-center.p-1
-                          [:div.col.text-truncate
-                           [:h4.text-truncate
-                            (status-panel-title game)]]
+                          [:div.col [:h4 (status-panel-title game)]]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
@@ -547,6 +574,36 @@
 
 (defmethod reset-user-data ::teg/add-army [game]
   {:remaining (teg/calculate-extra-army game)
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-asia [_]
+  {:remaining (b/get-continent-bonus ::b/asia)
+   :continent ::b/asia
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-europa [_]
+  {:remaining (b/get-continent-bonus ::b/europa)
+   :continent ::b/europa
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-north-america [_]
+  {:remaining (b/get-continent-bonus ::b/north-america)
+   :continent ::b/north-america
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-south-america [_]
+  {:remaining (b/get-continent-bonus ::b/south-america)
+   :continent ::b/south-america
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-africa [_]
+  {:remaining (b/get-continent-bonus ::b/africa)
+   :continent ::b/africa
+   :additions {}})
+
+(defmethod reset-user-data ::teg/add-army-oceania [_]
+  {:remaining (b/get-continent-bonus ::b/oceania)
+   :continent ::b/oceania
    :additions {}})
 
 (defmethod reset-user-data ::teg/attack [_] 
@@ -577,7 +634,12 @@
   (when-not (= [old-phase old-turn]
                [new-phase new-turn])
     (swap! state assoc :user-data
-           (reset-user-data new-game)))
+           (reset-user-data new-game))
+    (when (and (is-my-turn? new-game)
+               (isa? new-phase ::teg/add-army-continent))
+      (show-toast (u/format "Incorporar %1 ejércitos en %2"
+                            (get-in @state [:user-data :remaining])
+                            (b/get-continent-name (get-in @state [:user-data :continent]))))))
   (doseq [country (keys b/countries)]
     (let [delta-army (- (teg/get-army new-game country)
                         (teg/get-army old-game country))]

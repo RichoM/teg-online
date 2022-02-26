@@ -145,7 +145,17 @@
   @game-id
   @user-atom
 
-  (go (print (<! (show-main-menu))))
+  (:teg-online.board/oceania
+   (group-by (fn [[k v]] (:continent v))
+             teg-online.board/countries))
+
+  (:teg-online.board/africa
+   (group-by (fn [c] (-> c teg-online.board/countries :continent))
+             (keys teg-online.board/countries)))
+
+  (map first (filter (fn [[k {:keys [continent]}]]
+                       (= continent :teg-online.board/oceania))
+                     teg-online.board/countries))
 
   (do
     (bs/hide-modals)
@@ -155,11 +165,11 @@
     (swap! game-atom teg/join-game :p3 "Diego")
     (swap! game-atom teg/distribute-countries)
     (swap! game-atom teg/start-game)
-    (swap! game-atom teg/add-army :teg-online.board/argentina 4)
-    (swap! game-atom teg/add-army :teg-online.board/chile 4)
-    (swap! game-atom assoc-in [:countries :teg-online.board/argentina :owner] :p1)
-    (swap! game-atom assoc-in [:countries :teg-online.board/chile :owner] :p2)
-    (swap! game-atom teg/next-phase ::teg/attack))
+    #_(swap! game-atom teg/add-army :teg-online.board/argentina 4)
+    #_(swap! game-atom teg/add-army :teg-online.board/chile 4)
+    #_(swap! game-atom assoc-in [:countries :teg-online.board/argentina :owner] :p1)
+    #_(swap! game-atom assoc-in [:countries :teg-online.board/chile :owner] :p2)
+    #_(swap! game-atom teg/next-phase ::teg/attack))
 
   (swap! game-atom update-in [:turn] inc)
   (swap! game-atom update-in [:players :p1 :name] (constantly "Un nombre mucho muy muuuuy largo"))
@@ -178,6 +188,9 @@
     (doseq [country (keys teg-online.board/countries)]
       (when (= loser (teg/country-owner game country))
         (swap! game-atom assoc-in [:countries country :owner] winner))))
+
+  (doseq [country (teg-online.board/get-countries-by-continent :teg-online.board/africa)]
+    (swap! game-atom assoc-in [:countries country :owner] :p1))
 
   (swap! game-atom assoc-in [:phase] ::teg/regroup)
 

@@ -19,7 +19,7 @@
                           sorted-countries)))
 
 (defn doc->game [{:keys [phase turn turn-order players countries]}]
-  {:phase (keyword (namespace ::teg/*) phase)
+  {:phase (when phase (keyword (namespace ::teg/*) phase))
    :turn turn
    :turn-order (mapv keyword turn-order)
    :players (into {} (map (fn [[id {:keys [cards name]}]]

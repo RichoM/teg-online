@@ -7,6 +7,12 @@
                  ::africa {:name "África" :bonus 3}
                  ::oceania {:name "Oceanía" :bonus 2}})
 
+(defn get-continent-name [continent-id]
+  (get-in continents [continent-id :name]))
+
+(defn get-continent-bonus [continent-id]
+  (get-in continents [continent-id :bonus]))
+
 (def countries {; South America
                 ::argentina {:name "Argentina"
                              :continent ::south-america
@@ -168,6 +174,14 @@
                 ::australia {:name "Australia"
                              :continent ::oceania
                              :neighbours #{::sumatra ::borneo ::java ::chile}}})
+
+(def get-countries-by-continent
+ (memoize
+  (fn [continent]
+    (->> countries
+         (filter (fn [[_ v]] (= (v :continent) continent)))
+         (map first)
+         set))))
 
 (def card-symbols #{::balloon ::cannon ::ship ::all})
 
