@@ -30,6 +30,10 @@
   (when-let [user-atom (@state :user-atom)]
     @user-atom))
 
+(defn is-my-turn? [game]
+  (= (:id (get-user))
+     (teg/get-current-player game)))
+
 (defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
                               :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
@@ -206,8 +210,7 @@
 
 (defmulti can-interact-with-country? 
   (fn [{:keys [phase] :as game} _country _player]
-    (when (= (:id (get-user))
-             (teg/get-current-player game))
+    (when (is-my-turn? game)
       phase)))
 
 (defmethod can-interact-with-country? ::teg/add-army [game country-id player-id]
@@ -475,13 +478,11 @@
 (defmulti finish-turn-enabled? :phase)
 
 (defmethod finish-turn-enabled? ::teg/add-army [game]
-  (and (= (:id (get-user))
-          (teg/get-current-player game))
+  (and (is-my-turn? game)
        (= 0 (get-in @state [:user-data :remaining] 0))))
 
 (defmethod finish-turn-enabled? :default [game]
-  (= (:id (get-user))
-          (teg/get-current-player game)))
+  (is-my-turn? game))
 
 (defmulti status-panel-title :phase)
 
@@ -545,6 +546,11 @@
 
 (defmethod reset-user-data :default [_] {})
 
+(defn show-toast [msg]
+  (-> (bs/make-toast :header (list [:h5 msg]
+                                [:span.me-auto] bs/close-toast-btn))
+      (bs/show-toast {:delay 2500})))
+
 (defn initialize [game-atom user-atom]
   (go (reset! state {:game-atom game-atom
                      :user-atom user-atom
@@ -555,6 +561,13 @@
       (add-watch state :ui-change
                  #(a/put! (@state :updates) @game-atom))
       (let [state-change (fn [_key _atom old-state new-state]
+                           (when-not (= (old-state :turn)
+                                        (new-state :turn))
+                             (show-toast (if (is-my-turn? new-state)
+                                           "¡Es tu turno!"
+                                           (list [:span "Es el turno de "]
+                                                 [:span.fw-bolder.text-nowrap
+                                                  (teg/get-current-player-name new-state)]))))
                            (when (not= [(old-state :phase) (old-state :turn)]
                                        [(new-state :phase) (new-state :turn)])
                              (swap! state assoc :user-data

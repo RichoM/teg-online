@@ -48,6 +48,9 @@
 (defn get-current-player [{:keys [turn turn-order]}]
   (when turn (nth turn-order (mod turn (count turn-order)))))
 
+(defn get-current-player-name [game]
+  (:name (get-player game (get-current-player game))))
+
 (defn get-current-phase [{:keys [phase]}] phase)
 
 (defn get-army [game country-id]
