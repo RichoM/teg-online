@@ -550,6 +550,91 @@
     (is (thrown? js/Error (teg/regroup game ::b/argentina ::b/uruguay 9))
         "Attempting to regroup moving more troops than allowed should throw error")))
 
+(deftest finish-action-should-ignore-players-without-countries
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries [::b/argentina ::b/peru ::b/chile])
+                 teg/start-game
+
+                 ; add-army-1
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/peru 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 ; add-army-2
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+
+                 ; attack (Richo)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 teg/finish-action
+
+                 ; regroup (Richo)
+                 teg/finish-action)]
+    (is (zero? (count (teg/player-countries game ::p2))))
+    (is (= ::p3 (teg/get-current-player game)))))
+
+(deftest finish-action-should-ignore-players-without-countries-2
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries [::b/argentina ::b/peru ::b/chile])
+                 teg/start-game
+
+                 ; add-army-1
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/peru 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 ; add-army-2
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+
+                 ; attack (Richo)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 teg/finish-action
+
+                 ; regroup (Richo)
+                 teg/finish-action
+
+                 ; attack (Sofía)
+                 teg/finish-action
+                 teg/finish-action
+                 
+                 ; add-army
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+                                  
+                 ; attack (Richo)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/chile [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/chile [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/chile [1 1 1]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/chile [1 1 1]])
+                 (teg/invade ::b/argentina ::b/chile 1))]
+    (is (zero? (count (teg/player-countries game ::p2))))
+    (is (zero? (count (teg/player-countries game ::p3))))
+    (is (= ::p1 (teg/get-current-player game)))))
+
+
 (comment
   (def game-atom (atom (-> (teg/new-game)
                            (teg/join-game ::p1 "Richo")
