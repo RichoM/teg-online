@@ -202,20 +202,24 @@
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
         (let [additions (get-in @state [:user-data :additions] {})]
           (swap! state dissoc :user-data)
-          (doseq [[country-id extra-army] additions]
-            (when (> extra-army 0)
-              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom #(reduce (fn [game [country-id extra-army]]
+                                      (if (> extra-army 0)
+                                        (teg/add-army game country-id extra-army)
+                                        game))
+                                    % additions))
           (swap! game-atom teg/finish-action)))))
 
 (defmethod finish-turn! ::teg/add-army-continent [game-atom]
-  (go (when (<! (bs/confirm "Confirmar" 
+  (go (when (<! (bs/confirm "Confirmar"
                             (u/format "¿Terminar incorporación de ejércitos en %1?"
                                       (b/get-continent-name (get-in @state [:user-data :continent])))))
         (let [additions (get-in @state [:user-data :additions] {})]
           (swap! state dissoc :user-data)
-          (doseq [[country-id extra-army] additions]
-            (when (> extra-army 0)
-              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom #(reduce (fn [game [country-id extra-army]]
+                                      (if (> extra-army 0)
+                                        (teg/add-army game country-id extra-army)
+                                        game))
+                                    % additions))
           (swap! game-atom teg/finish-action)))))
 
 (defmethod finish-turn! ::teg/attack [game-atom]
@@ -226,10 +230,12 @@
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
         (let [regroups (get-in @state [:user-data :regroups] [])]
           (swap! state dissoc :user-data)
-          (doseq [[country-a country-b moving-army] regroups]
-            (when (> moving-army 0)
-              (swap! game-atom teg/regroup country-a country-b moving-army))))
-        (swap! game-atom teg/finish-action))))
+          (swap! game-atom #(reduce (fn [game [country-a country-b moving-army]]
+                                      (if (> moving-army 0)
+                                        (teg/regroup game country-a country-b moving-army)
+                                        game))
+                                    % regroups))
+          (swap! game-atom teg/finish-action)))))
 
 (defmulti can-interact-with-country? 
   (fn [{:keys [phase] :as game} _country _player]
