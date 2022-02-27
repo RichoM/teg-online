@@ -84,7 +84,9 @@
                      (update-modal game)))
         (update-modal @game-atom)
         (bs/on-click start-game-btn 
-                     #(swap! game-atom (comp teg/distribute-countries teg/start-game)))
+                     #(swap! game-atom (comp teg/start-game
+                                             teg/distribute-goals
+                                             teg/distribute-countries)))
         (<! (bs/show-modal modal
                            {:backdrop "static"
                             :keyboard false}))
@@ -152,11 +154,24 @@
     (swap! game-atom teg/join-game :p1 "Richo")
     (swap! game-atom teg/join-game :p2 "Lechu")
     (swap! game-atom teg/join-game :p3 "Diego")
-    (swap! game-atom teg/distribute-countries (shuffle (keys b/countries)))
+    (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+    (swap! game-atom teg/distribute-goals)
     (swap! game-atom teg/start-game))
+
+  (map (fn [player-id]
+         (let [{:keys [name goal]} (teg/get-player @game-atom player-id)]
+           [name goal (:name (teg/get-player-goal @game-atom player-id))]))
+       (@game-atom :turn-order))
+
+  (teg/get-player-goal @game-atom :p3)
+
+  (doseq [country (-> (b/get-countries-by-continent ::b/europa)
+                      (disj ::b/rusia))]
+    (swap! game-atom assoc-in [:countries country :owner] :p1))
 
   (doseq [country (b/get-countries-by-continent ::b/africa)]
     (swap! game-atom assoc-in [:countries country :owner] :p1))
 
   (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1)
+  
   )
