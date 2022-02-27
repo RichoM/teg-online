@@ -631,6 +631,17 @@
   [_key _ref
    {old-turn :turn, old-phase :phase, :as old-game}
    {new-turn :turn, new-phase :phase, :as new-game}]
+  (let [user-id ((get-user) :id)
+        {secret-goal :name} (teg/get-player-goal new-game user-id)]
+    (when (and secret-goal (nil? (teg/get-player-goal old-game user-id)))
+      (bs/alert "Objetivo secreto" secret-goal)))
+  (when (and (nil? (old-game :winner))
+             (new-game :winner))
+    (bs/alert "Fin del juego"
+              [:h2
+               [:span "El ganador es "]
+               [:span.fw-bolder.text-nowrap
+                (:name (teg/get-player new-game (new-game :winner)))]]))
   (when-not (= old-turn new-turn)
     (show-toast (if (is-my-turn? new-game)
                   "¡Es tu turno!"
