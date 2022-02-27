@@ -34,8 +34,8 @@
   (= (:id (get-user))
      (teg/get-current-player game)))
 
-(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
-                              :or {title nil, message nil, default-value 0, show-cancel? true}}]
+(defn show-add-army-dialog [& {:keys [title message min-value max-value default-value show-cancel?]
+                               :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
             counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span.text-black-50])
@@ -49,8 +49,8 @@
                         (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
                         #(swap! counter-value inc))
             plus-10-btn (bs/on-click
-                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
-                        #(swap! counter-value + 10))
+                         (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
+                         #(swap! counter-value + 10))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
                            #(reset! result-value @counter-value))
@@ -237,7 +237,7 @@
                                     % regroups))
           (swap! game-atom teg/finish-action)))))
 
-(defmulti can-interact-with-country? 
+(defmulti can-interact-with-country?
   (fn [{:keys [phase] :as game} _country _player]
     (when (is-my-turn? game)
       phase)))
@@ -437,11 +437,11 @@
                  :!border text-color
                  :extent (oget morph :extent)
                  :position {:x (+ (oget morph :x) 1)
-                            :y (- (oget morph :y) 3)})]      
-      (oset! label :center 
-             (oget (if highlight? stack morph) 
+                            :y (- (oget morph :y) 3)})]
+      (oset! label :center
+             (oget (if highlight? stack morph)
                    :center))
-      (when highlight? 
+      (when highlight?
         (.addMorph morph stack))
       (.addMorph morph label))))
 
@@ -463,11 +463,11 @@
                                                    (get-in @state [:user-data :regroups] []))))
               selected? (= id (get-in @state [:user-data :selected-country]))]
           (oset! morph :form tinted-form)
-          (oset! morph :alpha (if player-idx 
+          (oset! morph :alpha (if player-idx
                                 (if selected? 0.25 0.5)
                                 0))
           (oset! counter :alpha (if player-idx 1 0))
-          (update-army-counter counter color 
+          (update-army-counter counter color
                                (if player-idx
                                  (- (+ army additions)
                                     substractions)
@@ -524,8 +524,8 @@
   (let [remaining (get-in @state [:user-data :remaining] 0)]
     (list [:span "Incorporando ejércitos "]
           [:span.text-nowrap
-           (u/format "(%1 %2)" 
-                     remaining 
+           (u/format "(%1 %2)"
+                     remaining
                      (if (= 1 remaining) "restante" "restantes"))])))
 
 (defmethod status-panel-title ::teg/add-army-continent [_]
@@ -612,7 +612,7 @@
    :continent ::b/oceania
    :additions {}})
 
-(defmethod reset-user-data ::teg/attack [_] 
+(defmethod reset-user-data ::teg/attack [_]
   {:selected-country nil})
 
 (defmethod reset-user-data ::teg/regroup [_]
@@ -623,7 +623,7 @@
 
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
-                                   [:span.me-auto] 
+                                   [:span.me-auto]
                                    bs/close-toast-btn))
       (bs/show-toast {:delay 2500})))
 
