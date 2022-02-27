@@ -871,24 +871,24 @@
                  (fn [_ _ old new]
                    (reset! goal-achieved? (validator-fn old new :p1))))
       (testing name
-        (is (not @goal-achieved?))
+        (is (not @goal-achieved?) "1")
         (do ;;; Leave :p2 with only 1 country
-          (doseq [country (teg/player-countries @game-atom :p2)]
-            (swap! game-atom assoc-in [:countries country :owner] :p1))
+          (doseq [[idx country] (map-indexed vector (teg/player-countries @game-atom :p2))]
+            (swap! game-atom assoc-in [:countries country :owner] (if (zero? (mod idx 2)) :p1 :p3)))
           (swap! game-atom assoc-in [:countries ::b/chile :owner] :p2))
-        (is (not @goal-achieved?))
+        (is (not @goal-achieved?) "2")
         (do ;;; Set turn/phase -> p1/attack and increase Argentina's army
           (swap! game-atom #(-> %
                                 (update-in [:countries ::b/argentina :army] + 9)
                                 (assoc :turn 0)
                                 (assoc :phase ::teg/attack))))
-        (is (not @goal-achieved?))
+        (is (not @goal-achieved?) "3")
         (do ;;; Let p1 invade Chile
           (swap! game-atom #(-> %
                                 (teg/attack [::b/argentina [6 6 6]]
                                             [::b/chile [1]])
                                 (teg/invade ::b/argentina ::b/chile 1))))
-        (is @goal-achieved?)))))
+        (is @goal-achieved? "4")))))
 
 (deftest destruction-goal-failure
   (let [game-atom (atom nil)]
@@ -907,8 +907,8 @@
       (testing name
         (is (not @goal-achieved?))
         (do ;;; Leave :p2 with only 1 country
-          (doseq [country (teg/player-countries @game-atom :p2)]
-            (swap! game-atom assoc-in [:countries country :owner] :p1))
+          (doseq [[idx country] (map-indexed vector (teg/player-countries @game-atom :p2))]
+            (swap! game-atom assoc-in [:countries country :owner] (if (zero? (mod idx 2)) :p1 :p3)))
           (swap! game-atom assoc-in [:countries ::b/chile :owner] :p2))
         (is (not @goal-achieved?))
         (do ;;; Set turn/phase -> p3/attack and increase Peru's army
