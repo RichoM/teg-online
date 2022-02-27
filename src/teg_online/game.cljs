@@ -215,20 +215,101 @@
                     {:game game, :country src-id, :army moving-army})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; End turn
+
+(defn next-turn [game]
+  (update game :turn inc))
+
+(defn get-next-phase-add-army [game next-player & [begin-continent]]
+  (let [continents (player-continents game next-player)]
+    (case (if begin-continent
+            (fnext (drop-while #(not= % begin-continent)
+                               continents))
+            (first continents))
+      ::board/asia ::add-army-asia
+      ::board/europa ::add-army-europa
+      ::board/north-america ::add-army-north-america
+      ::board/south-america ::add-army-south-america
+      ::board/africa ::add-army-africa
+      ::board/oceania ::add-army-oceania
+      ::add-army)))
+
+(defmulti get-next-phase :phase)
+
+(defmethod get-next-phase ::add-army-1 [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    ::add-army-2
+    ::add-army-1))
+
+(defmethod get-next-phase ::add-army-2 [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    ::attack
+    ::add-army-2))
+
+(defmethod get-next-phase ::add-army [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    ::attack
+    (get-next-phase-add-army game (get-current-player (next-turn game)))))
+
+(defmethod get-next-phase ::attack [_] ::regroup)
+
+(defmethod get-next-phase ::regroup [{:keys [turn players] :as game}]
+  (if (is-next-player-the-first-player? game)
+    (get-next-phase-add-army game (get-current-player (next-turn game)))
+    ::attack))
+
+(defmethod get-next-phase ::add-army-asia [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/asia))
+
+(defmethod get-next-phase ::add-army-europa [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/europa))
+
+(defmethod get-next-phase ::add-army-north-america [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/north-america))
+
+(defmethod get-next-phase ::add-army-south-america [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/south-america))
+
+(defmethod get-next-phase ::add-army-africa [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/africa))
+
+(defmethod get-next-phase ::add-army-oceania [game]
+  (get-next-phase-add-army game (get-current-player game) ::board/oceania))
+
+(defn next-phase [game]
+  (assoc game :phase (get-next-phase game)))
+
+(defmulti finish-action* :phase)
+
+(defmethod finish-action* ::add-army [game]
+  (next-turn (next-phase game)))
+
+(defmethod finish-action* ::add-army-continent [game]
+  (next-phase game))
+
+(defmethod finish-action* ::attack [game]
+  (next-phase game))
+
+(defmethod finish-action* ::regroup [game]
+  (next-turn (next-phase game)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
 (defn with-winner-check [action]
   (fn [game & args]
-    (let [player-id (get-current-player game)
-          validator-fn (get (get-player-goal game player-id)
-                            :validator-fn
-                            (constantly false))
-          new-game (apply action game args)]
-      (if (and (nil? (new-game :winner))
-               (or (validator-fn game new-game player-id)
-                   ((common-goal :validator-fn) game new-game player-id)))
-        (assoc new-game :winner player-id)
-        new-game))))
+    (if (game :winner)
+      game ; Do nothing if the game is already over
+      (let [player-id (get-current-player game)
+            validator-fn (get (get-player-goal game player-id)
+                              :validator-fn
+                              (constantly false))
+            new-game (apply action game args)]
+        (if (and (nil? (new-game :winner))
+                 (or (validator-fn game new-game player-id)
+                     ((common-goal :validator-fn) game new-game player-id)))
+          (assoc new-game :winner player-id)
+          new-game)))))
 
 (defn new-game []
   {:players {}
@@ -329,88 +410,12 @@
           (update-in [:countries src-id :army] - moving-army)
           (update-in [:countries dst-id :army] + moving-army)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; End turn
 
-(defn next-turn [game]
-  (update game :turn inc))
-
-(defn get-next-phase-add-army [game next-player & [begin-continent]]
-  (let [continents (player-continents game next-player)]
-    (case (if begin-continent
-            (fnext (drop-while #(not= % begin-continent)
-                               continents))
-            (first continents))
-      ::board/asia ::add-army-asia
-      ::board/europa ::add-army-europa
-      ::board/north-america ::add-army-north-america
-      ::board/south-america ::add-army-south-america
-      ::board/africa ::add-army-africa
-      ::board/oceania ::add-army-oceania
-      ::add-army)))
-
-(defmulti get-next-phase :phase)
-
-(defmethod get-next-phase ::add-army-1 [{:keys [turn players] :as game}]
-  (if (is-next-player-the-first-player? game)
-    ::add-army-2
-    ::add-army-1))
-
-(defmethod get-next-phase ::add-army-2 [{:keys [turn players] :as game}]
-  (if (is-next-player-the-first-player? game)
-    ::attack
-    ::add-army-2))
-
-(defmethod get-next-phase ::add-army [{:keys [turn players] :as game}]
-  (if (is-next-player-the-first-player? game)
-    ::attack
-    (get-next-phase-add-army game (get-current-player (next-turn game)))))
-
-(defmethod get-next-phase ::attack [_] ::regroup)
-
-(defmethod get-next-phase ::regroup [{:keys [turn players] :as game}]
-  (if (is-next-player-the-first-player? game)
-    (get-next-phase-add-army game (get-current-player (next-turn game)))
-    ::attack))
-
-(defmethod get-next-phase ::add-army-asia [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/asia))
-
-(defmethod get-next-phase ::add-army-europa [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/europa))
-
-(defmethod get-next-phase ::add-army-north-america [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/north-america))
-
-(defmethod get-next-phase ::add-army-south-america [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/south-america))
-
-(defmethod get-next-phase ::add-army-africa [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/africa))
-
-(defmethod get-next-phase ::add-army-oceania [game]
-  (get-next-phase-add-army game (get-current-player game) ::board/oceania))
-
-(defn next-phase [game]
-  (assoc game :phase (get-next-phase game)))
-
-(defmulti finish-action* :phase)
-
-(defmethod finish-action* ::add-army [game]
-  (next-turn (next-phase game)))
-
-(defmethod finish-action* ::add-army-continent [game]
-  (next-phase game))
-
-(defmethod finish-action* ::attack [game]
-  (next-phase game))
-
-(defmethod finish-action* ::regroup [game]
-  (next-turn (next-phase game)))
-
-(defn finish-action [game]
-  (let [game' (finish-action* game)
-        current-player (get-current-player game')]
-    (if-not (seq (player-countries game' current-player))
-      (finish-action game')
-      game')))
+(def finish-action
+  (with-winner-check
+    (fn [game]
+      (let [game' (finish-action* game)
+            current-player (get-current-player game')]
+        (if-not (seq (player-countries game' current-player))
+          (finish-action game')
+          game')))))
