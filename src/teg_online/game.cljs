@@ -35,6 +35,9 @@
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
 
+(defn get-player-goal [game player-id]
+  (get-in game [:players player-id :goal]))
+
 (defn calculate-extra-army
   ([game] (calculate-extra-army game (get-current-player game)))
   ([{:keys [turn turn-order] :as game} player-id]
@@ -214,6 +217,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
+(defn with-winner-check [action]
+  (fn [game & args]
+    (let [player-id (get-current-player game)
+          validator-fn (get (get-player-goal game player-id)
+                            :validator-fn
+                            (constantly false))
+          new-game (apply action game args)]
+      (if (and (nil? (new-game :winner))
+               (or (validator-fn game new-game player-id)
+                   ((common-goal :validator-fn) game new-game player-id)))
+        (assoc new-game :winner player-id)
+        new-game))))
+
 (defn new-game []
   {:players {}
    :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
@@ -221,12 +237,13 @@
                          board/countries)
    :turn-order []
    :phase nil
-   :turn nil})
+   :turn nil
+   :winner nil})
 
 (defn new-player [id name]
   {:id id
-   :name name
-   :cards #{}})
+   :goal nil
+   :name name})
 
 (defn join-game [game id name]
   (if (contains? (game :players) id)
@@ -252,58 +269,65 @@
                 {:id country, :owner player, :army 1})))
      @temp)))
 
-(defn add-army [game country army]
-  (assert-valid-country game country)
-  (update-in game [:countries country :army] + army))
+(def add-army
+  (with-winner-check
+    (fn [game country army]
+      (assert-valid-country game country)
+      (update-in game [:countries country :army] + army))))
 
-(defn attack [game [attacker-id attacker-throw] [defender-id defender-throw]]
-  (assert-valid-country game attacker-id)
-  (assert-valid-country game defender-id)
-  (assert-neighbours game attacker-id defender-id)
-  (let [current-player (get-current-player game)]
-    (assert-country-owner game attacker-id current-player)
-    (assert-country-owner-any game defender-id (dissoc (game :players) current-player)))
-  (let [[a-count d-count] (get-dice-count game attacker-id defender-id)]
-    (assert-valid-throw game attacker-id a-count attacker-throw)
-    (assert-valid-throw game defender-id d-count defender-throw))
-  (assert-valid-phase game ::attack)
-  (let [dice-count (min (count attacker-throw)
-                        (count defender-throw))
-        attacker-wins (map (fn [a d] (> a d))
-                           (take dice-count (sort > attacker-throw))
-                           (take dice-count (sort > defender-throw)))
-        defender-hits (count (filter true? attacker-wins))
-        attacker-hits (count (filter false? attacker-wins))]
-    (-> game
-        (update-in [:countries defender-id :army] - defender-hits)
-        (update-in [:countries attacker-id :army] - attacker-hits))))
+(def attack
+  (with-winner-check
+    (fn [game [attacker-id attacker-throw] [defender-id defender-throw]]
+      (assert-valid-country game attacker-id)
+      (assert-valid-country game defender-id)
+      (assert-neighbours game attacker-id defender-id)
+      (let [current-player (get-current-player game)]
+        (assert-country-owner game attacker-id current-player)
+        (assert-country-owner-any game defender-id (dissoc (game :players) current-player)))
+      (let [[a-count d-count] (get-dice-count game attacker-id defender-id)]
+        (assert-valid-throw game attacker-id a-count attacker-throw)
+        (assert-valid-throw game defender-id d-count defender-throw))
+      (assert-valid-phase game ::attack)
+      (let [dice-count (min (count attacker-throw)
+                            (count defender-throw))
+            attacker-wins (map (fn [a d] (> a d))
+                               (take dice-count (sort > attacker-throw))
+                               (take dice-count (sort > defender-throw)))
+            defender-hits (count (filter true? attacker-wins))
+            attacker-hits (count (filter false? attacker-wins))]
+        (-> game
+            (update-in [:countries defender-id :army] - defender-hits)
+            (update-in [:countries attacker-id :army] - attacker-hits))))))
 
-(defn invade [game attacker-id defender-id moving-army]
-  (assert-valid-country game attacker-id)
-  (assert-valid-country game defender-id)
-  (assert-neighbours game attacker-id defender-id)
-  (assert-zero-army game defender-id)
-  (assert-valid-invading-army game attacker-id moving-army)
-  (let [current-player (get-current-player game)]
-    (assert-country-owner game attacker-id current-player)
-    (assert-country-owner-any game defender-id (dissoc (game :players) current-player))
-    (-> game
-        (update-in [:countries attacker-id :army] - moving-army)
-        (update-in [:countries defender-id :army] + moving-army)
-        (assoc-in [:countries defender-id :owner] current-player))))
+(def invade 
+  (with-winner-check
+    (fn [game attacker-id defender-id moving-army]
+      (assert-valid-country game attacker-id)
+      (assert-valid-country game defender-id)
+      (assert-neighbours game attacker-id defender-id)
+      (assert-zero-army game defender-id)
+      (assert-valid-invading-army game attacker-id moving-army)
+      (let [current-player (get-current-player game)]
+        (assert-country-owner game attacker-id current-player)
+        (assert-country-owner-any game defender-id (dissoc (game :players) current-player))
+        (-> game
+            (update-in [:countries attacker-id :army] - moving-army)
+            (update-in [:countries defender-id :army] + moving-army)
+            (assoc-in [:countries defender-id :owner] current-player))))))
 
-(defn regroup [game src-id dst-id moving-army]
-  (assert-valid-country game src-id)
-  (assert-valid-country game dst-id)
-  (assert-neighbours game src-id dst-id)
-  (assert-valid-regrouping-army game src-id moving-army)
-  (let [current-player (get-current-player game)]
-    (assert-country-owner game src-id current-player)
-    (assert-country-owner game dst-id current-player))
-  (-> game
-      (update-in [:countries src-id :army] - moving-army)
-      (update-in [:countries dst-id :army] + moving-army)))
-
+(def regroup 
+  (with-winner-check
+    (fn [game src-id dst-id moving-army]
+      (assert-valid-country game src-id)
+      (assert-valid-country game dst-id)
+      (assert-neighbours game src-id dst-id)
+      (assert-valid-regrouping-army game src-id moving-army)
+      (let [current-player (get-current-player game)]
+        (assert-country-owner game src-id current-player)
+        (assert-country-owner game dst-id current-player))
+      (-> game
+          (update-in [:countries src-id :army] - moving-army)
+          (update-in [:countries dst-id :army] + moving-army)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; End turn
