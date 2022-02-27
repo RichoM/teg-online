@@ -183,6 +183,40 @@
          (map first)
          set))))
 
+(defn neighbour-pairs [country-set]
+  (let [pairs (volatile! #{})
+        country-set (set country-set)]
+    (doseq [country country-set]
+      (doseq [neighbour (->> country 
+                             countries 
+                             :neighbours
+                             (filter country-set))]
+        (vswap! pairs conj #{country neighbour})))
+    @pairs))
+
+(defn neighbour-triplets [country-set]
+  (let [triplets (volatile! #{})
+        country-set (set country-set)]
+    (doseq [country country-set]
+      (doseq [neighbour-pairs (->> country
+                                   countries
+                                   :neighbours
+                                   (filter country-set)
+                                   neighbour-pairs)]
+        (vswap! triplets conj (conj neighbour-pairs country))))
+    @triplets))
+
+(comment
+  
+  (def country-list [::colombia ::brasil ::peru ::chile ::uruguay ::argentina])
+  (time (neighbour-pairs country-list))
+  (time (neighbour-triplets country-list))
+  (time (neighbour-pairs (keys countries)))
+  (time (neighbour-triplets (keys countries)))
+  (set #{1 2 3})
+  
+  )
+
 (def card-symbols #{::balloon ::cannon ::ship ::all})
 
 (def cards #{[::argentina ::all]

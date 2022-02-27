@@ -34,8 +34,8 @@
   (= (:id (get-user))
      (teg/get-current-player game)))
 
-(defn show-add-army-dialog [&{:keys [title message min-value max-value default-value show-cancel?]
-                              :or {title nil, message nil, default-value 0, show-cancel? true}}]
+(defn show-add-army-dialog [& {:keys [title message min-value max-value default-value show-cancel?]
+                               :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
             counter-value (atom default-value :validator #(and (>= % min-value) (<= % max-value)))
             counter-span (crate/html [:span.text-black-50])
@@ -49,8 +49,8 @@
                         (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus]])
                         #(swap! counter-value inc))
             plus-10-btn (bs/on-click
-                        (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
-                        #(swap! counter-value + 10))
+                         (crate/html [:button.btn.btn-success.btn-lg {:type "button"} [:i.fas.fa-plus.pe-1] "10"])
+                         #(swap! counter-value + 10))
             accept-button (bs/on-click
                            (crate/html bs/accept-modal-btn)
                            #(reset! result-value @counter-value))
@@ -202,20 +202,24 @@
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
         (let [additions (get-in @state [:user-data :additions] {})]
           (swap! state dissoc :user-data)
-          (doseq [[country-id extra-army] additions]
-            (when (> extra-army 0)
-              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom #(reduce (fn [game [country-id extra-army]]
+                                      (if (> extra-army 0)
+                                        (teg/add-army game country-id extra-army)
+                                        game))
+                                    % additions))
           (swap! game-atom teg/finish-action)))))
 
 (defmethod finish-turn! ::teg/add-army-continent [game-atom]
-  (go (when (<! (bs/confirm "Confirmar" 
+  (go (when (<! (bs/confirm "Confirmar"
                             (u/format "¿Terminar incorporación de ejércitos en %1?"
                                       (b/get-continent-name (get-in @state [:user-data :continent])))))
         (let [additions (get-in @state [:user-data :additions] {})]
           (swap! state dissoc :user-data)
-          (doseq [[country-id extra-army] additions]
-            (when (> extra-army 0)
-              (swap! game-atom teg/add-army country-id extra-army)))
+          (swap! game-atom #(reduce (fn [game [country-id extra-army]]
+                                      (if (> extra-army 0)
+                                        (teg/add-army game country-id extra-army)
+                                        game))
+                                    % additions))
           (swap! game-atom teg/finish-action)))))
 
 (defmethod finish-turn! ::teg/attack [game-atom]
@@ -226,12 +230,14 @@
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
         (let [regroups (get-in @state [:user-data :regroups] [])]
           (swap! state dissoc :user-data)
-          (doseq [[country-a country-b moving-army] regroups]
-            (when (> moving-army 0)
-              (swap! game-atom teg/regroup country-a country-b moving-army))))
-        (swap! game-atom teg/finish-action))))
+          (swap! game-atom #(reduce (fn [game [country-a country-b moving-army]]
+                                      (if (> moving-army 0)
+                                        (teg/regroup game country-a country-b moving-army)
+                                        game))
+                                    % regroups))
+          (swap! game-atom teg/finish-action)))))
 
-(defmulti can-interact-with-country? 
+(defmulti can-interact-with-country?
   (fn [{:keys [phase] :as game} _country _player]
     (when (is-my-turn? game)
       phase)))
@@ -431,11 +437,11 @@
                  :!border text-color
                  :extent (oget morph :extent)
                  :position {:x (+ (oget morph :x) 1)
-                            :y (- (oget morph :y) 3)})]      
-      (oset! label :center 
-             (oget (if highlight? stack morph) 
+                            :y (- (oget morph :y) 3)})]
+      (oset! label :center
+             (oget (if highlight? stack morph)
                    :center))
-      (when highlight? 
+      (when highlight?
         (.addMorph morph stack))
       (.addMorph morph label))))
 
@@ -457,11 +463,11 @@
                                                    (get-in @state [:user-data :regroups] []))))
               selected? (= id (get-in @state [:user-data :selected-country]))]
           (oset! morph :form tinted-form)
-          (oset! morph :alpha (if player-idx 
+          (oset! morph :alpha (if player-idx
                                 (if selected? 0.25 0.5)
                                 0))
           (oset! counter :alpha (if player-idx 1 0))
-          (update-army-counter counter color 
+          (update-army-counter counter color
                                (if player-idx
                                  (- (+ army additions)
                                     substractions)
@@ -518,8 +524,8 @@
   (let [remaining (get-in @state [:user-data :remaining] 0)]
     (list [:span "Incorporando ejércitos "]
           [:span.text-nowrap
-           (u/format "(%1 %2)" 
-                     remaining 
+           (u/format "(%1 %2)"
+                     remaining
                      (if (= 1 remaining) "restante" "restantes"))])))
 
 (defmethod status-panel-title ::teg/add-army-continent [_]
@@ -606,7 +612,7 @@
    :continent ::b/oceania
    :additions {}})
 
-(defmethod reset-user-data ::teg/attack [_] 
+(defmethod reset-user-data ::teg/attack [_]
   {:selected-country nil})
 
 (defmethod reset-user-data ::teg/regroup [_]
@@ -617,7 +623,7 @@
 
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
-                                   [:span.me-auto] 
+                                   [:span.me-auto]
                                    bs/close-toast-btn))
       (bs/show-toast {:delay 2500})))
 
@@ -625,6 +631,17 @@
   [_key _ref
    {old-turn :turn, old-phase :phase, :as old-game}
    {new-turn :turn, new-phase :phase, :as new-game}]
+  (let [user-id ((get-user) :id)
+        {secret-goal :name} (teg/get-player-goal new-game user-id)]
+    (when (and secret-goal (nil? (teg/get-player-goal old-game user-id)))
+      (bs/alert "Objetivo secreto" secret-goal)))
+  (when (and (nil? (old-game :winner))
+             (new-game :winner))
+    (bs/alert "Fin del juego"
+              [:h2
+               [:span "El ganador es "]
+               [:span.fw-bolder.text-nowrap
+                (:name (teg/get-player new-game (new-game :winner)))]]))
   (when-not (= old-turn new-turn)
     (show-toast (if (is-my-turn? new-game)
                   "¡Es tu turno!"

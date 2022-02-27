@@ -12,19 +12,20 @@
 (def destructors (atom []))
 
 (defn game->doc [game]
-  (assoc (select-keys game [:phase :turn :turn-order :players])
+  (assoc (select-keys game [:phase :turn :turn-order :players :winner])
          :countries (mapv (fn [country]
                             (let [{:keys [army owner]} (get-in game [:countries country])]
                               {:army army, :owner owner}))
                           sorted-countries)))
 
-(defn doc->game [{:keys [phase turn turn-order players countries]}]
+(defn doc->game [{:keys [phase turn turn-order players countries winner]}]
   {:phase (when phase (keyword (namespace ::teg/*) phase))
    :turn turn
    :turn-order (mapv keyword turn-order)
-   :players (into {} (map (fn [[id {:keys [cards name]}]]
+   :winner (when winner (keyword winner))
+   :players (into {} (map (fn [[id {:keys [name goal]}]]
                             [id {:id id
-                                 :cards (set cards)
+                                 :goal goal
                                  :name name}])
                           players))
    :countries (into {} (map-indexed (fn [idx {:keys [army owner]}]
