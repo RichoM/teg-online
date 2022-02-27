@@ -1,5 +1,5 @@
 (ns teg-online.game-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is testing]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.utils.core :as u]))
@@ -758,3 +758,44 @@
                           teg/finish-action))
     (is (= ::teg/add-army-south-america (teg/get-current-phase @game-atom)))
     (is (= ::p2 (teg/get-current-player @game-atom)))))
+
+(deftest occupation-goal-2
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 1)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? #(validator-fn @game-atom :p1)]
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not (goal-achieved?)) "1")
+        (do ;;; Conquer South America
+          (doseq [country (b/get-countries-by-continent ::b/south-america)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not (goal-achieved?)) "2")
+        (do ;;; Conquer Europe (except Rusia)
+          (doseq [country (b/get-countries-by-continent ::b/europa)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1))
+          (swap! game-atom assoc-in [:countries ::b/rusia :owner] :p2))
+        (is (goal-achieved?) "3") ; True because there is a triplet in north america
+        (do ;;; Lose Canada (now we don't have a triplet)
+          (swap! game-atom assoc-in [:countries ::b/canada :owner] :p2))
+        (is (not (goal-achieved?)) "4") ; False because no triplet
+        (do ;;; Lose Suecia and Polonia
+          (swap! game-atom assoc-in [:countries ::b/suecia :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/polonia :owner] :p2))
+        (is (not (goal-achieved?)) "5") ; Now we don't even own 7 countries in Europe
+        (do ;;; Conquer Rusia (now there is a triplet Rusia - Iran - Aral)
+          (swap! game-atom assoc-in [:countries ::b/rusia :owner] :p1))
+        ; Although there is a triplet and we own exactly 7 countries in Europe, one of 
+        ; these (Rusia) is part of of the triplet so it shouldn't count
+        (is (not (goal-achieved?)) "6")
+        (do ;;; Conquer Polonia (now we have 7 countries excluding Rusia)
+          (swap! game-atom assoc-in [:countries ::b/polonia :owner] :p1))
+        (is (goal-achieved?) "7")
+        (do ;;; Lose Argentina (now we don't have all of South America)
+          (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p2))
+        (is (not (goal-achieved?)) "8")))))

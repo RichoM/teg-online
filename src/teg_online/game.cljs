@@ -4,7 +4,7 @@
             [teg-online.utils.core :as u]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Querying game state
+;; Queries
 
 (defn game-started? [game]
   (some? (game :turn)))
@@ -110,20 +110,17 @@
                            (>= (-> ::board/europa countries count) 4))))}
    {:name "Ocupar América del Sur, 7 países de Europa y 3 países limítrofes entre sí en cualquier lugar del mapa"
     :validator-fn (fn [game player-id]
-                    (and (let [countries (player-countries-by-continent game player-id)]
-                           (and (>= (-> ::board/south-america countries count)
-                                    (-> ::board/south-america board/get-countries-by-continent count))
-                                (>= (-> ::board/europa countries count) 7)))
-                         ;; TODO(Richo): 3 países limítrofes entre sí en cualquier lugar del mapa
-                         #_(let [countries (->> (player-countries game player-id)
-                                              (map (fn [id] [id (board/countries id)]))
-                                              (remove (fn [[_ {:keys [continent]}]]
-                                                        (contains? #{::board/south-america ::board/europa} continent))))
-                               country-ids (set (map first countries))]
-                           (some (fn [[id {:keys [neighbours]}]]
-                                   (>= (count (filter country-ids neighbours))
-                                       2))
-                                 countries))))}
+                    (let [countries (player-countries game player-id)
+                          triplets (board/neighbour-triplets countries)]
+                      (some (fn [triplet]
+                              (let [countries-without-triplet (->> countries
+                                                                   (remove triplet)
+                                                                   (map board/countries)
+                                                                   (group-by :continent))]
+                                (and (>= (-> ::board/south-america countries-without-triplet count)
+                                         (-> ::board/south-america board/get-countries-by-continent count))
+                                     (>= (-> ::board/europa countries-without-triplet count) 7))))
+                            triplets)))}
    {:name "Ocupar Asia y 2 países de América del Sur"
     :validator-fn (constantly false)}
    {:name "Ocupar Europa, 4 países de Asia y 2 países de América del Sur"
@@ -302,7 +299,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Ending turn
+;; End turn
 
 (defn next-turn [game]
   (update game :turn inc))
