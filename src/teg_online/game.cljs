@@ -35,9 +35,6 @@
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
 
-(defn get-player-goal [game player-id]
-  (get-in game [:players player-id :goal]))
-
 (defn calculate-extra-army
   ([game] (calculate-extra-army game (get-current-player game)))
   ([{:keys [turn turn-order] :as game} player-id]
@@ -79,6 +76,17 @@
   (->> (player-countries game player-id)
        (map board/countries)
        (group-by :continent)))
+
+(declare occupation-goals)
+(declare destruction-goal)
+
+(defn get-player-goal [game player-id]
+  (when-let [goal-idx (get-in game [:players player-id :goal])]
+    (if (< goal-idx (count occupation-goals))
+      (get occupation-goals goal-idx)
+      (destruction-goal (nth (get-players game) (- goal-idx
+                                                   (count occupation-goals)))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -349,6 +357,26 @@
          (swap! temp assoc-in [:countries country]
                 {:id country, :owner player, :army 1})))
      @temp)))
+
+(defn distribute-goals [game]
+  (let [goals (atom #{})
+        rand-goal (fn []
+                    (let [goal (rand-int 15)]
+                      (if (contains? @goals goal)
+                        (recur)
+                        goal)))
+        temp (atom game)]
+    (doseq [player-id (game :turn-order)]
+      (let [goal (let [rnd (rand-goal)]
+                   (if (< rnd (count occupation-goals))
+                     rnd
+                     (let [target (rand-nth (remove #(= % player-id)
+                                                    (game :turn-order)))]
+                       (+ (count occupation-goals)
+                          (u/index-of (game :turn-order) target)))))]
+        (swap! goals conj goal)
+        (swap! temp assoc-in [:players player-id :goal] goal)))
+    @temp))
 
 (def add-army
   (with-winner-check
