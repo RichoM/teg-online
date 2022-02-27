@@ -4,21 +4,6 @@
             [teg-online.utils.core :as u]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Game phases
-(derive ::attack ::game-phase)
-(derive ::regroup ::game-phase)
-(derive ::add-army ::game-phase)
-(derive ::add-army-1 ::add-army) ; Special case for first round
-(derive ::add-army-2 ::add-army) ; Special case for second round
-(derive ::add-army-continent ::add-army) ; Special cases for continent bonus
-(derive ::add-army-asia ::add-army-continent)
-(derive ::add-army-europa ::add-army-continent)
-(derive ::add-army-north-america ::add-army-continent)
-(derive ::add-army-south-america ::add-army-continent)
-(derive ::add-army-africa ::add-army-continent)
-(derive ::add-army-oceania ::add-army-continent)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Querying game state
 
 (defn game-started? [game]
@@ -50,7 +35,7 @@
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
 
-(defn calculate-extra-army 
+(defn calculate-extra-army
   ([game] (calculate-extra-army game (get-current-player game)))
   ([{:keys [turn turn-order] :as game} player-id]
    (when turn
@@ -86,6 +71,77 @@
 (defn get-dice-count [game attacker-id defender-id]
   [(min 3 (dec (get-army game attacker-id)))
    (min 3 (get-army game defender-id))])
+
+(defn player-countries-by-continent [game player-id]
+  (->> (player-countries game player-id)
+       (map board/countries)
+       (group-by :continent)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Game phases
+
+(derive ::attack ::game-phase)
+(derive ::regroup ::game-phase)
+(derive ::add-army ::game-phase)
+(derive ::add-army-1 ::add-army) ; Special case for first round
+(derive ::add-army-2 ::add-army) ; Special case for second round
+(derive ::add-army-continent ::add-army) ; Special cases for continent bonus
+(derive ::add-army-asia ::add-army-continent)
+(derive ::add-army-europa ::add-army-continent)
+(derive ::add-army-north-america ::add-army-continent)
+(derive ::add-army-south-america ::add-army-continent)
+(derive ::add-army-africa ::add-army-continent)
+(derive ::add-army-oceania ::add-army-continent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Goals
+
+(def common-goal
+  {:name "Ocupar 30 países"
+   :validator-fn (fn [game player-id] (>= (count (player-countries game player-id)) 30))})
+
+(def occupation-goals
+  [{:name "Ocupar África, 5 países de América del Norte y 4 países de Europa"
+    :validator-fn (fn [game player-id]
+                    (let [countries (player-countries-by-continent game player-id)]
+                      (and (>= (-> ::board/africa countries count)
+                               (-> ::board/africa board/get-countries-by-continent count))
+                           (>= (-> ::board/north-america countries count) 5)
+                           (>= (-> ::board/europa countries count) 4))))}
+   {:name "Ocupar América del Sur, 7 países de Europa y 3 países limítrofes entre sí en cualquier lugar del mapa"
+    :validator-fn (fn [game player-id]
+                    (and (let [countries (player-countries-by-continent game player-id)]
+                           (and (>= (-> ::board/south-america countries count)
+                                    (-> ::board/south-america board/get-countries-by-continent count))
+                                (>= (-> ::board/europa countries count) 7)))
+                         ;; TODO(Richo): 3 países limítrofes entre sí en cualquier lugar del mapa
+                         #_(let [countries (->> (player-countries game player-id)
+                                              (map (fn [id] [id (board/countries id)]))
+                                              (remove (fn [[_ {:keys [continent]}]]
+                                                        (contains? #{::board/south-america ::board/europa} continent))))
+                               country-ids (set (map first countries))]
+                           (some (fn [[id {:keys [neighbours]}]]
+                                   (>= (count (filter country-ids neighbours))
+                                       2))
+                                 countries))))}
+   {:name "Ocupar Asia y 2 países de América del Sur"
+    :validator-fn (constantly false)}
+   {:name "Ocupar Europa, 4 países de Asia y 2 países de América del Sur"
+    :validator-fn (constantly false)}
+   {:name "Ocupar américa del Norte, 2 países de Oceanía y 4 de Asia"
+    :validator-fn (constantly false)}
+   {:name "Ocupar 2 países de Oceanía, 2 países de África, 2 países de América del Sur, 3 países de Europa, 4 de América del Norte y 3 de Asia"
+    :validator-fn (constantly false)}
+   {:name "Ocupar Oceanía, América del Norte y 2 países de Europa"
+    :validator-fn (constantly false)}
+   {:name "Ocupar América del Sur, África y 4 países de Asia"
+    :validator-fn (constantly false)}
+   {:name "Ocupar Oceanía, África y 5 países de América del Norte"
+    :validator-fn (constantly false)}])
+
+(defn destruction-goal [{:keys [id name]}]
+  {:name (u/format "Destruir al ejército del jugador %1" name)
+   :validator-fn (fn [game _] (empty? (player-countries game id)))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Assertions
