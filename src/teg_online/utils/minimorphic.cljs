@@ -106,13 +106,53 @@
              100 100 1)
   )
 
-(defn appear [^js/Morph morph seconds]
+(defn appear 
+  ([^js/Morph morph seconds] (appear morph seconds 1))
+  ([^js/Morph morph seconds max-alpha]
   (let [effect (make-morph :alpha 0)]
     (on-step effect (fn [_ delta]
                       (let [alpha (+ (oget morph :alpha)
                                      (/ delta seconds))]
                         (oset! morph :alpha alpha)
-                        (when (>= alpha 1)
+                        (when (>= alpha max-alpha)
+                          (oset! morph :alpha max-alpha)
                           (.remove effect)))))
     (.addMorph js/World.current effect)
-    morph))
+    morph)))
+
+(comment
+  (def min-magnitude 2)
+  (def max-magnitude 4)
+  (filter #(or (<= % 2) (>= % 4))
+          (repeatedly 1000 #(+ min-magnitude (rand (- max-magnitude min-magnitude)))))
+
+  )
+
+(defn fireworks [^js/Morph morph point
+                 & {:keys [amount min-magnitude max-magnitude]
+                    :or {amount 200, min-magnitude 50, max-magnitude 300}}]
+  (let [make-particle (fn [dx dy color]
+                        (let [delta-alpha -0.92
+                              particle (make-morph :center point
+                                                   :width 5, :height 5
+                                                   :alpha 1, :color color)]
+                          (on-step particle
+                                   (fn [_ delta]
+                                     (oset! particle :x (+ (oget particle :x)
+                                                           (* dx delta)))
+                                     (oset! particle :y (+ (oget particle :y)
+                                                           (* dy delta)))
+                                     (oset! particle :alpha (+ (oget particle :alpha)
+                                                               (* delta-alpha delta)))
+                                     (when (<= (oget particle :alpha) 0.001)
+                                       (.remove particle))))))
+        colors ["red" "yellow" "green" "blue"]
+        color (rand-nth colors)]
+    (loop [i 0]
+      (when (< i amount)
+        (let [angle (* (rand) 350)
+              magnitude (+ min-magnitude (rand (- max-magnitude min-magnitude)))
+              o (* (js/Math.sin angle) magnitude)
+              a (* (js/Math.cos angle) magnitude)]
+          (.addMorph morph (make-particle a o color)))
+        (recur (inc i))))))
