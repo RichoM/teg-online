@@ -557,8 +557,13 @@
         (when turn
           (.appendChild status-bar
                         (crate/html
-                         [:div.row.align-items-center.p-1
-                          [:div.col [:h4 (status-panel-title game)]]
+                         [:div.row.align-items-center.py-1.g-1
+                          [:div.col-auto 
+                           [:button.btn.btn-lg.btn-outline-dark {:type "button"} 
+                            [:i.fas.fa-bars]]]
+                          [:div.col.text-center [:h4 (status-panel-title game)]]
+                          [:div.col-auto 
+                           [:button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]]
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
