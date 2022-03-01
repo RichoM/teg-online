@@ -562,7 +562,9 @@
                           [:div.col-auto 
                            [:button.btn.btn-lg.btn-outline-dark {:type "button"} 
                             [:i.fas.fa-bars]]]
-                          [:div.col.text-center [:h4 (status-panel-title game)]]
+                          [:div.col.text-center
+                           [:h4 (when-not (teg/game-over? game)
+                                  (status-panel-title game))]]
                           [:div.col-auto 
                            [:button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]]
                           [:div.col-auto
@@ -630,20 +632,29 @@
 
 (defmethod reset-user-data :default [_] {})
 
+(defn maybe-reset-user-data
+  [{old-turn :turn, old-phase :phase}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (= [old-phase old-turn]
+               [new-phase new-turn])
+    (swap! state assoc :user-data
+           (reset-user-data new-game))))
+
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
                                    [:span.me-auto]
                                    bs/close-toast-btn))
       (bs/show-toast {:delay 2500})))
 
-(defn on-game-change
-  [_key _ref
-   {old-turn :turn, old-phase :phase, :as old-game}
-   {new-turn :turn, new-phase :phase, :as new-game}]
-  (let [user-id (get (get-user) :id)
-        {secret-goal :name} (teg/get-player-goal new-game user-id)]
-    (when (and secret-goal (nil? (teg/get-player-goal old-game user-id)))
-      (bs/alert "Objetivo secreto" secret-goal)))
+(defn maybe-show-secret-goal-dialog [old-game new-game]
+  (when-not (teg/game-over? new-game)
+    (let [user-id (get (get-user) :id)
+          {secret-goal :name} (teg/get-player-goal new-game user-id)]
+      (when (and secret-goal
+                 (nil? (teg/get-player-goal old-game user-id)))
+        (bs/alert "Objetivo secreto" secret-goal)))))
+
+(defn maybe-show-game-over-dialog [old-game new-game]
   (when (and (nil? (old-game :winner))
              (new-game :winner))
     (bs/alert "Fin del juego"
@@ -661,27 +672,46 @@
                               (secret-goal :name)
                               (if ((teg/common-goal :validator-fn) old-game new-game winner)
                                 (teg/common-goal :name)
-                                (secret-goal :name)))]]])))
-  (when-not (= old-turn new-turn)
-    (show-toast (if (is-my-turn? new-game)
-                  "¡Es tu turno!"
-                  (list [:span "Es el turno de "]
-                        [:span.fw-bolder.text-nowrap
-                         (teg/get-current-player-name new-game)]))))
-  (when-not (= [old-phase old-turn]
-               [new-phase new-turn])
-    (swap! state assoc :user-data
-           (reset-user-data new-game))
-    (when (and (is-my-turn? new-game)
-               (isa? new-phase ::teg/add-army-continent))
-      (show-toast (u/format "Incorporar %1 ejércitos en %2"
-                            (get-in @state [:user-data :remaining])
-                            (b/get-continent-name (get-in @state [:user-data :continent]))))))
-  (doseq [country (keys b/countries)]
-    (let [delta-army (- (teg/get-army new-game country)
-                        (teg/get-army old-game country))]
-      (when-not (zero? delta-army)
-        (moved-army-effect country delta-army))))
+                                (secret-goal :name)))]]]))))
+
+(defn maybe-show-turn-notification
+  [{old-turn :turn} {new-turn :turn, :as new-game}]
+  (when-not (teg/game-over? new-game)
+    (when-not (= old-turn new-turn)
+      (show-toast (if (is-my-turn? new-game)
+                    "¡Es tu turno!"
+                    (list [:span "Es el turno de "]
+                          [:span.fw-bolder.text-nowrap
+                           (teg/get-current-player-name new-game)]))))))
+
+(defn maybe-show-phase-notification 
+  [{old-turn :turn, old-phase :phase}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (teg/game-over? new-game)
+    (when-not (= [old-phase old-turn]
+                 [new-phase new-turn])
+      (when (and (is-my-turn? new-game)
+                 (isa? new-phase ::teg/add-army-continent))
+        (show-toast (u/format "Incorporar %1 ejércitos en %2"
+                              (get-in @state [:user-data :remaining])
+                              (b/get-continent-name (get-in @state [:user-data :continent]))))))))
+
+(defn maybe-show-moving-army-effect [old-game new-game]
+  (when-not (teg/game-over? new-game)
+    (doseq [country (keys b/countries)]
+      (let [delta-army (- (teg/get-army new-game country)
+                          (teg/get-army old-game country))]
+        (when-not (zero? delta-army)
+          (moved-army-effect country delta-army))))))
+
+(defn on-game-change
+  [_key _ref old-game new-game]
+  (maybe-reset-user-data old-game new-game)
+  (maybe-show-secret-goal-dialog old-game new-game)
+  (maybe-show-game-over-dialog old-game new-game)
+  (maybe-show-turn-notification old-game new-game)
+  (maybe-show-phase-notification old-game new-game)
+  (maybe-show-moving-army-effect old-game new-game)
   (a/put! (@state :updates) new-game))
 
 (defn initialize [game-atom user-atom]
