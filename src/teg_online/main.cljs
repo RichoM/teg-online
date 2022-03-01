@@ -9,6 +9,8 @@
             [teg-online.board :as b]
             [teg-online.ui :as ui]))
 
+(enable-console-print!)
+
 (defonce game-atom (atom (teg/new-game)))
 (defonce game-id (atom nil))
 (defonce user-atom (atom nil))
@@ -164,6 +166,8 @@
        (@game-atom :turn-order))
 
   (teg/get-player-goal @game-atom :p3)
+
+  (swap! game-atom assoc :phase ::teg/add-army-europa)
 
   (doseq [country (-> (b/get-countries-by-continent ::b/europa)
                       (disj ::b/rusia))]
