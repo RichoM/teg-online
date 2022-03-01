@@ -84,8 +84,9 @@
   (when-let [goal-idx (get-in game [:players player-id :goal])]
     (if (< goal-idx (count occupation-goals))
       (get occupation-goals goal-idx)
-      (destruction-goal (nth (get-players game) (- goal-idx
-                                                   (count occupation-goals)))))))
+      (destruction-goal (nth (get-players game)
+                             (- goal-idx
+                                (count occupation-goals)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -137,19 +138,65 @@
                                           (>= (-> ::board/europa countries-without-triplet count) 7))))
                                  triplets))))}
    {:name "Ocupar Asia y 2 países de América del Sur"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/asia countries count)
+                                    (-> ::board/asia board/get-countries-by-continent count))
+                                (>= (-> ::board/south-america countries count) 2)))))}
    {:name "Ocupar Europa, 4 países de Asia y 2 países de América del Sur"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/europa countries count)
+                                    (-> ::board/europa board/get-countries-by-continent count))
+                                (>= (-> ::board/asia countries count) 4)
+                                (>= (-> ::board/south-america countries count) 2)))))}
    {:name "Ocupar américa del Norte, 2 países de Oceanía y 4 de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/north-america countries count)
+                                    (-> ::board/north-america board/get-countries-by-continent count))
+                                (>= (-> ::board/oceania countries count) 2)
+                                (>= (-> ::board/asia countries count) 4)))))}
    {:name "Ocupar 2 países de Oceanía, 2 países de África, 2 países de América del Sur, 3 países de Europa, 4 de América del Norte y 3 de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/oceania countries count) 2)
+                                (>= (-> ::board/africa countries count) 2)
+                                (>= (-> ::board/south-america countries count) 2)
+                                (>= (-> ::board/europa countries count) 3)
+                                (>= (-> ::board/north-america countries count) 4)
+                                (>= (-> ::board/asia countries count) 3)))))}
    {:name "Ocupar Oceanía, América del Norte y 2 países de Europa"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/north-america countries count)
+                                    (-> ::board/north-america board/get-countries-by-continent count))
+                                (>= (-> ::board/oceania countries count)
+                                    (-> ::board/oceania board/get-countries-by-continent count))
+                                (>= (-> ::board/europa countries count) 2)))))}
    {:name "Ocupar América del Sur, África y 4 países de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/south-america countries count)
+                                    (-> ::board/south-america board/get-countries-by-continent count))
+                                (>= (-> ::board/africa countries count)
+                                    (-> ::board/africa board/get-countries-by-continent count))
+                                (>= (-> ::board/asia countries count) 4)))))}
    {:name "Ocupar Oceanía, África y 5 países de América del Norte"
-    :validator-fn (constantly false)}])
+    :validator-fn (fn [old-game new-game player-id]
+                    (and (= player-id (get-current-player old-game))
+                         (let [countries (player-countries-by-continent new-game player-id)]
+                           (and (>= (-> ::board/oceania countries count)
+                                    (-> ::board/oceania board/get-countries-by-continent count))
+                                (>= (-> ::board/africa countries count)
+                                    (-> ::board/africa board/get-countries-by-continent count))
+                                (>= (-> ::board/north-america countries count) 5)))))}])
 
 (defn destruction-goal [{:keys [id name]}]
   {:name (u/format "Destruir al ejército del jugador %1" name)
