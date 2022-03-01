@@ -631,7 +631,7 @@
   [_key _ref
    {old-turn :turn, old-phase :phase, :as old-game}
    {new-turn :turn, new-phase :phase, :as new-game}]
-  (let [user-id ((get-user) :id)
+  (let [user-id (get (get-user) :id)
         {secret-goal :name} (teg/get-player-goal new-game user-id)]
     (when (and secret-goal (nil? (teg/get-player-goal old-game user-id)))
       (bs/alert "Objetivo secreto" secret-goal)))
