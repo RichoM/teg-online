@@ -647,10 +647,21 @@
   (when (and (nil? (old-game :winner))
              (new-game :winner))
     (bs/alert "Fin del juego"
-              [:h2
-               [:span "El ganador es "]
-               [:span.fw-bolder.text-nowrap
-                (:name (teg/get-player new-game (new-game :winner)))]]))
+              (let [winner (new-game :winner)
+                    winner-name (:name (teg/get-player new-game winner))
+                    secret-goal (teg/get-player-goal new-game winner)]
+                [:div.container
+                 [:div.row [:h2
+                            [:span "El ganador es "]
+                            [:span.fw-bolder.text-nowrap winner-name]]]
+                 [:div.row.m-2]
+                 [:div.row [:h3
+                            [:i.fas.fa-angle-right.me-2]
+                            (if ((secret-goal :validator-fn) old-game new-game winner)
+                              (secret-goal :name)
+                              (if ((teg/common-goal :validator-fn) old-game new-game winner)
+                                (teg/common-goal :name)
+                                (secret-goal :name)))]]])))
   (when-not (= old-turn new-turn)
     (show-toast (if (is-my-turn? new-game)
                   "¡Es tu turno!"
