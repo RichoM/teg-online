@@ -547,10 +547,13 @@
 (defmethod finish-btn-label ::teg/attack [_] "Reagrupar")
 (defmethod finish-btn-label ::teg/regroup [_] "Finalizar turno")
 
-(defn update-status-panel [{:keys [turn]}]
+(defn update-status-panel [{:keys [turn] :as game}]
   (go (let [game (get-game)
             status-bar (js/document.querySelector "#status-bar")]
         (oset! status-bar :innerHTML "")
+        (if (is-my-turn? game) 
+          (.add (oget status-bar :classList) "player-turn")
+          (.remove (oget status-bar :classList) "player-turn"))
         (when turn
           (.appendChild status-bar
                         (crate/html
