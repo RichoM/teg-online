@@ -31,8 +31,9 @@
     @user-atom))
 
 (defn is-my-turn? [game]
-  (= (:id (get-user))
-     (teg/get-current-player game)))
+  (and (not (teg/game-over? game))
+       (= (get (get-user) :id)
+          (teg/get-current-player game))))
 
 (defn show-add-army-dialog [& {:keys [title message min-value max-value default-value show-cancel?]
                                :or {title nil, message nil, default-value 0, show-cancel? true}}]

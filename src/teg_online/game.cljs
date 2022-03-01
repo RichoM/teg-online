@@ -9,6 +9,9 @@
 (defn game-started? [game]
   (some? (game :turn)))
 
+(defn game-over? [game]
+  (some? (game :winner)))
+
 (defn get-players [game]
   (map (game :players)
        (game :turn-order)))
