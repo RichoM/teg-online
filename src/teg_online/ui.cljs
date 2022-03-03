@@ -199,7 +199,7 @@
 
 (defn surrender! [game-atom]
   (go (when (<! (bs/confirm "¡Cobarde!" "¿Estás seguro de que querés abandonar?"))
-        )))
+        (swap! game-atom teg/surrender (get (get-user) :id)))))
 
 (defn show-menu! [game-atom]
   (go (let [secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
