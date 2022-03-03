@@ -713,7 +713,7 @@
              (new-game :winner))
     (when (= (get (get-user) :id)
              (new-game :winner))
-      (start-fireworks))
+      #_(start-fireworks))
     (bs/alert "Fin del juego"
               (let [winner (new-game :winner)
                     winner-name (:name (teg/get-player new-game winner))
