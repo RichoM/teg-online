@@ -19,9 +19,6 @@
 (defn get-player [game player-id]
   (get-in game [:players player-id]))
 
-(defn still-playing? [game player-id]
-  (:playing? (get-player game player-id)))
-
 (defn get-current-player [{:keys [turn turn-order]}]
   (when turn (nth turn-order (mod turn (count turn-order)))))
 
@@ -40,6 +37,10 @@
 (defn player-army-count [game player-id]
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
+
+(defn still-playing? [game player-id]
+  (and (seq (player-countries game player-id))
+       (:playing? (get-player game player-id))))
 
 (defn calculate-extra-army
   ([game] (calculate-extra-army game (get-current-player game)))
@@ -489,8 +490,7 @@
     (fn [game]
       (let [game' (finish-action* game)
             current-player (get-current-player game')]
-        (if (or (empty? (player-countries game' current-player))
-                (not (still-playing? game' current-player)))
+        (if-not (still-playing? game' current-player)
           (finish-action game')
           game')))))
 
@@ -498,9 +498,8 @@
   (with-winner-check
     (fn [game player-id]
       (let [game' (assoc-in game [:players player-id :playing?] false)
-            still-playing (->> (game' :players)
-                               (filter (comp :playing? second))
-                               (map first))]
+            still-playing (->> (game' :turn-order)
+                               (filter (partial still-playing? game')))]
         (if (= 1 (count still-playing))
           (assoc game' :winner (first still-playing))
           (if (= player-id (get-current-player game'))
