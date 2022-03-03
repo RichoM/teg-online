@@ -23,10 +23,11 @@
    :turn turn
    :turn-order (mapv keyword turn-order)
    :winner (when winner (keyword winner))
-   :players (into {} (map (fn [[id {:keys [name goal]}]]
+   :players (into {} (map (fn [[id {:keys [name goal playing?]}]]
                             [id {:id id
                                  :goal goal
-                                 :name name}])
+                                 :name name
+                                 :playing? playing?}])
                           players))
    :countries (into {} (map-indexed (fn [idx {:keys [army owner]}]
                                       (let [id (nth sorted-countries idx)]

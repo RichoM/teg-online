@@ -9,6 +9,9 @@
 (defn game-started? [game]
   (some? (game :turn)))
 
+(defn game-over? [game]
+  (some? (game :winner)))
+
 (defn get-players [game]
   (map (game :players)
        (game :turn-order)))
@@ -34,6 +37,10 @@
 (defn player-army-count [game player-id]
   (reduce + (map :army (get (group-by :owner (-> game :countries vals))
                             player-id))))
+
+(defn still-playing? [game player-id]
+  (and (seq (player-countries game player-id))
+       (:playing? (get-player game player-id))))
 
 (defn calculate-extra-army
   ([game] (calculate-extra-army game (get-current-player game)))
@@ -84,8 +91,9 @@
   (when-let [goal-idx (get-in game [:players player-id :goal])]
     (if (< goal-idx (count occupation-goals))
       (get occupation-goals goal-idx)
-      (destruction-goal (nth (get-players game) (- goal-idx
-                                                   (count occupation-goals)))))))
+      (destruction-goal (nth (get-players game)
+                             (- goal-idx
+                                (count occupation-goals)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,53 +117,89 @@
 
 (def common-goal
   {:name "Ocupar 30 países"
-   :validator-fn (fn [old-game new-game player-id]
-                   (and (= player-id (get-current-player old-game))
-                        (>= (count (player-countries new-game player-id)) 30)))})
+   :validator-fn (fn [_ new-game player-id]
+                   (>= (count (player-countries new-game player-id)) 30))})
 
 (def occupation-goals
   [{:name "Ocupar África, 5 países de América del Norte y 4 países de Europa"
-    :validator-fn (fn [old-game new-game player-id]
-                    (and (= player-id (get-current-player old-game))
-                         (let [countries (player-countries-by-continent new-game player-id)]
-                           (and (>= (-> ::board/africa countries count)
-                                    (-> ::board/africa board/get-countries-by-continent count))
-                                (>= (-> ::board/north-america countries count) 5)
-                                (>= (-> ::board/europa countries count) 4)))))}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/africa countries count)
+                               (-> ::board/africa board/get-countries-by-continent count))
+                           (>= (-> ::board/north-america countries count) 5)
+                           (>= (-> ::board/europa countries count) 4))))}
    {:name "Ocupar América del Sur, 7 países de Europa y 3 países limítrofes entre sí en cualquier lugar del mapa"
-    :validator-fn (fn [old-game new-game player-id]
-                    (and (= player-id (get-current-player old-game))
-                         (let [countries (player-countries new-game player-id)
-                               triplets (board/neighbour-triplets countries)]
-                           (some (fn [triplet]
-                                   (let [countries-without-triplet (->> countries
-                                                                        (remove triplet)
-                                                                        (map board/countries)
-                                                                        (group-by :continent))]
-                                     (and (>= (-> ::board/south-america countries-without-triplet count)
-                                              (-> ::board/south-america board/get-countries-by-continent count))
-                                          (>= (-> ::board/europa countries-without-triplet count) 7))))
-                                 triplets))))}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries new-game player-id)
+                          triplets (board/neighbour-triplets countries)]
+                      (some (fn [triplet]
+                              (let [countries-without-triplet (->> countries
+                                                                   (remove triplet)
+                                                                   (map board/countries)
+                                                                   (group-by :continent))]
+                                (and (>= (-> ::board/south-america countries-without-triplet count)
+                                         (-> ::board/south-america board/get-countries-by-continent count))
+                                     (>= (-> ::board/europa countries-without-triplet count) 7))))
+                            triplets)))}
    {:name "Ocupar Asia y 2 países de América del Sur"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/asia countries count)
+                               (-> ::board/asia board/get-countries-by-continent count))
+                           (>= (-> ::board/south-america countries count) 2))))}
    {:name "Ocupar Europa, 4 países de Asia y 2 países de América del Sur"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/europa countries count)
+                               (-> ::board/europa board/get-countries-by-continent count))
+                           (>= (-> ::board/asia countries count) 4)
+                           (>= (-> ::board/south-america countries count) 2))))}
    {:name "Ocupar américa del Norte, 2 países de Oceanía y 4 de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/north-america countries count)
+                               (-> ::board/north-america board/get-countries-by-continent count))
+                           (>= (-> ::board/oceania countries count) 2)
+                           (>= (-> ::board/asia countries count) 4))))}
    {:name "Ocupar 2 países de Oceanía, 2 países de África, 2 países de América del Sur, 3 países de Europa, 4 de América del Norte y 3 de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/oceania countries count) 2)
+                           (>= (-> ::board/africa countries count) 2)
+                           (>= (-> ::board/south-america countries count) 2)
+                           (>= (-> ::board/europa countries count) 3)
+                           (>= (-> ::board/north-america countries count) 4)
+                           (>= (-> ::board/asia countries count) 3))))}
    {:name "Ocupar Oceanía, América del Norte y 2 países de Europa"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/north-america countries count)
+                               (-> ::board/north-america board/get-countries-by-continent count))
+                           (>= (-> ::board/oceania countries count)
+                               (-> ::board/oceania board/get-countries-by-continent count))
+                           (>= (-> ::board/europa countries count) 2))))}
    {:name "Ocupar América del Sur, África y 4 países de Asia"
-    :validator-fn (constantly false)}
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/south-america countries count)
+                               (-> ::board/south-america board/get-countries-by-continent count))
+                           (>= (-> ::board/africa countries count)
+                               (-> ::board/africa board/get-countries-by-continent count))
+                           (>= (-> ::board/asia countries count) 4))))}
    {:name "Ocupar Oceanía, África y 5 países de América del Norte"
-    :validator-fn (constantly false)}])
+    :validator-fn (fn [_ new-game player-id]
+                    (let [countries (player-countries-by-continent new-game player-id)]
+                      (and (>= (-> ::board/oceania countries count)
+                               (-> ::board/oceania board/get-countries-by-continent count))
+                           (>= (-> ::board/africa countries count)
+                               (-> ::board/africa board/get-countries-by-continent count))
+                           (>= (-> ::board/north-america countries count) 5))))}])
 
 (defn destruction-goal [{:keys [id name]}]
   {:name (u/format "Destruir al ejército del jugador %1" name)
-   :validator-fn (fn [old-game new-game player-id] 
-                   (and (= player-id (get-current-player old-game))
-                        (seq (player-countries old-game id))
+   :validator-fn (fn [old-game new-game _]
+                   (and (or (nil? (get-player old-game id))
+                            (seq (player-countries old-game id)))
                         (empty? (player-countries new-game id))))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -319,6 +363,7 @@
           (assoc new-game :winner player-id)
           new-game)))))
 
+
 (defn new-game []
   {:players {}
    :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
@@ -332,7 +377,8 @@
 (defn new-player [id name]
   {:id id
    :goal nil
-   :name name})
+   :name name
+   :playing? true})
 
 (defn join-game [game id name]
   (if (contains? (game :players) id)
@@ -444,6 +490,18 @@
     (fn [game]
       (let [game' (finish-action* game)
             current-player (get-current-player game')]
-        (if-not (seq (player-countries game' current-player))
+        (if-not (still-playing? game' current-player)
           (finish-action game')
           game')))))
+
+(def surrender
+  (with-winner-check
+    (fn [game player-id]
+      (let [game' (assoc-in game [:players player-id :playing?] false)
+            still-playing (->> (game' :turn-order)
+                               (filter (partial still-playing? game')))]
+        (if (= 1 (count still-playing))
+          (assoc game' :winner (first still-playing))
+          (if (= player-id (get-current-player game'))
+            (finish-action game')
+            game'))))))

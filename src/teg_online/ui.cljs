@@ -31,8 +31,9 @@
     @user-atom))
 
 (defn is-my-turn? [game]
-  (= (:id (get-user))
-     (teg/get-current-player game)))
+  (and (not (teg/game-over? game))
+       (= (get (get-user) :id)
+          (teg/get-current-player game))))
 
 (defn show-add-army-dialog [& {:keys [title message min-value max-value default-value show-cancel?]
                                :or {title nil, message nil, default-value 0, show-cancel? true}}]
@@ -195,6 +196,48 @@
             (= 0 (teg/get-army game defender)) :success
             (= 1 (teg/get-army game attacker)) :failure
             :else :cancel)))))
+
+(defn surrender! [game-atom]
+  (go (when (<! (bs/confirm "¡Cobarde!" "¿Estás seguro de que querés abandonar?"))
+        (swap! game-atom teg/surrender (get (get-user) :id)))))
+
+(defn show-menu! [game-atom]
+  (go (let [user-id (get (get-user) :id)
+            secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
+                                         {:type "button"}
+                                         "Ver objetivo secreto"])
+            common-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
+                                         {:type "button"}
+                                         "Ver objetivo común"])
+            surrender-btn (crate/html [:button.btn.btn-danger.btn-lg
+                                       {:type "button"}
+                                       "Abandonar partida"])
+            modal (bs/make-modal
+                   :body [:div.container-fluid
+                          [:div.row secret-goal-btn]
+                          [:div.row.m-1]
+                          [:div.row common-goal-btn]
+                          [:div.row.m-1]
+                          [:div.row surrender-btn]])
+            update-menu (fn [game]
+                          (if-not (teg/get-player game user-id)
+                            (do (oset! secret-goal-btn :disabled true)
+                                (oset! surrender-btn :disabled true))
+                            (do (oset! secret-goal-btn :disabled false)
+                                (oset! surrender-btn :disabled
+                                       (or (teg/game-over? game)
+                                           (not (teg/still-playing? game user-id)))))))]
+        (bs/on-click secret-goal-btn
+                     #(bs/alert "Objetivo secreto"
+                                (:name (teg/get-player-goal @game-atom user-id))))
+        (bs/on-click common-goal-btn
+                     #(bs/alert "Objetivo común"
+                                (:name teg/common-goal)))
+        (bs/on-click surrender-btn #(surrender! game-atom))
+        (add-watch game-atom ::menu-update (fn [_ _ _ game] (update-menu game)))
+        (update-menu @game-atom)
+        (<! (bs/show-modal modal))
+        (remove-watch game-atom ::menu-update))))
 
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
@@ -490,6 +533,8 @@
         (oset! players-row :innerHTML "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
           (let [player (players pid)
+                playing? (and (:playing? player)
+                              (seq (teg/player-countries game pid)))
                 icon-style (u/format "color: %1;" (player-colors idx))]
             (.appendChild players-row
                           (crate/html
@@ -499,15 +544,20 @@
                                                      "player-turn"))}
                             [:div.row
                              [:div.col-auto.text-truncate
-                              [:i.fas.fa-square {:style icon-style}]
-                              [:span.mx-1 (player :name)]]]
+                              [:i.fas.fa-square.me-1 {:style icon-style}]
+                              [:span {:class (when-not playing? "text-decoration-line-through")}
+                               (player :name)]]]
                             [:div.row
                              [:div.col-auto
-                              [:i.fas.fa-flag {:style icon-style}]
-                              [:span.mx-1 (count (teg/player-countries game pid))]]
+                              [:i.fas.fa-flag.me-1 {:style icon-style}]
+                              [:span (count (teg/player-countries game pid))]]
                              [:div.col-auto
-                              [:i.fas.fa-shield-alt {:style icon-style}]
-                              [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
+                              [:i.fas.fa-shield-alt.me-1 {:style icon-style}]
+                              [:span (teg/player-army-count game pid)]]]])))))))
+
+(defn exchange-button-visible? [game]
+  (and (is-my-turn? game)
+       (= ::teg/add-army (:phase game))))
 
 (defmulti finish-turn-enabled? :phase)
 
@@ -547,22 +597,39 @@
 (defmethod finish-btn-label ::teg/attack [_] "Reagrupar")
 (defmethod finish-btn-label ::teg/regroup [_] "Finalizar turno")
 
-(defn update-status-panel [{:keys [turn]}]
+(defn update-status-panel [{:keys [turn] :as game}]
   (go (let [game (get-game)
             status-bar (js/document.querySelector "#status-bar")]
         (oset! status-bar :innerHTML "")
+        (if (is-my-turn? game) 
+          (.add (oget status-bar :classList) "player-turn")
+          (.remove (oget status-bar :classList) "player-turn"))
         (when turn
           (.appendChild status-bar
                         (crate/html
-                         [:div.row.align-items-center.p-1
-                          [:div.col [:h4 (status-panel-title game)]]
+                         [:div.row.align-items-center.py-1.g-1
+                          [:div.col-auto 
+                           [:button#menu-button.btn.btn-lg.btn-outline-dark {:type "button"} 
+                            [:i.fas.fa-bars]]]
+                          [:div.col.text-center
+                           [:h4 (when-not (teg/game-over? game)
+                                  (status-panel-title game))]]
+                          (when (exchange-button-visible? game)
+                            [:div.col-auto
+                             [:button#exchange-button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]])
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
                             (finish-btn-label game)]]]))
+          (.addEventListener (js/document.querySelector "#menu-button")
+                             "click"
+                             #(show-menu! (@state :game-atom)))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
-                             #(finish-turn! (@state :game-atom)))))))
+                             #(finish-turn! (@state :game-atom)))
+          (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
+            ;; TODO(Richo): Show dialog with all the player cards and allow him to choose the three to exchange
+            (oset! exchange-btn :disabled true))))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
@@ -621,47 +688,110 @@
 
 (defmethod reset-user-data :default [_] {})
 
+(defn maybe-reset-user-data
+  [{old-turn :turn, old-phase :phase}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (= [old-phase old-turn]
+               [new-phase new-turn])
+    (swap! state assoc :user-data
+           (reset-user-data new-game))))
+
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
                                    [:span.me-auto]
                                    bs/close-toast-btn))
       (bs/show-toast {:delay 2500})))
 
-(defn on-game-change
-  [_key _ref
-   {old-turn :turn, old-phase :phase, :as old-game}
-   {new-turn :turn, new-phase :phase, :as new-game}]
-  (let [user-id ((get-user) :id)
-        {secret-goal :name} (teg/get-player-goal new-game user-id)]
-    (when (and secret-goal (nil? (teg/get-player-goal old-game user-id)))
-      (bs/alert "Objetivo secreto" secret-goal)))
+(defn start-fireworks []
+  (let [fireworks (-> (mm/make-morph :color "black"
+                                     :alpha 0
+                                     :width (oget world :width)
+                                     :height (oget world :height))
+                      (mm/appear 2 0.75))]
+    (.addMorph world fireworks)
+    (mm/on-step fireworks
+                (fn []
+                  (when (and (>= (oget fireworks :alpha) 0.75)
+                             (< (rand) 0.05))
+                    (let [x (rand (oget fireworks :width))
+                          y (rand (oget fireworks :height))
+                          amount (+ 150 (rand 300))
+                          min 0
+                          max (+ 200 (rand 400))]
+                      (mm/fireworks world (clj->js {:x x :y y})
+                                    :amount amount
+                                    :min-magnitude min
+                                    :max-magnitude max)))))))
+
+(defn maybe-show-secret-goal-dialog [old-game new-game]
+  (when-not (teg/game-over? new-game)
+    (let [user-id (get (get-user) :id)
+          {secret-goal :name} (teg/get-player-goal new-game user-id)]
+      (when (and secret-goal
+                 (nil? (teg/get-player-goal old-game user-id)))
+        (bs/alert "Objetivo secreto" secret-goal)))))
+
+(defn maybe-show-game-over-dialog [old-game new-game]
   (when (and (nil? (old-game :winner))
              (new-game :winner))
+    (when (= (get (get-user) :id)
+             (new-game :winner))
+      #_(start-fireworks))
     (bs/alert "Fin del juego"
-              [:h2
-               [:span "El ganador es "]
-               [:span.fw-bolder.text-nowrap
-                (:name (teg/get-player new-game (new-game :winner)))]]))
-  (when-not (= old-turn new-turn)
-    (show-toast (if (is-my-turn? new-game)
-                  "¡Es tu turno!"
-                  (list [:span "Es el turno de "]
-                        [:span.fw-bolder.text-nowrap
-                         (teg/get-current-player-name new-game)]))))
-  (when-not (= [old-phase old-turn]
-               [new-phase new-turn])
-    (swap! state assoc :user-data
-           (reset-user-data new-game))
-    (when (and (is-my-turn? new-game)
-               (isa? new-phase ::teg/add-army-continent))
-      (show-toast (u/format "Incorporar %1 ejércitos en %2"
-                            (get-in @state [:user-data :remaining])
-                            (b/get-continent-name (get-in @state [:user-data :continent]))))))
-  (doseq [country (keys b/countries)]
-    (let [delta-army (- (teg/get-army new-game country)
-                        (teg/get-army old-game country))]
-      (when-not (zero? delta-army)
-        (moved-army-effect country delta-army))))
+              (let [winner (new-game :winner)
+                    winner-name (:name (teg/get-player new-game winner))
+                    secret-goal (teg/get-player-goal new-game winner)]
+                [:div.container
+                 [:div.row [:h2
+                            [:span "El ganador es "]
+                            [:span.fw-bolder.text-nowrap winner-name]]]
+                 [:div.row.m-2]
+                 [:div.row [:h3
+                            [:i.fas.fa-angle-right.me-2]
+                            (if ((secret-goal :validator-fn) old-game new-game winner)
+                              (secret-goal :name)
+                              (if ((teg/common-goal :validator-fn) old-game new-game winner)
+                                (teg/common-goal :name)
+                                (secret-goal :name)))]]]))))
+
+(defn maybe-show-turn-notification
+  [{old-turn :turn} {new-turn :turn, :as new-game}]
+  (when-not (teg/game-over? new-game)
+    (when-not (= old-turn new-turn)
+      (show-toast (if (is-my-turn? new-game)
+                    "¡Es tu turno!"
+                    (list [:span "Es el turno de "]
+                          [:span.fw-bolder.text-nowrap
+                           (teg/get-current-player-name new-game)]))))))
+
+(defn maybe-show-phase-notification 
+  [{old-turn :turn, old-phase :phase}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (teg/game-over? new-game)
+    (when-not (= [old-phase old-turn]
+                 [new-phase new-turn])
+      (when (and (is-my-turn? new-game)
+                 (isa? new-phase ::teg/add-army-continent))
+        (show-toast (u/format "Incorporar %1 ejércitos en %2"
+                              (get-in @state [:user-data :remaining])
+                              (b/get-continent-name (get-in @state [:user-data :continent]))))))))
+
+(defn maybe-show-moving-army-effect [old-game new-game]
+  (when-not (teg/game-over? new-game)
+    (doseq [country (keys b/countries)]
+      (let [delta-army (- (teg/get-army new-game country)
+                          (teg/get-army old-game country))]
+        (when-not (zero? delta-army)
+          (moved-army-effect country delta-army))))))
+
+(defn on-game-change
+  [_key _ref old-game new-game]
+  (maybe-reset-user-data old-game new-game)
+  (maybe-show-secret-goal-dialog old-game new-game)
+  (maybe-show-game-over-dialog old-game new-game)
+  (maybe-show-turn-notification old-game new-game)
+  (maybe-show-phase-notification old-game new-game)
+  (maybe-show-moving-army-effect old-game new-game)
   (a/put! (@state :updates) new-game))
 
 (defn initialize [game-atom user-atom]

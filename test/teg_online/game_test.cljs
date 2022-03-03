@@ -856,6 +856,236 @@
           (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p2))
         (is (not @goal-achieved?) "8")))))
 
+(deftest occupation-goal-2
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 2)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Asia
+          (doseq [country (b/get-countries-by-continent ::b/asia)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not @goal-achieved?)) ; We're missing 1 country in South America
+        (do ;;; Conquer Argentina
+          (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1))
+        (is @goal-achieved?)
+        (do ;;; Lose China (now we're missing 1 country in Asia)
+          (swap! game-atom assoc-in [:countries ::b/china :owner] :p2))
+        (is (not @goal-achieved?))))))
+
+(deftest occupation-goal-3
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 3)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Europe
+          (doseq [country (b/get-countries-by-continent ::b/europa)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not @goal-achieved?)) ; We're missing 1 country in South America
+        (do ;;; Conquer Argentina
+          (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1))
+        (is @goal-achieved?)
+        (do ;;; Lose Aral (we still have 4 countries in Asia)
+          (swap! game-atom assoc-in [:countries ::b/aral :owner] :p2))
+        (is @goal-achieved?)
+        (do ;;; Lose Iran (now we only have 3 countries in Asia)
+          (swap! game-atom assoc-in [:countries ::b/iran :owner] :p2))
+        (is (not @goal-achieved?))))))
+
+(deftest occupation-goal-4
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 4)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer North America
+          (doseq [country (b/get-countries-by-continent ::b/north-america)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is @goal-achieved?)
+        (do ;;; Lose Borneo (now we only have 1 in oceanía)
+          (swap! game-atom assoc-in [:countries ::b/borneo :owner] :p2))
+        (is (not @goal-achieved?))
+        (do ;;; Lose Iran and Aral (we're left with just 3 in asia)
+          (swap! game-atom assoc-in [:countries ::b/iran :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/aral :owner] :p2))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Australia (we're still missing 1 in asia)
+          (swap! game-atom assoc-in [:countries ::b/australia :owner] :p1))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer China
+          (swap! game-atom assoc-in [:countries ::b/china :owner] :p1))
+        (is @goal-achieved?)))))
+
+(deftest occupation-goal-5
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 5)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?) "1")
+        (do ;;; Conquer Sahara
+          (swap! game-atom assoc-in [:countries ::b/sahara :owner] :p1))
+        (is (not @goal-achieved?) "2")
+        (do ;;; Conquer Argentina
+          (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1))
+        (is @goal-achieved? "3")
+        (do ;;; Lose Borneo
+          (swap! game-atom assoc-in [:countries ::b/borneo :owner] :p2))
+        (is (not @goal-achieved?) "4")
+        (do ;;; Conquer Borneo but lose Italia 
+          (swap! game-atom assoc-in [:countries ::b/borneo :owner] :p1)
+          (swap! game-atom assoc-in [:countries ::b/italia :owner] :p2))
+        (is (not @goal-achieved?) "5")
+        (do ;;; Conquer Italia but lose Canada and Alaska
+          (swap! game-atom assoc-in [:countries ::b/italia :owner] :p1)
+          (swap! game-atom assoc-in [:countries ::b/canada :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/alaska :owner] :p2))
+        (is (not @goal-achieved?) "6")
+        (do ;;; Conquer Canada and Alaska but lose Siberia and Katchatka
+          (swap! game-atom assoc-in [:countries ::b/canada :owner] :p1)
+          (swap! game-atom assoc-in [:countries ::b/alaska :owner] :p1)
+          (swap! game-atom assoc-in [:countries ::b/siberia :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/katchatka :owner] :p2))
+        (is @goal-achieved? "7")
+        (do ;;; Now lose Malasia
+          (swap! game-atom assoc-in [:countries ::b/malasia :owner] :p2))
+        (is (not @goal-achieved?) "8")))))
+
+(deftest occupation-goal-6
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 6)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer North America
+          (doseq [country (b/get-countries-by-continent ::b/north-america)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Oceanía
+          (doseq [country (b/get-countries-by-continent ::b/oceania)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is @goal-achieved?)
+        (do ;;; Lose Polonia and Italia
+          (swap! game-atom assoc-in [:countries ::b/polonia :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/italia :owner] :p2))
+        (is (not @goal-achieved?))))))
+
+(deftest occupation-goal-7
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 7)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer South America
+          (doseq [country (b/get-countries-by-continent ::b/south-america)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Africa
+          (doseq [country (b/get-countries-by-continent ::b/africa)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is @goal-achieved?)
+        (do ;;; Lose Aral and Iran
+          (swap! game-atom assoc-in [:countries ::b/aral :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/iran :owner] :p2))
+        (is (not @goal-achieved?))))))
+
+(deftest occupation-goal-8
+  (let [{:keys [name validator-fn]} (nth teg/occupation-goals 8)]
+    (testing name
+      (let [game-atom (atom nil)
+            goal-achieved? (atom nil)]
+        (add-watch game-atom ::goal-checker
+                   (fn [_ _ old new]
+                     (reset! goal-achieved? (validator-fn old new :p1))))
+        (do ;;; Initialize game
+          (reset! game-atom (teg/new-game))
+          (swap! game-atom teg/join-game :p1 "Richo")
+          (swap! game-atom teg/join-game :p2 "Lechu")
+          (swap! game-atom teg/join-game :p3 "Diego")
+          (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+          (swap! game-atom teg/start-game))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Oceanía
+          (doseq [country (b/get-countries-by-continent ::b/oceania)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Africa
+          (doseq [country (b/get-countries-by-continent ::b/africa)]
+            (swap! game-atom assoc-in [:countries country :owner] :p1)))
+        (is @goal-achieved?)
+        (do ;;; Lose Canada
+          (swap! game-atom assoc-in [:countries ::b/canada :owner] :p2))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Canada but lose Australia
+          (swap! game-atom assoc-in [:countries ::b/canada :owner] :p1)
+          (swap! game-atom assoc-in [:countries ::b/australia :owner] :p2))
+        (is (not @goal-achieved?))
+        (do ;;; Conquer Australia but lose Sahara
+          (swap! game-atom assoc-in [:countries ::b/sahara :owner] :p2)
+          (swap! game-atom assoc-in [:countries ::b/australia :owner] :p1))
+        (is (not @goal-achieved?))
+))))
+
 (deftest destruction-goal-success
   (let [game-atom (atom nil)]
     (do ;;; Initialize game
@@ -865,30 +1095,30 @@
       (swap! game-atom teg/join-game :p3 "Diego")
       (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
       (swap! game-atom teg/start-game))
-    (let [{:keys [name validator-fn]} (teg/destruction-goal (second (teg/get-players @game-atom)))
-          goal-achieved? (atom nil)]
-      (add-watch game-atom ::goal-checker
-                 (fn [_ _ old new]
-                   (reset! goal-achieved? (validator-fn old new :p1))))
+    (do ;;; Assign destruction goal to p1
+      (swap! game-atom
+             assoc-in [:players :p1 :goal]
+             (+ 1 (count teg/occupation-goals))))
+    (let [goal-achieved? #(= (@game-atom :winner) :p1)]
       (testing name
-        (is (not @goal-achieved?) "1")
+        (is (not (goal-achieved?)) "1")
         (do ;;; Leave :p2 with only 1 country
           (doseq [[idx country] (map-indexed vector (teg/player-countries @game-atom :p2))]
             (swap! game-atom assoc-in [:countries country :owner] (if (zero? (mod idx 2)) :p1 :p3)))
           (swap! game-atom assoc-in [:countries ::b/chile :owner] :p2))
-        (is (not @goal-achieved?) "2")
+        (is (not (goal-achieved?)) "2")
         (do ;;; Set turn/phase -> p1/attack and increase Argentina's army
           (swap! game-atom #(-> %
                                 (update-in [:countries ::b/argentina :army] + 9)
                                 (assoc :turn 0)
                                 (assoc :phase ::teg/attack))))
-        (is (not @goal-achieved?) "3")
+        (is (not (goal-achieved?)) "3")
         (do ;;; Let p1 invade Chile
           (swap! game-atom #(-> %
                                 (teg/attack [::b/argentina [6 6 6]]
                                             [::b/chile [1]])
                                 (teg/invade ::b/argentina ::b/chile 1))))
-        (is @goal-achieved? "4")))))
+        (is (goal-achieved?) "4")))))
 
 (deftest destruction-goal-failure
   (let [game-atom (atom nil)]
@@ -899,41 +1129,90 @@
       (swap! game-atom teg/join-game :p3 "Diego")
       (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
       (swap! game-atom teg/start-game))
-    (let [{:keys [name validator-fn]} (teg/destruction-goal (second (teg/get-players @game-atom)))
-          goal-achieved? (atom nil)]
-      (add-watch game-atom ::goal-checker
-                 (fn [_ _ old new]
-                   (reset! goal-achieved? (validator-fn old new :p1))))
+    (do ;;; Assign destruction goal to p1
+      (swap! game-atom
+             assoc-in [:players :p1 :goal]
+             (+ 1 (count teg/occupation-goals))))
+    (let [goal-achieved? #(= (@game-atom :winner) :p1)]
       (testing name
-        (is (not @goal-achieved?))
+        (is (not (goal-achieved?)))
         (do ;;; Leave :p2 with only 1 country
           (doseq [[idx country] (map-indexed vector (teg/player-countries @game-atom :p2))]
             (swap! game-atom assoc-in [:countries country :owner] (if (zero? (mod idx 2)) :p1 :p3)))
           (swap! game-atom assoc-in [:countries ::b/chile :owner] :p2))
-        (is (not @goal-achieved?))
+        (is (not (goal-achieved?)))
         (do ;;; Set turn/phase -> p3/attack and increase Peru's army
           (swap! game-atom #(-> %
                                 (update-in [:countries ::b/peru :army] + 9)
                                 (assoc :turn 2)
                                 (assoc :phase ::teg/attack))))
-        (is (not @goal-achieved?))
+        (is (not (goal-achieved?)))
         (do ;;; Let p3 invade Chile
           (swap! game-atom #(-> %
                                 (teg/attack [::b/peru [6 6 6]]
                                             [::b/chile [1]])
                                 (teg/invade ::b/peru ::b/chile 1))))
-        (is (not @goal-achieved?)
+        (is (not (goal-achieved?))
             "Should fail because p3 invaded Chile (not p1)")
         (do ;;; Set turn/phase -> p1/attack and increase Argentina's army
           (swap! game-atom #(-> %
                                 (update-in [:countries ::b/argentina :army] + 9)
                                 (assoc :turn 0)
                                 (assoc :phase ::teg/attack))))
-        (is (not @goal-achieved?))
+        (is (not (goal-achieved?)))
         (do ;;; Let p1 invade Chile
           (swap! game-atom #(-> %
                                 (teg/attack [::b/argentina [6 6 6]]
                                             [::b/chile [1]])
                                 (teg/invade ::b/argentina ::b/chile 1))))
-        (is (not @goal-achieved?)
+        (is (not (goal-achieved?))
             "Should fail as well because p3 invaded Chile (not p1)")))))
+
+(deftest finish-action-should-ignore-players-that-are-no-longer-playing
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries [::b/argentina ::b/peru ::b/chile])
+                 teg/start-game
+
+                 ; add-army-1
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/peru 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 ; add-army-2
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+
+                 ; attack (Richo)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 teg/finish-action
+
+                 ; regroup (Richo)
+                 teg/finish-action)]
+    (is (= ::p2 (teg/get-current-player game)))
+    ; When the current user surrenders, it automatically finishes its turn
+    (let [game' (teg/surrender game ::p2)]
+      (is (= ::p3 (teg/get-current-player game'))))
+    ; A user can surrender at any moment, even on other user turn
+    (let [game' (-> game
+                    (teg/surrender ::p3)
+
+                    ; attack/regroup (Sofía)
+                    teg/finish-action
+                    teg/finish-action)]
+      (is (= ::p1 (teg/get-current-player game'))))
+    ; If only one player is left playing, the game ends right there
+    (let [game' (-> game
+                    (teg/surrender ::p2)
+                    (teg/surrender ::p3))]
+      (is (teg/game-over? game'))
+      (is (= ::p1 (:winner game'))))
+    ; The same case as before but with surrenders in reverse order
+    (let [game' (-> game
+                    (teg/surrender ::p3)
+                    (teg/surrender ::p2))]
+      (is (teg/game-over? game'))
+      (is (= ::p1 (:winner game'))))))
