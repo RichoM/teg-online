@@ -202,7 +202,8 @@
         (swap! game-atom teg/surrender (get (get-user) :id)))))
 
 (defn show-menu! [game-atom]
-  (go (let [secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
+  (go (let [user-id (get (get-user) :id)
+            secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
                                          {:type "button"}
                                          "Ver objetivo secreto"])
             common-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
@@ -217,15 +218,22 @@
                           [:div.row.m-1]
                           [:div.row common-goal-btn]
                           [:div.row.m-1]
-                          [:div.row surrender-btn]])]
+                          [:div.row surrender-btn]])
+            update-menu (fn [game]
+                          (oset! surrender-btn :disabled
+                                 (or (teg/game-over? game)
+                                     (not (teg/still-playing? game user-id)))))]
         (bs/on-click secret-goal-btn
                      #(bs/alert "Objetivo secreto"
-                                (:name (teg/get-player-goal @game-atom (get (get-user) :id)))))
-        (bs/on-click common-goal-btn 
+                                (:name (teg/get-player-goal @game-atom user-id))))
+        (bs/on-click common-goal-btn
                      #(bs/alert "Objetivo común"
                                 (:name teg/common-goal)))
         (bs/on-click surrender-btn #(surrender! game-atom))
-        (<! (bs/show-modal modal)))))
+        (add-watch game-atom ::menu-update (fn [_ _ _ game] (update-menu game)))
+        (update-menu @game-atom)
+        (<! (bs/show-modal modal))
+        (remove-watch game-atom ::menu-update))))
 
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
