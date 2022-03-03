@@ -19,6 +19,9 @@
 (defn get-player [game player-id]
   (get-in game [:players player-id]))
 
+(defn still-playing? [game player-id]
+  (:playing? (get-player game player-id)))
+
 (defn get-current-player [{:keys [turn turn-order]}]
   (when turn (nth turn-order (mod turn (count turn-order)))))
 
@@ -487,7 +490,7 @@
       (let [game' (finish-action* game)
             current-player (get-current-player game')]
         (if (or (empty? (player-countries game' current-player))
-                (not (:playing? (get-player game' current-player))))
+                (not (still-playing? game' current-player)))
           (finish-action game')
           game')))))
 
