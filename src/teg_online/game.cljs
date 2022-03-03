@@ -359,6 +359,7 @@
           (assoc new-game :winner player-id)
           new-game)))))
 
+
 (defn new-game []
   {:players {}
    :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
@@ -372,7 +373,8 @@
 (defn new-player [id name]
   {:id id
    :goal nil
-   :name name})
+   :name name
+   :playing? true})
 
 (defn join-game [game id name]
   (if (contains? (game :players) id)
@@ -484,6 +486,20 @@
     (fn [game]
       (let [game' (finish-action* game)
             current-player (get-current-player game')]
-        (if-not (seq (player-countries game' current-player))
+        (if (or (empty? (player-countries game' current-player))
+                (not (:playing? (get-player game' current-player))))
           (finish-action game')
           game')))))
+
+(def surrender
+  (with-winner-check
+    (fn [game player-id]
+      (let [game' (assoc-in game [:players player-id :playing?] false)
+            still-playing (->> (game' :players)
+                               (filter (comp :playing? second))
+                               (map first))]
+        (if (= 1 (count still-playing))
+          (assoc game' :winner (first still-playing))
+          (if (= player-id (get-current-player game'))
+            (finish-action game')
+            game'))))))

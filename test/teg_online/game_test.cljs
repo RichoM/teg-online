@@ -1167,3 +1167,52 @@
                                 (teg/invade ::b/argentina ::b/chile 1))))
         (is (not (goal-achieved?))
             "Should fail as well because p3 invaded Chile (not p1)")))))
+
+(deftest finish-action-should-ignore-players-that-are-no-longer-playing
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries [::b/argentina ::b/peru ::b/chile])
+                 teg/start-game
+
+                 ; add-army-1
+                 (teg/add-army ::b/argentina 5) teg/finish-action
+                 (teg/add-army ::b/peru 5) teg/finish-action
+                 (teg/add-army ::b/chile 5) teg/finish-action
+                 ; add-army-2
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/add-army ::b/chile 3) teg/finish-action
+
+                 ; attack (Richo)
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [1 1 1]])
+                 teg/finish-action
+
+                 ; regroup (Richo)
+                 teg/finish-action)]
+    (is (= ::p2 (teg/get-current-player game)))
+    ; When the current user surrenders, it automatically finishes its turn
+    (let [game' (teg/surrender game ::p2)]
+      (is (= ::p3 (teg/get-current-player game'))))
+    ; A user can surrender at any moment, even on other user turn
+    (let [game' (-> game
+                    (teg/surrender ::p3)
+
+                    ; attack/regroup (Sofía)
+                    teg/finish-action
+                    teg/finish-action)]
+      (is (= ::p1 (teg/get-current-player game'))))
+    ; If only one player is left playing, the game ends right there
+    (let [game' (-> game
+                    (teg/surrender ::p2)
+                    (teg/surrender ::p3))]
+      (is (teg/game-over? game'))
+      (is (= ::p1 (:winner game'))))
+    ; The same case as before but with surrenders in reverse order
+    (let [game' (-> game
+                    (teg/surrender ::p3)
+                    (teg/surrender ::p2))]
+      (is (teg/game-over? game'))
+      (is (= ::p1 (:winner game'))))))
