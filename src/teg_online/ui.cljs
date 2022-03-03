@@ -197,6 +197,36 @@
             (= 1 (teg/get-army game attacker)) :failure
             :else :cancel)))))
 
+(defn surrender! [game-atom]
+  (go (when (<! (bs/confirm "¡Cobarde!" "¿Estás seguro de que querés abandonar?"))
+        )))
+
+(defn show-menu! [game-atom]
+  (go (let [secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
+                                         {:type "button"}
+                                         "Ver objetivo secreto"])
+            common-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
+                                         {:type "button"}
+                                         "Ver objetivo común"])
+            surrender-btn (crate/html [:button.btn.btn-danger.btn-lg
+                                       {:type "button"}
+                                       "Abandonar partida"])
+            modal (bs/make-modal
+                   :body [:div.container-fluid
+                          [:div.row secret-goal-btn]
+                          [:div.row.m-1]
+                          [:div.row common-goal-btn]
+                          [:div.row.m-1]
+                          [:div.row surrender-btn]])]
+        (bs/on-click secret-goal-btn
+                     #(bs/alert "Objetivo secreto"
+                                (:name (teg/get-player-goal @game-atom (get (get-user) :id)))))
+        (bs/on-click common-goal-btn 
+                     #(bs/alert "Objetivo común"
+                                (:name teg/common-goal)))
+        (bs/on-click surrender-btn #(surrender! game-atom))
+        (<! (bs/show-modal modal)))))
+
 (defmulti finish-turn! (fn [game-atom] (@game-atom :phase)))
 
 (defmethod finish-turn! ::teg/add-army [game-atom]
@@ -560,7 +590,7 @@
                         (crate/html
                          [:div.row.align-items-center.py-1.g-1
                           [:div.col-auto 
-                           [:button.btn.btn-lg.btn-outline-dark {:type "button"} 
+                           [:button#menu-button.btn.btn-lg.btn-outline-dark {:type "button"} 
                             [:i.fas.fa-bars]]]
                           [:div.col.text-center
                            [:h4 (when-not (teg/game-over? game)
@@ -571,6 +601,9 @@
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
                             (finish-btn-label game)]]]))
+          (.addEventListener (js/document.querySelector "#menu-button")
+                             "click"
+                             #(show-menu! (@state :game-atom)))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
                              #(finish-turn! (@state :game-atom)))))))
