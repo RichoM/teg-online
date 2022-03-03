@@ -220,9 +220,13 @@
                           [:div.row.m-1]
                           [:div.row surrender-btn]])
             update-menu (fn [game]
-                          (oset! surrender-btn :disabled
-                                 (or (teg/game-over? game)
-                                     (not (teg/still-playing? game user-id)))))]
+                          (if-not (teg/get-player game user-id)
+                            (do (oset! secret-goal-btn :disabled true)
+                                (oset! surrender-btn :disabled true))
+                            (do (oset! secret-goal-btn :disabled false)
+                                (oset! surrender-btn :disabled
+                                       (or (teg/game-over? game)
+                                           (not (teg/still-playing? game user-id)))))))]
         (bs/on-click secret-goal-btn
                      #(bs/alert "Objetivo secreto"
                                 (:name (teg/get-player-goal @game-atom user-id))))
@@ -529,6 +533,8 @@
         (oset! players-row :innerHTML "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
           (let [player (players pid)
+                playing? (and (:playing? player)
+                              (seq (teg/player-countries game pid)))
                 icon-style (u/format "color: %1;" (player-colors idx))]
             (.appendChild players-row
                           (crate/html
@@ -538,15 +544,20 @@
                                                      "player-turn"))}
                             [:div.row
                              [:div.col-auto.text-truncate
-                              [:i.fas.fa-square {:style icon-style}]
-                              [:span.mx-1 (player :name)]]]
+                              [:i.fas.fa-square.me-1 {:style icon-style}]
+                              [:span {:class (when-not playing? "text-decoration-line-through")}
+                               (player :name)]]]
                             [:div.row
                              [:div.col-auto
-                              [:i.fas.fa-flag {:style icon-style}]
-                              [:span.mx-1 (count (teg/player-countries game pid))]]
+                              [:i.fas.fa-flag.me-1 {:style icon-style}]
+                              [:span (count (teg/player-countries game pid))]]
                              [:div.col-auto
-                              [:i.fas.fa-shield-alt {:style icon-style}]
-                              [:span.mx-1 (teg/player-army-count game pid)]]]])))))))
+                              [:i.fas.fa-shield-alt.me-1 {:style icon-style}]
+                              [:span (teg/player-army-count game pid)]]]])))))))
+
+(defn exchange-button-visible? [game]
+  (and (is-my-turn? game)
+       (= ::teg/add-army (:phase game))))
 
 (defmulti finish-turn-enabled? :phase)
 
@@ -603,8 +614,9 @@
                           [:div.col.text-center
                            [:h4 (when-not (teg/game-over? game)
                                   (status-panel-title game))]]
-                          [:div.col-auto 
-                           [:button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]]
+                          (when (exchange-button-visible? game)
+                            [:div.col-auto
+                             [:button#exchange-button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]])
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
@@ -614,7 +626,10 @@
                              #(show-menu! (@state :game-atom)))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
-                             #(finish-turn! (@state :game-atom)))))))
+                             #(finish-turn! (@state :game-atom)))
+          (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
+            ;; TODO(Richo): Show dialog with all the player cards and allow him to choose the three to exchange
+            (oset! exchange-btn :disabled true))))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
