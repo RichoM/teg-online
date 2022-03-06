@@ -7,7 +7,8 @@
             [teg-online.firebase :as fb]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.ui :as ui]))
+            [teg-online.ui :as ui]
+            [clojure.edn :as edn]))
 
 (enable-console-print!)
 
@@ -53,6 +54,11 @@
                             :keyboard false}))
         @action)))
 
+(defn try-to-join [game]
+  (let [{user-id :id, user-name :name} @user-atom]
+    (when-not (contains? (game :players) user-id)
+      (swap! game-atom teg/join-game user-id user-name))))
+
 (defn show-waiting-dialog []
   (go (let [host? (= (:id @user-atom)
                      (:id (first (teg/get-players @game-atom))))
@@ -64,9 +70,9 @@
                    :body [:div.container-fluid
                           [:div.row.text-center [:h2
                                                  [:span "Código de la partida: "]
-                                                 [:span.fw-bolder.text-nowrap 
+                                                 [:span.fw-bolder.text-nowrap
                                                   {:style "user-select: all;"}
-                                                  [:a {:href (oget js/location :href)} 
+                                                  [:a {:href (oget js/location :href)}
                                                    (str @game-id)]]]]
                           [:div.row.m-2]
                           [:div.row.text-center [:h3 "Esperando jugadores..."]]
@@ -83,9 +89,11 @@
                              (bs/hide-modal modal)))]
         (add-watch game-atom ::waiting-for-players
                    (fn [_ _ _ game]
-                     (update-modal game)))
+                     (update-modal game)
+                     ;; HACK(Richo): We try to join again just in case some other player got there first...
+                     (try-to-join game)))
         (update-modal @game-atom)
-        (bs/on-click start-game-btn 
+        (bs/on-click start-game-btn
                      #(swap! game-atom (comp teg/start-game
                                              teg/distribute-goals
                                              teg/distribute-countries)))
@@ -113,11 +121,9 @@
                              :hash-game hash))]
         (if (<! (fb/connect! doc-id game-atom))
           (do (oset! js/location :!hash doc-id)
-              (let [game @game-atom
-                    {user-id :id, user-name :name} @user-atom]
+              (let [game @game-atom]
                 (when-not (teg/game-started? game)
-                  (when-not (contains? (game :players) user-id)
-                    (swap! game-atom teg/join-game user-id user-name))
+                  (try-to-join game)
                   (<! (show-waiting-dialog)))))
           (do (<! (bs/alert "ERROR" 
                             (list [:span "La partida "]
@@ -149,6 +155,8 @@
 (comment
   @game-id
   @user-atom
+  @game-atom
+  
 
   (do
     (bs/hide-modals)
@@ -166,6 +174,12 @@
        (@game-atom :turn-order))
 
   (teg/get-player-goal @game-atom :p3)
+
+  
+  (doseq [[i c] (map-indexed vector (teg/player-countries @game-atom (last (@game-atom :turn-order))))]
+    (swap! game-atom assoc-in [:countries c :owner] (if (odd? i)
+                                                      (first (@game-atom :turn-order))
+                                                      (second (@game-atom :turn-order)))))
 
   (swap! game-atom assoc :phase ::teg/add-army-europa)
 
