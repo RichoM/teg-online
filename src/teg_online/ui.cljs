@@ -533,6 +533,7 @@
         (oset! players-row :innerHTML "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
           (let [player (players pid)
+                game-started? (teg/game-started? game)
                 playing? (and (:playing? player)
                               (seq (teg/player-countries game pid)))
                 icon-style (u/format "color: %1;" (player-colors idx))]
@@ -545,7 +546,9 @@
                             [:div.row
                              [:div.col-auto.text-truncate
                               [:i.fas.fa-square.me-1 {:style icon-style}]
-                              [:span {:class (when-not playing? "text-decoration-line-through")}
+                              [:span {:class (when (and game-started?
+                                                        (not playing?)) 
+                                               "text-decoration-line-through")}
                                (player :name)]]]
                             [:div.row
                              [:div.col-auto
