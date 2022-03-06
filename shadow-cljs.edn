@@ -1,7 +1,8 @@
 {:source-paths ["src" "test"]
 
  :dependencies [[crate "0.2.5"]
-                [binaryage/oops "0.7.1"]]
+                [binaryage/oops "0.7.1"]
+                [juji/editscript "0.5.8"]]
 
  :nrepl {:port 9000
          :middleware []}
