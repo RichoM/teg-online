@@ -3,6 +3,22 @@
             [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
+(defn new-game []
+  {:players {}
+   :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
+                         {}
+                         board/countries)
+   :turn-order []
+   :phase nil
+   :turn nil
+   :winner nil})
+
+(defn new-player [id name]
+  {:id id
+   :goal nil
+   :name name
+   :playing? true})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Queries
 
@@ -362,23 +378,6 @@
                      ((common-goal :validator-fn) game new-game player-id)))
           (assoc new-game :winner player-id)
           new-game)))))
-
-
-(defn new-game []
-  {:players {}
-   :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
-                         {}
-                         board/countries)
-   :turn-order []
-   :phase nil
-   :turn nil
-   :winner nil})
-
-(defn new-player [id name]
-  {:id id
-   :goal nil
-   :name name
-   :playing? true})
 
 (defn join-game [game id name]
   (if (contains? (game :players) id)
