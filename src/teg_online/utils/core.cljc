@@ -16,6 +16,16 @@
    (or (reduce #(when (pred %2) (reduced %2)) nil coll)
        default-value)))
 
+(defn index-by
+  "Returns a map of the elements of `coll` keyed by the result of `f` on each
+   element.  The value at each key will be a single element (in contrast to
+   `clojure.core/group-by`).  Therefore `f` should generally return an unique
+   key for every element - otherwise elements get discarded."
+  ;; NOTE(Richo): Taken from the following thread
+  ;; https://www.reddit.com/r/Clojure/comments/8iw3b8/plain_groupby_for_unique_values/
+  [f coll]
+  (persistent! (reduce #(assoc! %1 (f %2) %2) (transient {}) coll)))
+
 (defn index-of ^long
   [^java.util.List v e]
   (.indexOf v e))
