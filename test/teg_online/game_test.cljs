@@ -1216,3 +1216,59 @@
                     (teg/surrender ::p2))]
       (is (teg/game-over? game'))
       (is (= ::p1 (:winner game'))))))
+
+(deftest draw-card?-should-start-false
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/join-game ::p3 "Sofía")
+                 (teg/distribute-countries [::b/argentina ::b/peru ::b/chile])
+                 teg/start-game)]
+    (is (not (teg/draw-card? game)))))
+
+(deftest draw-card?-should-be-set-after-invading-a-country
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/finish-action
+                 (teg/add-army ::b/brasil 5)
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1))]
+    (is (teg/draw-card? game))))
+
+(deftest draw-card?-should-go-back-to-false-after-finish-turn
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 teg/start-game
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/finish-action
+                 (teg/add-army ::b/brasil 5)
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1))]
+    (is (teg/draw-card? game))
+    (let [game' (-> game
+                    (teg/finish-action) ; finish attack
+                    (teg/finish-action) ; finish regroup
+                    )]
+      (is (not (teg/draw-card? game'))))))

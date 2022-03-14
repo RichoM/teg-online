@@ -11,7 +11,8 @@
    :turn-order []
    :phase nil
    :turn nil
-   :winner nil})
+   :winner nil
+   :current-player nil})
 
 (defn new-player [id name]
   {:id id
@@ -111,6 +112,8 @@
                              (- goal-idx
                                 (count occupation-goals)))))))
 
+(defn draw-card? [game]
+  (get-in game [:current-turn :draw-card?]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -285,8 +288,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; End turn
 
+(defn reset-current-turn [game]
+  (assoc game :current-turn
+         {:draw-card? false
+          :extra-army (calculate-extra-army game)}))
+
 (defn next-turn [game]
-  (update game :turn inc))
+  (-> game 
+      (update :turn inc)
+      (reset-current-turn)))
 
 (defn get-next-phase-add-army [game next-player & [begin-continent]]
   (let [continents (player-continents game next-player)]
@@ -388,9 +398,10 @@
         (update :players assoc id (new-player id name)))))
 
 (defn start-game [game]
-  (assoc game
-         :turn 0
-         :phase ::add-army-1))
+  (-> game
+      (assoc :turn 0
+             :phase ::add-army-1)
+      (reset-current-turn)))
 
 (defn distribute-countries
   ([game] (distribute-countries game (shuffle (keys board/countries))))
@@ -467,7 +478,8 @@
         (-> game
             (update-in [:countries attacker-id :army] - moving-army)
             (update-in [:countries defender-id :army] + moving-army)
-            (assoc-in [:countries defender-id :owner] current-player))))))
+            (assoc-in [:countries defender-id :owner] current-player)
+            (assoc-in [:current-turn :draw-card?] true))))))
 
 (def regroup 
   (with-winner-check
