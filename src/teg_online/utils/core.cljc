@@ -10,6 +10,8 @@
                        players))))
 
 (defn seek
+  ;; NOTE(Richo): Code taken from Niki Tonsky's tweet
+  ;; https://twitter.com/nikitonsky/status/1430538652984221703
   ([pred coll]
    (reduce #(when (pred %2) (reduced %2)) nil coll))
   ([pred coll default-value]
