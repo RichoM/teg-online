@@ -1272,3 +1272,93 @@
                     (teg/finish-action) ; finish regroup
                     )]
       (is (not (teg/draw-card? game'))))))
+
+
+(deftest draw-card-should-only-be-allowed-after-invading
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 (teg/start-game))]
+    (is (thrown? js/Error
+                 (teg/draw-card game ::b/argentina)))
+    (let [game' (-> game
+                    (teg/add-army ::b/argentina 4)
+                    (teg/add-army ::b/uruguay 1)
+                    teg/finish-action
+                    (teg/add-army ::b/brasil 5)
+                    teg/finish-action
+                    (teg/add-army ::b/argentina 3) teg/finish-action
+                    (teg/add-army ::b/peru 3) teg/finish-action
+                    (teg/attack [::b/argentina [6 6 6]]
+                                [::b/peru [5 5 5]])
+                    (teg/attack [::b/argentina [6 6 6]]
+                                [::b/peru [5]])
+                    (teg/invade ::b/argentina ::b/peru 1)
+                    (teg/draw-card ::b/argentina))]
+      (is (= #{[::b/argentina ::b/all]}
+             (teg/get-player-cards game' ::p1))))))
+
+(deftest draw-card-should-only-be-allowed-once-per-turn
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 (teg/start-game)
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/finish-action
+                 (teg/add-army ::b/brasil 5)
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 (teg/draw-card ::b/argentina))]
+    (is (thrown? js/Error
+                 (teg/draw-card game ::b/peru)))))
+
+
+(deftest draw-card-should-only-be-allowed-if-the-card-is-free
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 (teg/start-game)
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/finish-action
+                 (teg/add-army ::b/brasil 5)
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 (teg/draw-card ::b/argentina)
+                 (teg/finish-action) ; finish attack
+                 (teg/finish-action) ; finish regroup
+
+                 (teg/attack [::b/brasil [6 6 6]]
+                             [::b/peru [1]])
+                 (teg/invade ::b/brasil ::b/peru 1)
+                 (teg/finish-action) ; finish attack
+                 )]
+    (is (thrown? js/Error
+                 (teg/draw-card game ::b/argentina))
+        "Should throw because the Argentina card belongs to Richo")
+    (let [game' (-> game
+                    (teg/draw-card ::b/peru)
+                    (teg/finish-action))]
+      (is (= #{[::b/argentina ::b/all]}
+             (teg/get-player-cards game' ::p1)))
+      (is (= #{[::b/peru ::b/ship]}
+             (teg/get-player-cards game' ::p2))))))

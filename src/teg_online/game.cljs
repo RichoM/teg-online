@@ -8,6 +8,10 @@
    :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
                          {}
                          board/countries)
+   :cards (->> board/cards
+               (map (fn [[country type]]
+                      {:country country, :type type, :owner nil}))
+               (u/index-by :country))
    :turn-order []
    :phase nil
    :turn nil
@@ -114,6 +118,12 @@
 
 (defn draw-card? [game]
   (get-in game [:current-turn :draw-card?]))
+
+(defn get-player-cards [game player-id]
+  (->> (vals (game :cards))
+       (filter #(= player-id (:owner %)))
+       (map (fn [{:keys [country type]}] [country type]))
+       (set)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -516,3 +526,17 @@
           (if (= player-id (get-current-player game'))
             (finish-action game')
             game'))))))
+
+(def draw-card
+  (with-winner-check
+    (fn [game country-id]
+      (if (draw-card? game)
+        (if-not (get-in game [:cards country-id :owner])
+          (-> game
+              (assoc-in [:cards country-id :owner] (get-current-player game))
+              (assoc-in [:current-turn :draw-card?] false))
+          (throw (ex-info (u/format "Current player is not allowed to draw card %1 because it belongs to other player!"
+                                    country-id)
+                          {:game game, :country country-id})))
+        (throw (ex-info "Current player is not allowed to draw card!"
+                        {:game game}))))))
