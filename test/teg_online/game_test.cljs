@@ -1362,3 +1362,108 @@
              (teg/get-player-cards game' ::p1)))
       (is (= #{[::b/peru ::b/ship]}
              (teg/get-player-cards game' ::p2))))))
+
+(deftest exchange-is-allowed-if-player-has-at-least-3-cards-of-different-types
+  (let [attack-turn (fn [game country-a country-d country-card]
+                      (-> game
+                          (teg/attack [country-a [6 6 6]]
+                                      [country-d [1]])
+                          (teg/invade country-a country-d 1)
+                          (teg/finish-action)
+                          (teg/draw-card country-card)
+                          (teg/finish-action)))
+        add-army-turn (fn [game country]
+                        (-> game
+                            (teg/add-army country (teg/calculate-extra-army game))
+                            (teg/finish-action)))
+        game-atom (atom nil)]
+    (reset! game-atom (teg/new-game))
+    (swap! game-atom teg/join-game :p1 "Richo")
+    (swap! game-atom teg/join-game :p2 "Lechu")
+    (swap! game-atom teg/join-game :p3 "Diego")
+    (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+    (swap! game-atom teg/distribute-goals)
+    (swap! game-atom teg/start-game)
+    (swap! game-atom #(-> %
+                          (assoc :turn 6, :phase ::teg/attack)
+                          (assoc-in [:countries ::b/colombia :army] 10)
+                          (assoc-in [:countries ::b/oregon :army] 10)
+                          (assoc-in [:countries ::b/mongolia :army] 10)
+                          (teg/reset-current-turn)))
+    (swap! game-atom attack-turn ::b/colombia ::b/brasil ::b/brasil)
+    (swap! game-atom attack-turn ::b/oregon ::b/yukon ::b/yukon)
+    (swap! game-atom attack-turn ::b/mongolia ::b/iran ::b/iran)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/peru ::b/peru)
+    (swap! game-atom attack-turn ::b/oregon ::b/california ::b/california)
+    (swap! game-atom attack-turn ::b/mongolia ::b/aral ::b/aral)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/mexico ::b/mexico)
+    (swap! game-atom attack-turn ::b/oregon ::b/nueva-york ::b/nueva-york)
+    (swap! game-atom attack-turn ::b/mongolia ::b/siberia ::b/argentina)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (teg/can-exchange? @game-atom :p2))
+    (is (teg/can-exchange? @game-atom :p3))))
+
+(deftest exchange-is-allowed-if-player-has-at-least-3-cards-of-same-type
+  (let [attack-turn (fn [game country-a country-d country-card]
+                      (-> game
+                          (teg/attack [country-a [6 6 6]]
+                                      [country-d [1]])
+                          (teg/invade country-a country-d 1)
+                          (teg/finish-action)
+                          (teg/draw-card country-card)
+                          (teg/finish-action)))
+        add-army-turn (fn [game country]
+                        (-> game
+                            (teg/add-army country (teg/calculate-extra-army game))
+                            (teg/finish-action)))
+        game-atom (atom nil)]
+    (reset! game-atom (teg/new-game))
+    (swap! game-atom teg/join-game :p1 "Richo")
+    (swap! game-atom teg/join-game :p2 "Lechu")
+    (swap! game-atom teg/join-game :p3 "Diego")
+    (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+    (swap! game-atom teg/distribute-goals)
+    (swap! game-atom teg/start-game)
+    (swap! game-atom #(-> %
+                          (assoc :turn 6, :phase ::teg/attack)
+                          (assoc-in [:countries ::b/colombia :army] 10)
+                          (assoc-in [:countries ::b/oregon :army] 10)
+                          (assoc-in [:countries ::b/mongolia :army] 10)
+                          (teg/reset-current-turn)))
+    (swap! game-atom attack-turn ::b/colombia ::b/brasil ::b/brasil)
+    (swap! game-atom attack-turn ::b/oregon ::b/yukon ::b/alemania)
+    (swap! game-atom attack-turn ::b/mongolia ::b/iran ::b/malasia)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/peru ::b/peru)
+    (swap! game-atom attack-turn ::b/oregon ::b/california ::b/zaire)
+    (swap! game-atom attack-turn ::b/mongolia ::b/aral ::b/java)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/mexico ::b/mexico)
+    (swap! game-atom attack-turn ::b/oregon ::b/nueva-york ::b/mongolia)
+    (swap! game-atom attack-turn ::b/mongolia ::b/siberia ::b/argentina)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (teg/can-exchange? @game-atom :p2))
+    (is (teg/can-exchange? @game-atom :p3))))
+

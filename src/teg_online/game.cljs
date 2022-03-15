@@ -125,6 +125,22 @@
        (map (fn [{:keys [country type]}] [country type]))
        (set)))
 
+(defn- has-three-cards-of-different-type? [game player-id]
+  (let [cards (group-by second (get-player-cards game player-id))]
+    (if (contains? cards ::board/all)
+      (>= (count (keys (dissoc cards ::board/all))) 2)
+      (>= (count (keys cards)) 3))))
+
+(defn- has-three-cards-of-same-type? [game player-id]
+  (let [cards (group-by second (get-player-cards game player-id))]
+    (if (contains? cards ::board/all)
+      (some (fn [[_ c]] (>= (count c) 2)) cards)
+      (some (fn [[_ c]] (>= (count c) 3)) cards))))
+
+(defn can-exchange? [game player-id]
+  (or (has-three-cards-of-different-type? game player-id)
+      (has-three-cards-of-same-type? game player-id)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
 
