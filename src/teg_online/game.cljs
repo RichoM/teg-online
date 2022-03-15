@@ -126,9 +126,7 @@
 (defn get-player-cards [game player-id]
   (->> (vals (game :cards))
        (filter #(= player-id (:owner %)))
-       (map :country)
-       ;(map (fn [{:keys [country type]}] [country type]))
-       (set)))
+       (map :country)))
 
 (defn- group-cards-by-type [game cards]
   (let [grouped-cards (->> cards

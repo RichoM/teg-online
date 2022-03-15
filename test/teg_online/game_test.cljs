@@ -1298,7 +1298,7 @@
                     (teg/invade ::b/argentina ::b/peru 1)
                     (teg/draw-card ::b/argentina))]
       (is (= #{::b/argentina}
-             (teg/get-player-cards game' ::p1))))))
+             (set (teg/get-player-cards game' ::p1)))))))
 
 (deftest draw-card-should-only-be-allowed-once-per-turn
   (let [game (-> (teg/new-game)
@@ -1359,9 +1359,9 @@
                     (teg/draw-card ::b/peru)
                     (teg/finish-action))]
       (is (= #{::b/argentina}
-             (teg/get-player-cards game' ::p1)))
+             (set (teg/get-player-cards game' ::p1))))
       (is (= #{::b/peru}
-             (teg/get-player-cards game' ::p2))))))
+             (set (teg/get-player-cards game' ::p2)))))))
 
 (deftest exchange-is-allowed-if-player-has-at-least-3-cards-of-different-types
   (let [attack-turn (fn [game country-a country-d country-card]
