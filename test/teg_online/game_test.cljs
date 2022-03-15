@@ -1534,7 +1534,7 @@
       (swap! game-atom add-army-turn ::b/oregon))))
 
 
-(deftest exchange-ACAACA
+(deftest exchange-full-test
   (let [game-atom (atom nil)]
     (reset! game-atom (-> (teg/new-game)
                           (teg/join-game ::p1 "Richo")
@@ -1547,12 +1547,14 @@
                           (assoc-in [:cards ::b/katchatka :owner] ::p1) ; balloon
                           (assoc-in [:cards ::b/egipto :owner] ::p1) ; balloon
                           (assoc-in [:cards ::b/polonia :owner] ::p1) ; cannon
+                          (assoc-in [:cards ::b/java :owner] ::p1) ; cannon
                           (assoc-in [:cards ::b/argentina :owner] ::p1) ; all
 
                           (assoc-in [:cards ::b/india :owner] ::p2) ; balloon
                           (assoc-in [:cards ::b/alemania :owner] ::p2) ; ship
                           (assoc-in [:cards ::b/malasia :owner] ::p2) ; cannon
                           (assoc-in [:cards ::b/labrador :owner] ::p2) ; cannon
+                          (assoc-in [:cards ::b/japon :owner] ::p2) ; cannon
                           (assoc-in [:cards ::b/taimir :owner] ::p2) ; all
 
                           (assoc :turn 6, :phase ::teg/attack)
@@ -1565,4 +1567,30 @@
         "Should throw because the cards are not a valid exchange")
     (is (thrown? js/Error
                  (teg/exchange-cards @game-atom [::b/egipto ::b/egipto ::b/egipto]))
-        "Should throw because the cards are not a valid exchange")))
+        "Should throw because the cards are not a valid exchange")
+    (swap! game-atom teg/exchange-cards [::b/francia ::b/katchatka ::b/egipto])
+    (is (= 7 (teg/get-extra-army @game-atom)))
+    (swap! game-atom #(-> %
+                          (assoc :turn 7, :phase ::teg/attack)
+                          (teg/reset-current-turn)))
+    (is (thrown? js/Error
+                 (teg/exchange-cards @game-atom [::b/francia ::b/katchatka ::b/egipto]))
+        "Should throw because the player doesn't own these cards")
+    (is (thrown? js/Error
+                 (teg/exchange-cards @game-atom [::b/alemania ::b/malasia ::b/labrador]))
+        "Should throw because the cards are not a valid exchange")
+    (swap! game-atom teg/exchange-cards [::b/india ::b/alemania ::b/malasia])
+    (is (= 7 (teg/get-extra-army @game-atom)))
+    (swap! game-atom #(-> %
+                          (assoc :turn 8, :phase ::teg/attack)
+                          (teg/reset-current-turn)))
+    (swap! game-atom teg/exchange-cards [::b/polonia ::b/java ::b/argentina])
+    (is (= 10 (teg/get-extra-army @game-atom)))
+    (swap! game-atom #(-> %
+                          (assoc :turn 9, :phase ::teg/attack)
+                          (teg/reset-current-turn)))
+    (swap! game-atom teg/exchange-cards [::b/labrador ::b/japon ::b/taimir])
+    (is (= 10 (teg/get-extra-army @game-atom)))
+    (swap! game-atom #(-> %
+                          (assoc :turn 10, :phase ::teg/attack)
+                          (teg/reset-current-turn)))))

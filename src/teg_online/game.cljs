@@ -22,7 +22,8 @@
   {:id id
    :goal nil
    :name name
-   :playing? true})
+   :playing? true
+   :exchanges 0})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Queries
@@ -149,6 +150,12 @@
 
 (defn can-exchange? [game player-id]
   (valid-exchange? game (get-player-cards game player-id)))
+
+(defn get-exchange-bonus [game player-id]
+  (let [exchanges (get-in game [:players player-id :exchanges] 0)
+        bonus (concat [4 7 10]
+                      (iterate (partial + 5) 15))]
+    (nth bonus exchanges)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -580,14 +587,13 @@
         (when-not (set/subset? #{card-1 card-2 card-3}
                                (set (get-player-cards game player-id)))
           (throw (ex-info "Current player doesn't own the cards being exchanged"
-                          {:game game, :cards [card-1 card-2 card-3]}))))
-      (when-not (valid-exchange? game [card-1 card-2 card-3])
-        (throw (ex-info "Cards are not eligible for exchange"
-                        {:game game, :cards [card-1 card-2 card-3]})))
-      
-      ; TODO(Richo): Make the exchange bonus variable (4, 7, 10, .. , 15, 20, 25, ..)
-    (-> game
-        (assoc-in [:cards card-1 :owner] nil)
-        (assoc-in [:cards card-2 :owner] nil)
-        (assoc-in [:cards card-3 :owner] nil)
-        (update-in [:current-turn :extra-army] + 4)))))
+                          {:game game, :cards [card-1 card-2 card-3]})))
+        (when-not (valid-exchange? game [card-1 card-2 card-3])
+          (throw (ex-info "Cards are not eligible for exchange"
+                          {:game game, :cards [card-1 card-2 card-3]})))
+        (-> game
+            (assoc-in [:cards card-1 :owner] nil)
+            (assoc-in [:cards card-2 :owner] nil)
+            (assoc-in [:cards card-3 :owner] nil)
+            (update-in [:current-turn :extra-army] + (get-exchange-bonus game player-id))
+            (update-in [:players player-id :exchanges] inc))))))
