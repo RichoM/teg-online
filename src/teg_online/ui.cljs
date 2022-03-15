@@ -649,7 +649,7 @@
 (defmulti reset-user-data :phase)
 
 (defmethod reset-user-data ::teg/add-army [game]
-  {:remaining (teg/calculate-extra-army game)
+  {:remaining (teg/get-extra-army game)
    :additions {}})
 
 (defmethod reset-user-data ::teg/add-army-asia [_]
