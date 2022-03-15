@@ -206,18 +206,43 @@
 (defn show-draw-card-dialog [game country-id]
   (go (let [country-name (:name (b/countries country-id))
             card-image (-> game :cards country-id :type card-images)]
-        (-> (bs/make-modal :header (list [:h2 "Conseguiste una carta de país"]
-                                         bs/close-modal-btn)
-                           :body [:div.container.text-center
-                                  [:div.row
-                                   [:div.col]
-                                   [:div.col-auto
-                                    [:div.row.border.border-dark.align-items-center
-                                     [:div.col-6 [:h1 country-name]]
-                                     [:div.col-6 [:img.img-fluid {:src card-image}]]]]
-                                   [:div.col]]]
-                           :footer bs/accept-modal-btn)
-            (bs/show-modal)))))
+        (<! (-> (bs/make-modal :header (list [:h2 "Conseguiste una tarjeta de país"]
+                                             bs/close-modal-btn)
+                               :body [:div.container.text-center
+                                      [:div.row
+                                       [:div.col]
+                                       [:div.col-auto
+                                        [:div.row.border.border-dark.align-items-center
+                                         [:div.col-6 [:h1 country-name]]
+                                         [:div.col-6 [:img.img-fluid {:src card-image}]]]]
+                                       [:div.col]]]
+                               :footer bs/accept-modal-btn)
+                (bs/show-modal))))))
+
+(defn show-card-list-dialog [game countries]
+  (go (<! (-> (bs/make-modal :header (list [:h2 "Tarjetas de país"] bs/close-modal-btn)
+                             :body [:div.container.text-center
+                                    [:div.row
+                                     [:div.col]
+                                     [:div.col-auto
+                                      (if (empty? countries)
+                                        [:h3 "Todavía no conseguiste ninguna tarjeta de país"]
+                                        (map (fn [country-id]
+                                             (let [country-name (:name (b/countries country-id))
+                                                   card-image (-> game :cards country-id :type card-images)]
+                                               [:div.row.my-2.border.border-dark.align-items-center
+                                                [:div.col-6 [:h1 country-name]]
+                                                [:div.col-6 [:img.img-fluid {:src card-image}]]]))
+                                           countries))]
+                                     [:div.col]]]
+                             :footer bs/accept-modal-btn)
+              (bs/show-modal)))))
+
+(comment
+  (show-draw-card-dialog (get-game) ::b/argentina)
+  (show-card-list-dialog (get-game) [::b/argentina ::b/uruguay ::b/australia ::b/alaska
+                                     ::b/alemania ::b/arabia])
+)
 
 (defn surrender! [game-atom]
   (go (when (<! (bs/confirm "¡Cobarde!" "¿Estás seguro de que querés abandonar?"))
@@ -231,6 +256,9 @@
             common-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
                                          {:type "button"}
                                          "Ver objetivo común"])
+            cards-btn (crate/html [:button.btn.btn-secondary.btn-lg
+                                   {:type "button"}
+                                   "Ver tarjetas de país"])
             surrender-btn (crate/html [:button.btn.btn-danger.btn-lg
                                        {:type "button"}
                                        "Abandonar partida"])
@@ -239,6 +267,8 @@
                           [:div.row secret-goal-btn]
                           [:div.row.m-1]
                           [:div.row common-goal-btn]
+                          [:div.row.m-1]
+                          [:div.row cards-btn]
                           [:div.row.m-1]
                           [:div.row surrender-btn]])
             update-menu (fn [game]
@@ -255,6 +285,10 @@
         (bs/on-click common-goal-btn
                      #(bs/alert "Objetivo común"
                                 (:name teg/common-goal)))
+        (bs/on-click cards-btn
+                     #(let [game @game-atom
+                            countries (teg/get-player-cards game user-id)]
+                        (show-card-list-dialog game countries)))
         (bs/on-click surrender-btn #(surrender! game-atom))
         (add-watch game-atom ::menu-update (fn [_ _ _ game] (update-menu game)))
         (update-menu @game-atom)
