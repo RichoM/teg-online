@@ -128,6 +128,11 @@
        (filter #(= player-id (:owner %)))
        (map :country)))
 
+(defn get-free-cards [game]
+  (->> (vals (game :cards))
+       (filter #(nil? (:owner %)))
+       (map :country)))
+
 (defn- group-cards-by-type [game cards]
   (let [grouped-cards (->> cards
                            (map (game :cards))
