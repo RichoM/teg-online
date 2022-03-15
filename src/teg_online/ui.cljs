@@ -4,7 +4,7 @@
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bs]
             [teg-online.utils.core :as u]
-            [teg-online.ui-constants :refer [country-data player-colors dice-images]]
+            [teg-online.ui-constants :refer [country-data player-colors dice-images card-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [crate.core :as crate]))
@@ -203,6 +203,22 @@
             (= 1 (teg/get-army game attacker)) :failure
             :else :cancel)))))
 
+(defn show-draw-card-dialog [game country-id]
+  (go (let [country-name (:name (b/countries country-id))
+            card-image (-> game :cards country-id :type card-images)]
+        (-> (bs/make-modal :header (list [:h2 "Conseguiste una carta de país"]
+                                         bs/close-modal-btn)
+                           :body [:div.container.text-center
+                                  [:div.row
+                                   [:div.col]
+                                   [:div.col-auto
+                                    [:div.row.border.border-dark.align-items-center
+                                     [:div.col-6 [:h1 country-name]]
+                                     [:div.col-6 [:img.img-fluid {:src card-image}]]]]
+                                   [:div.col]]]
+                           :footer bs/accept-modal-btn)
+            (bs/show-modal)))))
+
 (defn surrender! [game-atom]
   (go (when (<! (bs/confirm "¡Cobarde!" "¿Estás seguro de que querés abandonar?"))
         (swap! game-atom teg/surrender (get (get-user) :id)))))
@@ -284,6 +300,10 @@
                                         (teg/regroup game country-a country-b moving-army)
                                         game))
                                     % regroups))
+          (when (teg/draw-card? @game-atom)
+            (let [random-card (rand-nth (teg/get-free-cards @game-atom))]
+              (swap! game-atom teg/draw-card random-card)
+              (show-draw-card-dialog @game-atom random-card)))
           (swap! game-atom teg/finish-action)))))
 
 (defmulti can-interact-with-country?

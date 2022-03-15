@@ -17,6 +17,11 @@
                   "imgs/Dice-5.svg"
                   "imgs/Dice-6a.svg"])
 
+(def card-images {::b/all "imgs/all.png"
+                  ::b/ship "imgs/ship.png"
+                  ::b/cannon "imgs/cannon.png"
+                  ::b/balloon "imgs/balloon.png"})
+
 (def country-data
   {; South America
    ::b/colombia {:position [572 822]
