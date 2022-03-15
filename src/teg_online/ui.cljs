@@ -35,6 +35,12 @@
        (= (get (get-user) :id)
           (teg/get-current-player game))))
 
+(defn show-toast [msg]
+  (-> (bs/make-toast :header (list [:h5 msg]
+                                   [:span.me-auto]
+                                   bs/close-toast-btn))
+      (bs/show-toast {:delay 2500})))
+
 (defn show-add-army-dialog [& {:keys [title message min-value max-value default-value show-cancel?]
                                :or {title nil, message nil, default-value 0, show-cancel? true}}]
   (go (let [result-value (atom default-value)
@@ -698,12 +704,6 @@
                [new-phase new-turn])
     (swap! state assoc :user-data
            (reset-user-data new-game))))
-
-(defn show-toast [msg]
-  (-> (bs/make-toast :header (list [:h5 msg]
-                                   [:span.me-auto]
-                                   bs/close-toast-btn))
-      (bs/show-toast {:delay 2500})))
 
 (defn start-fireworks []
   (let [fireworks (-> (mm/make-morph :color "black"
