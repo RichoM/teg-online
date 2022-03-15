@@ -1297,7 +1297,7 @@
                                 [::b/peru [5]])
                     (teg/invade ::b/argentina ::b/peru 1)
                     (teg/draw-card ::b/argentina))]
-      (is (= #{[::b/argentina ::b/all]}
+      (is (= #{::b/argentina}
              (teg/get-player-cards game' ::p1))))))
 
 (deftest draw-card-should-only-be-allowed-once-per-turn
@@ -1358,9 +1358,9 @@
     (let [game' (-> game
                     (teg/draw-card ::b/peru)
                     (teg/finish-action))]
-      (is (= #{[::b/argentina ::b/all]}
+      (is (= #{::b/argentina}
              (teg/get-player-cards game' ::p1)))
-      (is (= #{[::b/peru ::b/ship]}
+      (is (= #{::b/peru}
              (teg/get-player-cards game' ::p2))))))
 
 (deftest exchange-is-allowed-if-player-has-at-least-3-cards-of-different-types
@@ -1467,3 +1467,102 @@
     (is (teg/can-exchange? @game-atom :p2))
     (is (teg/can-exchange? @game-atom :p3))))
 
+
+(deftest exchanging-cards-should-give-players-extra-army
+  (let [attack-turn (fn [game country-a country-d country-card]
+                      (-> game
+                          (teg/attack [country-a [6 6 6]]
+                                      [country-d [1]])
+                          (teg/invade country-a country-d 1)
+                          (teg/finish-action)
+                          (teg/draw-card country-card)
+                          (teg/finish-action)))
+        add-army-turn (fn [game country]
+                        (-> game
+                            (teg/add-army country (teg/calculate-extra-army game))
+                            (teg/finish-action)))
+        game-atom (atom nil)]
+    (reset! game-atom (teg/new-game))
+    (swap! game-atom teg/join-game :p1 "Richo")
+    (swap! game-atom teg/join-game :p2 "Lechu")
+    (swap! game-atom teg/join-game :p3 "Diego")
+    (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
+    (swap! game-atom teg/distribute-goals)
+    (swap! game-atom teg/start-game)
+    (swap! game-atom #(-> %
+                          (assoc :turn 6, :phase ::teg/attack)
+                          (assoc-in [:countries ::b/colombia :army] 10)
+                          (assoc-in [:countries ::b/oregon :army] 10)
+                          (assoc-in [:countries ::b/mongolia :army] 10)
+                          (teg/reset-current-turn)))
+    (swap! game-atom attack-turn ::b/colombia ::b/brasil ::b/brasil)
+    (swap! game-atom attack-turn ::b/oregon ::b/yukon ::b/yukon)
+    (swap! game-atom attack-turn ::b/mongolia ::b/iran ::b/iran)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/peru ::b/peru)
+    (swap! game-atom attack-turn ::b/oregon ::b/california ::b/california)
+    (swap! game-atom attack-turn ::b/mongolia ::b/aral ::b/aral)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (not (teg/can-exchange? @game-atom :p2)))
+    (is (not (teg/can-exchange? @game-atom :p3)))
+    (swap! game-atom add-army-turn ::b/colombia)
+    (swap! game-atom add-army-turn ::b/oregon)
+    (swap! game-atom add-army-turn ::b/mongolia)
+    (swap! game-atom attack-turn ::b/colombia ::b/mexico ::b/mexico)
+    (swap! game-atom attack-turn ::b/oregon ::b/nueva-york ::b/nueva-york)
+    (swap! game-atom attack-turn ::b/mongolia ::b/siberia ::b/argentina)
+    (is (not (teg/can-exchange? @game-atom :p1)))
+    (is (teg/can-exchange? @game-atom :p2))
+    (is (teg/can-exchange? @game-atom :p3))
+    (swap! game-atom add-army-turn ::b/colombia) ; Richo no puede canjear
+    (let [extra-army-before (teg/get-extra-army @game-atom)]
+      (swap! game-atom teg/exchange-cards [::b/yukon ::b/california ::b/nueva-york])
+      (is (= (teg/get-extra-army @game-atom)
+             (+ 4 extra-army-before)))
+      (is (empty? (teg/get-player-cards @game-atom :p2)))
+      (swap! game-atom add-army-turn ::b/oregon))
+    (let [extra-army-before (teg/get-extra-army @game-atom)]
+      (swap! game-atom teg/exchange-cards [::b/iran ::b/aral ::b/argentina])
+      (is (= (teg/get-extra-army @game-atom)
+             (+ 4 extra-army-before)))
+      (is (empty? (teg/get-player-cards @game-atom :p3)))
+      (swap! game-atom add-army-turn ::b/oregon))))
+
+
+(deftest exchange-ACAACA
+  (let [game-atom (atom nil)]
+    (reset! game-atom (-> (teg/new-game)
+                          (teg/join-game ::p1 "Richo")
+                          (teg/join-game ::p2 "Diego")
+                          (teg/distribute-countries [::b/argentina ::b/peru
+                                                     ::b/uruguay ::b/brasil])
+                          (teg/start-game)
+
+                          (assoc-in [:cards ::b/francia :owner] ::p1) ; balloon
+                          (assoc-in [:cards ::b/katchatka :owner] ::p1) ; balloon
+                          (assoc-in [:cards ::b/egipto :owner] ::p1) ; balloon
+                          (assoc-in [:cards ::b/polonia :owner] ::p1) ; cannon
+                          (assoc-in [:cards ::b/argentina :owner] ::p1) ; all
+
+                          (assoc-in [:cards ::b/india :owner] ::p2) ; balloon
+                          (assoc-in [:cards ::b/alemania :owner] ::p2) ; ship
+                          (assoc-in [:cards ::b/malasia :owner] ::p2) ; cannon
+                          (assoc-in [:cards ::b/labrador :owner] ::p2) ; cannon
+                          (assoc-in [:cards ::b/taimir :owner] ::p2) ; all
+
+                          (assoc :turn 6, :phase ::teg/attack)
+                          (teg/reset-current-turn)))
+    (is (thrown? js/Error
+                 (teg/exchange-cards @game-atom [::b/india ::b/alemania ::b/malasia]))
+        "Should throw because the player doesn't own these cards")
+    (is (thrown? js/Error
+                 (teg/exchange-cards @game-atom [::b/katchatka ::b/egipto ::b/polonia]))
+        "Should throw because the cards are not a valid exchange")
+    (is (thrown? js/Error
+                 (teg/exchange-cards @game-atom [::b/egipto ::b/egipto ::b/egipto]))
+        "Should throw because the cards are not a valid exchange")))

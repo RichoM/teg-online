@@ -75,6 +75,9 @@
                  (/ (count (player-countries game player-id))
                     2))))))))
 
+(defn get-extra-army [game]
+  (get-in game [:current-turn :extra-army]))
+
 (defn country-exists? [game country-id]
   (contains? (game :countries) country-id))
 
@@ -122,24 +125,30 @@
 (defn get-player-cards [game player-id]
   (->> (vals (game :cards))
        (filter #(= player-id (:owner %)))
-       (map (fn [{:keys [country type]}] [country type]))
+       (map :country)
+       ;(map (fn [{:keys [country type]}] [country type]))
        (set)))
 
-(defn- has-three-cards-of-different-type? [game player-id]
-  (let [cards (group-by second (get-player-cards game player-id))]
-    (if (contains? cards ::board/all)
-      (>= (count (keys (dissoc cards ::board/all))) 2)
-      (>= (count (keys cards)) 3))))
+(defn- group-cards-by-type [game cards]
+  (let [grouped-cards (->> cards
+                           (map (game :cards))
+                           (group-by :type))]
+    (reduce (fn [grouped-cards card]
+              (-> grouped-cards
+                  (update ::board/balloon conj card)
+                  (update ::board/cannon conj card)
+                  (update ::board/ship conj card)))
+            (dissoc grouped-cards ::board/all)
+            (grouped-cards ::board/all))))
 
-(defn- has-three-cards-of-same-type? [game player-id]
-  (let [cards (group-by second (get-player-cards game player-id))]
-    (if (contains? cards ::board/all)
-      (some (fn [[_ c]] (>= (count c) 2)) cards)
-      (some (fn [[_ c]] (>= (count c) 3)) cards))))
+(defn valid-exchange? [game cards]
+  (let [cards (->> (set cards)
+                   (group-cards-by-type game))]
+    (or (>= (count (keys cards)) 3)
+        (some (fn [[_ c]] (>= (count c) 3)) cards))))
 
 (defn can-exchange? [game player-id]
-  (or (has-three-cards-of-different-type? game player-id)
-      (has-three-cards-of-same-type? game player-id)))
+  (valid-exchange? game (get-player-cards game player-id)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -501,6 +510,11 @@
       (let [current-player (get-current-player game)]
         (assert-country-owner game attacker-id current-player)
         (assert-country-owner-any game defender-id (dissoc (game :players) current-player))
+        ; TODO(Richo): If the player has a card for this country, we should add two units to its army
+        ; (at the end of the turn!!). Maybe I can add the invaded countries to a list in the current
+        ; turn data so that I know which countries were invaded in this turn (to avoid using a card 
+        ; twice). Or maybe its easier to mark the cards with a used? flag and then at the end of turn 
+        ; check the unused cards and owned countries
         (-> game
             (update-in [:countries attacker-id :army] - moving-army)
             (update-in [:countries defender-id :army] + moving-army)
@@ -548,6 +562,7 @@
     (fn [game country-id]
       (if (draw-card? game)
         (if-not (get-in game [:cards country-id :owner])
+          ; TODO(Richo): If the player already owns this country we should add 2 units to its army
           (-> game
               (assoc-in [:cards country-id :owner] (get-current-player game))
               (assoc-in [:current-turn :draw-card?] false))
@@ -556,3 +571,23 @@
                           {:game game, :country country-id})))
         (throw (ex-info "Current player is not allowed to draw card!"
                         {:game game}))))))
+
+
+(def exchange-cards
+  (with-winner-check
+    (fn [game [card-1 card-2 card-3]]
+      (let [player-id (get-current-player game)]
+        (when-not (set/subset? #{card-1 card-2 card-3}
+                               (set (get-player-cards game player-id)))
+          (throw (ex-info "Current player doesn't own the cards being exchanged"
+                          {:game game, :cards [card-1 card-2 card-3]}))))
+      (when-not (valid-exchange? game [card-1 card-2 card-3])
+        (throw (ex-info "Cards are not eligible for exchange"
+                        {:game game, :cards [card-1 card-2 card-3]})))
+      
+      ; TODO(Richo): Make the exchange bonus variable (4, 7, 10, .. , 15, 20, 25, ..)
+    (-> game
+        (assoc-in [:cards card-1 :owner] nil)
+        (assoc-in [:cards card-2 :owner] nil)
+        (assoc-in [:cards card-3 :owner] nil)
+        (update-in [:current-turn :extra-army] + 4)))))
