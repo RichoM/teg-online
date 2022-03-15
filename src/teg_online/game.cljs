@@ -16,7 +16,7 @@
    :phase nil
    :turn nil
    :winner nil
-   :current-player nil})
+   :current-turn nil})
 
 (defn new-player [id name]
   {:id id
