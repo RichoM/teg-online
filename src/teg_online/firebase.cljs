@@ -14,8 +14,8 @@
 (defn game->doc [game]
   (assoc (select-keys game [:phase :turn :turn-order :players :winner :current-turn])
          :cards (mapv (fn [country]
-                        (let [{:keys [owner type]} (get-in game [:cards country])]
-                          {:owner owner, :type type}))
+                        (let [{:keys [owner type used?]} (get-in game [:cards country])]
+                          {:owner owner, :type type, :used? used?}))
                       sorted-countries)
          :countries (mapv (fn [country]
                             (let [{:keys [army owner]} (get-in game [:countries country])]
@@ -32,11 +32,12 @@
                             [id (assoc player :id id)])
                           players))
    :cards (->> cards
-               (map-indexed (fn [idx {:keys [type owner]}]
+               (map-indexed (fn [idx {:keys [type owner used?]}]
                               (let [country (nth sorted-countries idx)]
                                 [country {:country country
                                           :type (keyword (namespace ::b/*) type)
-                                          :owner (keyword owner)}])))
+                                          :owner (keyword owner)
+                                          :used? used?}])))
                (into {}))
    :countries (into {} (map-indexed (fn [idx {:keys [army owner]}]
                                       (let [id (nth sorted-countries idx)]
