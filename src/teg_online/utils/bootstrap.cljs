@@ -25,7 +25,7 @@
 
 (defn make-modal [& {:keys [header body footer]}]
   (crate/html [:div.modal.fade {:tabindex -1 :role "dialog"}
-               [:div.modal-dialog.modal-dialog-centered.modal-lg {:role "document"}
+               [:div.modal-dialog.modal-dialog-centered.modal-lg.modal-dialog-scrollable {:role "document"}
                 [:div.modal-content
                  (when header [:div.modal-header header])
                  (when body [:div.modal-body body])

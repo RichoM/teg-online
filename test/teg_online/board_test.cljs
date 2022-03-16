@@ -24,3 +24,16 @@
       (is (contains? ((b/countries neighbour) :neighbours) id)
           (u/format "%1 (%2) has non corresponding neighbour (%3)"
                     name id neighbour)))))
+
+(deftest cards-should-correspond-to-countries
+  (let [cards-by-country (group-by first b/cards)]
+    (doseq [id (keys b/countries)]
+      (is (contains? cards-by-country id)
+          (u/format "%1 doesn't have a card" id)))))
+
+(deftest card-types-should-match
+  (let [cards-by-type (group-by second b/cards)]
+    (is (= 2 (count (cards-by-type ::b/all))))
+    (is (= 16 (count (cards-by-type ::b/balloon))))
+    (is (= 16 (count (cards-by-type ::b/cannon))))
+    (is (= 16 (count (cards-by-type ::b/ship))))))

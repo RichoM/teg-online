@@ -206,22 +206,65 @@
         (vswap! triplets conj (conj neighbour-pairs country))))
     @triplets))
 
-(comment
-  
-  (def country-list [::colombia ::brasil ::peru ::chile ::uruguay ::argentina])
-  (time (neighbour-pairs country-list))
-  (time (neighbour-triplets country-list))
-  (time (neighbour-pairs (keys countries)))
-  (time (neighbour-triplets (keys countries)))
-  (set #{1 2 3})
-  
-  )
-
 (def card-symbols #{::balloon ::cannon ::ship ::all})
 
 (def cards #{[::argentina ::all]
-             [::chile ::balloon]
-             [::peru ::ship]
-             [::brasil ::ship]
+             [::taimir ::all]
+
+             [::francia ::balloon]
+             [::katchatka ::balloon]
+             [::egipto ::balloon]
+             [::india ::balloon]
+             [::italia ::balloon]
+             [::iran ::balloon]
+             [::rusia ::balloon]
+             [::colombia ::balloon]
              [::uruguay ::balloon]
-             [::colombia ::balloon]})
+             [::gobi ::balloon]
+             [::chile ::balloon]
+             [::etiopia ::balloon]
+             [::sumatra ::balloon]
+             [::españa ::balloon]
+             [::groenlandia ::balloon]
+             [::yukon ::balloon]
+
+             [::alemania ::ship]
+             [::zaire ::ship]
+             [::mongolia ::ship]
+             [::madagascar ::ship]
+             [::borneo ::ship]
+             [::alaska ::ship]
+             [::nueva-york ::ship]
+             [::gran-bretaña ::ship]
+             [::siberia ::ship]
+             [::israel ::ship]
+             [::brasil ::ship]
+             [::china ::ship]
+             [::peru ::ship]
+             [::islandia ::ship]
+             [::suecia ::ship]
+             [::turquia ::ship]
+
+             [::malasia ::cannon]
+             [::java ::cannon]
+             [::japon ::cannon]
+             [::canada ::cannon]
+             [::australia ::cannon]
+             [::aral ::cannon]
+             [::oregon ::cannon]
+             [::sahara ::cannon]
+             [::arabia ::cannon]
+             [::mexico ::cannon]
+             [::terranova ::cannon]
+             [::california ::cannon]
+             [::tartaria ::cannon]
+             [::sudafrica ::cannon]
+             [::labrador ::cannon]
+             [::polonia ::cannon]})
+
+
+(comment
+  (group-by first cards)
+  
+  
+  )

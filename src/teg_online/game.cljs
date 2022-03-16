@@ -3,6 +3,28 @@
             [teg-online.board :as board]
             [teg-online.utils.core :as u]))
 
+(defn new-game []
+  {:players {}
+   :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
+                         {}
+                         board/countries)
+   :cards (->> board/cards
+               (map (fn [[country type]]
+                      {:country country, :type type, :owner nil, :used? false}))
+               (u/index-by :country))
+   :turn-order []
+   :phase nil
+   :turn nil
+   :winner nil
+   :current-turn nil})
+
+(defn new-player [id name]
+  {:id id
+   :goal nil
+   :name name
+   :playing? true
+   :exchanges 0})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Queries
 
@@ -54,6 +76,9 @@
                  (/ (count (player-countries game player-id))
                     2))))))))
 
+(defn get-extra-army [game]
+  (get-in game [:current-turn :extra-army]))
+
 (defn country-exists? [game country-id]
   (contains? (game :countries) country-id))
 
@@ -95,6 +120,49 @@
                              (- goal-idx
                                 (count occupation-goals)))))))
 
+(defn draw-card? [game]
+  (get-in game [:current-turn :draw-card?]))
+
+(defn get-player-cards [game player-id]
+  (->> (vals (game :cards))
+       (filter #(= player-id (:owner %)))
+       (map :country)))
+
+(defn get-free-cards [game]
+  (->> (vals (game :cards))
+       (filter #(nil? (:owner %)))
+       (map :country)))
+
+(defn- group-cards-by-type [game cards]
+  (let [grouped-cards (->> cards
+                           (map (game :cards))
+                           (group-by :type))]
+    (reduce (fn [grouped-cards card]
+              (-> grouped-cards
+                  (update ::board/balloon conj card)
+                  (update ::board/cannon conj card)
+                  (update ::board/ship conj card)))
+            (dissoc grouped-cards ::board/all)
+            (grouped-cards ::board/all))))
+
+(defn valid-exchange? [game cards]
+  (let [cards (->> (set cards)
+                   (group-cards-by-type game))]
+    (or (>= (count (keys cards)) 3)
+        (some (fn [[_ c]] (>= (count c) 3)) cards))))
+
+(defn can-exchange?
+  ([game] (can-exchange? game (get-current-player game)))
+  ([game player-id]
+   (valid-exchange? game (get-player-cards game player-id))))
+
+(defn get-exchange-bonus
+  ([game] (get-exchange-bonus game (get-current-player game)))
+  ([game player-id]
+   (let [exchanges (get-in game [:players player-id :exchanges] 0)
+         bonus (concat [4 7 10]
+                       (iterate (partial + 5) 15))]
+     (nth bonus exchanges))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
@@ -269,8 +337,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; End turn
 
+(defn reset-current-turn [game]
+  (assoc game :current-turn
+         {:draw-card? false
+          :extra-army (calculate-extra-army game)}))
+
 (defn next-turn [game]
-  (update game :turn inc))
+  (-> game 
+      (update :turn inc)
+      (reset-current-turn)))
 
 (defn get-next-phase-add-army [game next-player & [begin-continent]]
   (let [continents (player-continents game next-player)]
@@ -363,23 +438,6 @@
           (assoc new-game :winner player-id)
           new-game)))))
 
-
-(defn new-game []
-  {:players {}
-   :countries (reduce-kv #(assoc %1 %2 {:id %2, :owner nil, :army 0})
-                         {}
-                         board/countries)
-   :turn-order []
-   :phase nil
-   :turn nil
-   :winner nil})
-
-(defn new-player [id name]
-  {:id id
-   :goal nil
-   :name name
-   :playing? true})
-
 (defn join-game [game id name]
   (if (contains? (game :players) id)
     (throw (ex-info (u/format "Player with id %1 already joined" id)
@@ -389,9 +447,10 @@
         (update :players assoc id (new-player id name)))))
 
 (defn start-game [game]
-  (assoc game
-         :turn 0
-         :phase ::add-army-1))
+  (-> game
+      (assoc :turn 0
+             :phase ::add-army-1)
+      (reset-current-turn)))
 
 (defn distribute-countries
   ([game] (distribute-countries game (shuffle (keys board/countries))))
@@ -465,10 +524,16 @@
       (let [current-player (get-current-player game)]
         (assert-country-owner game attacker-id current-player)
         (assert-country-owner-any game defender-id (dissoc (game :players) current-player))
+        ; TODO(Richo): If the player has a card for this country, we should add two units to its army
+        ; (at the end of the turn!!). Maybe I can add the invaded countries to a list in the current
+        ; turn data so that I know which countries were invaded in this turn (to avoid using a card 
+        ; twice). Or maybe its easier to mark the cards with a used? flag and then at the end of turn 
+        ; check the unused cards and owned countries
         (-> game
             (update-in [:countries attacker-id :army] - moving-army)
             (update-in [:countries defender-id :army] + moving-army)
-            (assoc-in [:countries defender-id :owner] current-player))))))
+            (assoc-in [:countries defender-id :owner] current-player)
+            (assoc-in [:current-turn :draw-card?] true))))))
 
 (def regroup 
   (with-winner-check
@@ -505,3 +570,56 @@
           (if (= player-id (get-current-player game'))
             (finish-action game')
             game'))))))
+
+(def draw-card
+  (with-winner-check
+    (fn [game country-id]
+      (if (draw-card? game)
+        (if-not (get-in game [:cards country-id :owner])
+          ; TODO(Richo): If the player already owns this country we should add 2 units to its army
+          (-> game
+              (assoc-in [:cards country-id :owner] (get-current-player game))
+              (assoc-in [:cards country-id :used?] false)
+              (assoc-in [:current-turn :draw-card?] false))
+          (throw (ex-info (u/format "Current player is not allowed to draw card %1 because it belongs to other player!"
+                                    country-id)
+                          {:game game, :country country-id})))
+        (throw (ex-info "Current player is not allowed to draw card!"
+                        {:game game}))))))
+
+(def check-unused-cards
+  (with-winner-check
+    (fn [game]
+      (let [player (get-current-player game)
+            countries (set (player-countries game player))
+            cards (->> (get-player-cards game player)
+                       (map (game :cards))
+                       (remove :used?)
+                       (map :country)
+                       (filter countries))]
+        (reduce (fn [game card]
+                  (-> game
+                      (update-in [:countries card :army] + 2)
+                      (assoc-in [:cards card :used?] true)))
+                game cards)))))
+
+(def exchange-cards
+  (with-winner-check
+    (fn [game [card-1 card-2 card-3]]
+      (let [player-id (get-current-player game)]
+        (when-not (set/subset? #{card-1 card-2 card-3}
+                               (set (get-player-cards game player-id)))
+          (throw (ex-info "Current player doesn't own the cards being exchanged"
+                          {:game game, :cards [card-1 card-2 card-3]})))
+        (when-not (valid-exchange? game [card-1 card-2 card-3])
+          (throw (ex-info "Cards are not eligible for exchange"
+                          {:game game, :cards [card-1 card-2 card-3]})))
+        (-> game
+            (assoc-in [:cards card-1 :owner] nil)
+            (assoc-in [:cards card-1 :used?] false)
+            (assoc-in [:cards card-2 :owner] nil)
+            (assoc-in [:cards card-2 :used?] false)
+            (assoc-in [:cards card-3 :owner] nil)
+            (assoc-in [:cards card-3 :used?] false)
+            (update-in [:current-turn :extra-army] + (get-exchange-bonus game player-id))
+            (update-in [:players player-id :exchanges] inc))))))
