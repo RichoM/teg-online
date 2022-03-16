@@ -392,7 +392,7 @@
             (let [random-card (rand-nth (teg/get-free-cards @game-atom))]
               (swap! game-atom teg/draw-card random-card)
               (show-draw-card-dialog @game-atom random-card)))
-          (swap! game-atom teg/finish-action)))))
+          (swap! game-atom (comp teg/finish-action teg/check-unused-cards))))))
 
 (defmulti can-interact-with-country?
   (fn [{:keys [phase] :as game} _country _player]
