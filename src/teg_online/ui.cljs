@@ -226,7 +226,7 @@
                                      [:div.col]
                                      [:div.col-auto
                                       (if (empty? countries)
-                                        [:h3 "Todavía no conseguiste ninguna tarjeta de país"]
+                                        [:h3 "No tenés ninguna tarjeta de país"]
                                         (map (fn [country-id]
                                              (let [country-name (:name (b/countries country-id))
                                                    card-image (-> game :cards country-id :type card-images)]
@@ -238,7 +238,61 @@
                              :footer bs/accept-modal-btn)
               (bs/show-modal)))))
 
+(defn show-exchange-dialog [game-atom forced?]
+  (go (let [result (atom nil)
+            selection (atom nil)
+            game @game-atom
+            user-id (get (get-user) :id)
+            countries (teg/get-player-cards game user-id)
+            accept-button (bs/on-click (crate/html bs/accept-modal-btn)
+                                       #(reset! result @selection))
+            cancel-button (crate/html bs/cancel-modal-btn)
+            close-button (crate/html bs/close-modal-btn)
+            modal (bs/make-modal :header (list [:h2 "Seleccionar 3 tarjetas"] close-button)
+                                 :body [:div.container.text-center
+                                        [:div.row
+                                         [:div.col]
+                                         [:div.col-auto
+                                          (if (empty? countries)
+                                            [:h3 "Todavía no conseguiste ninguna tarjeta de país"]
+                                            (map (fn [country-id]
+                                                   (let [country-name (:name (b/countries country-id))
+                                                         card-image (-> game :cards country-id :type card-images)
+                                                         country-row (crate/html [:div.row.my-2.border.border-dark.bg-gradient.align-items-center
+                                                                                  [:div.col-6 [:h1 country-name]]
+                                                                                  [:div.col-6 [:img.img-fluid {:src card-image}]]])]
+                                                     (bs/on-click country-row
+                                                                  #(if (contains? @selection country-id)
+                                                                     (do (swap! selection disj country-id)
+                                                                         (.remove (oget country-row :classList) "bg-primary"))
+                                                                     (when (< (count @selection) 3)
+                                                                       (swap! selection conj country-id)
+                                                                       (.add (oget country-row :classList) "bg-primary"))))))
+                                                 countries))]
+                                         [:div.col]]]
+                                 :footer (list accept-button
+                                               cancel-button))]
+        (add-watch selection ::selection-change
+                   (fn [_ _ _ value]
+                     (oset! accept-button :disabled
+                            (not (teg/valid-exchange? game value)))))
+        (oset! cancel-button :disabled forced?)
+        (oset! close-button :disabled forced?)
+        (reset! selection #{})
+        (<! (bs/show-modal modal
+                           (if forced?
+                             {:backdrop "static"
+                              :keyboard false}
+                             {})))
+        @result)))
+
 (comment
+  
+  (go (let [countries (<! (show-exchange-dialog (@state :game-atom) false))]
+        (bs/alert countries)))
+  (print "Richo")
+  (js/document.querySelectorAll ".country-row")
+
   (show-draw-card-dialog (get-game) ::b/argentina)
   (show-card-list-dialog (get-game) [::b/argentina ::b/uruguay ::b/australia ::b/alaska
                                      ::b/alemania ::b/arabia])
@@ -250,25 +304,25 @@
 
 (defn show-menu! [game-atom]
   (go (let [user-id (get (get-user) :id)
-            secret-goal-btn (crate/html [:button.btn.btn-primary.btn-lg
+            cards-btn (crate/html [:button.btn.btn-primary.btn-lg
+                                   {:type "button"}
+                                   "Ver tarjetas de país"])
+            secret-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
                                          {:type "button"}
                                          "Ver objetivo secreto"])
             common-goal-btn (crate/html [:button.btn.btn-secondary.btn-lg
                                          {:type "button"}
                                          "Ver objetivo común"])
-            cards-btn (crate/html [:button.btn.btn-secondary.btn-lg
-                                   {:type "button"}
-                                   "Ver tarjetas de país"])
             surrender-btn (crate/html [:button.btn.btn-danger.btn-lg
                                        {:type "button"}
                                        "Abandonar partida"])
             modal (bs/make-modal
                    :body [:div.container-fluid
+                          [:div.row cards-btn]
+                          [:div.row.m-1]
                           [:div.row secret-goal-btn]
                           [:div.row.m-1]
                           [:div.row common-goal-btn]
-                          [:div.row.m-1]
-                          [:div.row cards-btn]
                           [:div.row.m-1]
                           [:div.row surrender-btn]])
             update-menu (fn [game]
@@ -279,16 +333,16 @@
                                 (oset! surrender-btn :disabled
                                        (or (teg/game-over? game)
                                            (not (teg/still-playing? game user-id)))))))]
+        (bs/on-click cards-btn
+                     #(let [game @game-atom
+                            countries (teg/get-player-cards game user-id)]
+                        (show-card-list-dialog game countries)))
         (bs/on-click secret-goal-btn
                      #(bs/alert "Objetivo secreto"
                                 (:name (teg/get-player-goal @game-atom user-id))))
         (bs/on-click common-goal-btn
                      #(bs/alert "Objetivo común"
                                 (:name teg/common-goal)))
-        (bs/on-click cards-btn
-                     #(let [game @game-atom
-                            countries (teg/get-player-cards game user-id)]
-                        (show-card-list-dialog game countries)))
         (bs/on-click surrender-btn #(surrender! game-atom))
         (add-watch game-atom ::menu-update (fn [_ _ _ game] (update-menu game)))
         (update-menu @game-atom)
@@ -633,16 +687,20 @@
 
 (defmulti status-panel-title :phase)
 
-(defmethod status-panel-title ::teg/add-army [_]
-  (let [remaining (get-in @state [:user-data :remaining] 0)]
+(defmethod status-panel-title ::teg/add-army [game]
+  (let [remaining (if (is-my-turn? game)
+                    (get-in @state [:user-data :remaining] 0)
+                    (get-in game [:current-turn :extra-army] 0))]
     (list [:span "Incorporando ejércitos "]
           [:span.text-nowrap
            (u/format "(%1 %2)"
                      remaining
                      (if (= 1 remaining) "restante" "restantes"))])))
 
-(defmethod status-panel-title ::teg/add-army-continent [_]
-  (let [remaining (get-in @state [:user-data :remaining] 0)
+(defmethod status-panel-title ::teg/add-army-continent [game]
+  (let [remaining (if (is-my-turn? game)
+                    (get-in @state [:user-data :remaining] 0)
+                    (get-in game [:current-turn :extra-army] 0))
         continent (get-in @state [:user-data :continent])]
     (list [:span "Incorporando ejércitos en "]
           [:span.fw-bolder.text-nowrap (b/get-continent-name continent)]
@@ -660,8 +718,15 @@
 (defmethod finish-btn-label ::teg/attack [_] "Reagrupar")
 (defmethod finish-btn-label ::teg/regroup [_] "Finalizar turno")
 
+(defn exchange-cards! [game-atom & {:keys [forced?] :or {forced? false}}]
+  (go (when-let [countries (<! (show-exchange-dialog game-atom forced?))]
+        (let [game @game-atom
+              exchange-bonus (teg/get-exchange-bonus game)]
+          (swap! game-atom teg/exchange-cards (seq countries))
+          (swap! state update-in [:user-data :remaining] + exchange-bonus)))))
+
 (defn update-status-panel [{:keys [turn] :as game}]
-  (go (let [game (get-game)
+  (go (let [game-atom (@state :game-atom)
             status-bar (js/document.querySelector "#status-bar")]
         (oset! status-bar :innerHTML "")
         (if (is-my-turn? game) 
@@ -686,13 +751,17 @@
                             (finish-btn-label game)]]]))
           (.addEventListener (js/document.querySelector "#menu-button")
                              "click"
-                             #(show-menu! (@state :game-atom)))
+                             #(show-menu! game-atom))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
-                             #(finish-turn! (@state :game-atom)))
+                             #(finish-turn! game-atom))
           (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
-            ;; TODO(Richo): Show dialog with all the player cards and allow him to choose the three to exchange
-            (oset! exchange-btn :disabled true))))))
+            (.addEventListener exchange-btn
+                               "click"
+                               #(exchange-cards! game-atom))
+            (oset! exchange-btn :disabled
+                   (not (teg/can-exchange? game (get (get-user) :id)))))))))
+
 
 (defn update-ui [game]
   (go (<! (update-players game))
@@ -780,6 +849,19 @@
                                     :min-magnitude min
                                     :max-magnitude max)))))))
 
+(defn maybe-show-forced-exchange-dialog
+  [{old-turn :turn, old-phase :phase}
+   {new-turn :turn, new-phase :phase, :as new-game}]
+  (when-not (teg/game-over? new-game)
+    (when-not (= [old-phase old-turn]
+                 [new-phase new-turn])
+      (when (and (is-my-turn? new-game)
+                 (isa? new-phase ::teg/add-army)
+                 (>= (count (teg/get-player-cards new-game (get (get-user) :id)))
+                     5))
+        (exchange-cards! (@state :game-atom)
+                         :forced? true)))))
+
 (defn maybe-show-secret-goal-dialog [old-game new-game]
   (when-not (teg/game-over? new-game)
     (let [user-id (get (get-user) :id)
@@ -833,6 +915,24 @@
                               (get-in @state [:user-data :remaining])
                               (b/get-continent-name (get-in @state [:user-data :continent]))))))))
 
+(defn maybe-show-exchange-notification [old-game new-game]
+  (when-not (teg/game-over? new-game)
+    (when-not (is-my-turn? new-game)
+      (when (= (old-game :turn) (new-game :turn))
+        (let [player-id (teg/get-current-player new-game)]
+          (when (> (get-in new-game [:players player-id :exchanges])
+                   (get-in old-game [:players player-id :exchanges]))
+            (let [exchanges (get-in new-game [:players player-id :exchanges])]
+              (if (<= exchanges 10)
+                (show-toast (u/format "%1 realizó su %2 canje"
+                                      (teg/get-current-player-name new-game)
+                                      (nth ["primer" "segundo" "tercer" "cuarto" "quinto"
+                                            "sexto" "séptimo" "octavo" "noveno" "décimo"]
+                                           (dec exchanges))))
+                (show-toast (u/format "%1 realizó su canje número %2"
+                                      (teg/get-current-player-name new-game)
+                                      exchanges))))))))))
+
 (defn maybe-show-moving-army-effect [old-game new-game]
   (when-not (teg/game-over? new-game)
     (doseq [country (keys b/countries)]
@@ -844,10 +944,12 @@
 (defn on-game-change
   [_key _ref old-game new-game]
   (maybe-reset-user-data old-game new-game)
+  (maybe-show-forced-exchange-dialog old-game new-game)
   (maybe-show-secret-goal-dialog old-game new-game)
   (maybe-show-game-over-dialog old-game new-game)
   (maybe-show-turn-notification old-game new-game)
   (maybe-show-phase-notification old-game new-game)
+  (maybe-show-exchange-notification old-game new-game)
   (maybe-show-moving-army-effect old-game new-game)
   (a/put! (@state :updates) new-game))
 
