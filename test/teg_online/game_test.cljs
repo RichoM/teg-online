@@ -1594,3 +1594,91 @@
     (swap! game-atom #(-> %
                           (assoc :turn 10, :phase ::teg/attack)
                           (teg/reset-current-turn)))))
+
+(deftest check-unused-cards-1
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil])
+                 (teg/start-game)
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 teg/finish-action
+                 (teg/add-army ::b/brasil 5)
+                 teg/finish-action
+                 (teg/add-army ::b/argentina 3) teg/finish-action
+                 (teg/add-army ::b/peru 3) teg/finish-action
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 (teg/draw-card ::b/argentina)
+                 (teg/finish-action) ; finish attack
+                 (teg/check-unused-cards)
+                 (teg/finish-action) ; finish regroup
+                 )]
+    (is (= 9 (teg/get-army game ::b/argentina)))))
+
+(deftest check-unused-cards-2
+  (let [game (-> (teg/new-game)
+                 (teg/join-game ::p1 "Richo")
+                 (teg/join-game ::p2 "Diego")
+                 (teg/distribute-countries [::b/argentina ::b/peru
+                                            ::b/uruguay ::b/brasil
+                                            ::b/colombia ::b/chile])
+                 (teg/start-game)
+
+                 ; Richo
+                 (teg/add-army ::b/argentina 4)
+                 (teg/add-army ::b/uruguay 1)
+                 (teg/finish-action)
+
+                 ; Diego
+                 (teg/add-army ::b/brasil 5)
+                 (teg/finish-action)
+
+                 ; Richo
+                 (teg/add-army ::b/argentina 3)
+                 (teg/finish-action)
+
+                 ; Diego
+                 (teg/add-army ::b/peru 3)
+                 (teg/finish-action)
+
+                 ; Richo
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5 5 5]])
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/peru [5]])
+                 (teg/invade ::b/argentina ::b/peru 1)
+                 (teg/draw-card ::b/chile)
+                 (teg/finish-action) ; finish attack
+
+                 (teg/check-unused-cards)
+                 (teg/finish-action) ; finish regroup
+
+                 ; Diego
+                 (teg/finish-action)
+                 (teg/finish-action)
+
+                 ; Richo
+                 (teg/add-army ::b/argentina 3)
+                 (teg/finish-action)
+
+                 ; Diego
+                 (teg/add-army ::b/brasil 3)
+                 (teg/finish-action)
+
+                 ; Richo
+                 (teg/attack [::b/argentina [6 6 6]]
+                             [::b/chile [5]])
+                 (teg/invade ::b/argentina ::b/chile 1)
+                 (teg/draw-card ::b/brasil)
+                 (teg/finish-action) ; finish attack
+
+                 (teg/check-unused-cards)
+                 (teg/finish-action) ; finish regroup
+                 )]
+    (is (= 3 (teg/get-army game ::b/chile)))))

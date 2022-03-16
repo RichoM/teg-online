@@ -10,7 +10,7 @@
                          board/countries)
    :cards (->> board/cards
                (map (fn [[country type]]
-                      {:country country, :type type, :owner nil}))
+                      {:country country, :type type, :owner nil, :used? false}))
                (u/index-by :country))
    :turn-order []
    :phase nil
@@ -579,6 +579,7 @@
           ; TODO(Richo): If the player already owns this country we should add 2 units to its army
           (-> game
               (assoc-in [:cards country-id :owner] (get-current-player game))
+              (assoc-in [:cards country-id :used?] false)
               (assoc-in [:current-turn :draw-card?] false))
           (throw (ex-info (u/format "Current player is not allowed to draw card %1 because it belongs to other player!"
                                     country-id)
@@ -586,6 +587,21 @@
         (throw (ex-info "Current player is not allowed to draw card!"
                         {:game game}))))))
 
+(def check-unused-cards
+  (with-winner-check
+    (fn [game]
+      (let [player (get-current-player game)
+            countries (set (player-countries game player))
+            cards (->> (get-player-cards game player)
+                       (map (game :cards))
+                       (remove :used?)
+                       (map :country)
+                       (filter countries))]
+        (reduce (fn [game card]
+                  (-> game
+                      (update-in [:countries card :army] + 2)
+                      (assoc-in [:cards card :used?] true)))
+                game cards)))))
 
 (def exchange-cards
   (with-winner-check
@@ -600,7 +616,10 @@
                           {:game game, :cards [card-1 card-2 card-3]})))
         (-> game
             (assoc-in [:cards card-1 :owner] nil)
+            (assoc-in [:cards card-1 :used?] false)
             (assoc-in [:cards card-2 :owner] nil)
+            (assoc-in [:cards card-2 :used?] false)
             (assoc-in [:cards card-3 :owner] nil)
+            (assoc-in [:cards card-3 :used?] false)
             (update-in [:current-turn :extra-army] + (get-exchange-bonus game player-id))
             (update-in [:players player-id :exchanges] inc))))))
