@@ -151,14 +151,18 @@
     (or (>= (count (keys cards)) 3)
         (some (fn [[_ c]] (>= (count c) 3)) cards))))
 
-(defn can-exchange? [game player-id]
-  (valid-exchange? game (get-player-cards game player-id)))
+(defn can-exchange?
+  ([game] (can-exchange? game (get-current-player game)))
+  ([game player-id]
+   (valid-exchange? game (get-player-cards game player-id))))
 
-(defn get-exchange-bonus [game player-id]
-  (let [exchanges (get-in game [:players player-id :exchanges] 0)
-        bonus (concat [4 7 10]
-                      (iterate (partial + 5) 15))]
-    (nth bonus exchanges)))
+(defn get-exchange-bonus
+  ([game] (get-exchange-bonus game (get-current-player game)))
+  ([game player-id]
+   (let [exchanges (get-in game [:players player-id :exchanges] 0)
+         bonus (concat [4 7 10]
+                       (iterate (partial + 5) 15))]
+     (nth bonus exchanges))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game phases
