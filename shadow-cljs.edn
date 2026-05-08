@@ -4,7 +4,7 @@
                 [binaryage/oops "0.7.1"]
                 [juji/editscript "0.5.8"]]
 
- :nrepl {:port 9000
+ :nrepl {:port 9001
          :middleware []}
 
  :dev-http {8081 ["public" 
