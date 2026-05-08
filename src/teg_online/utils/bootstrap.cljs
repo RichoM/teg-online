@@ -41,7 +41,7 @@
   [:button.btn.btn-secondary.btn-lg {:type "button" :data-bs-dismiss "modal" :aria-label "Cancel"} "Cancelar"])
 
 (defn hide-modals []
-  (when-let [{:keys [modal ready]} @current-modal]
+  (when-let [{:keys [^js modal ready]} @current-modal]
     (reset! current-modal nil)
     (a/take! ready #(.hide modal) true)))
 
