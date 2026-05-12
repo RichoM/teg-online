@@ -100,13 +100,13 @@
                  :img "imgs/alemania.png"
                  :counter-offset [0 0]}
    ::b/españa {:position [1038 781]
-               :img "imgs/españa.png"
+               :img "imgs/espania.png"
                :counter-offset [-14 -25]}
    ::b/francia {:position [1158 648]
                 :img "imgs/francia.png"
                 :counter-offset [9 -22]}
    ::b/gran-bretaña {:position [1069 513]
-                     :img "imgs/gran_bretaña.png"
+                     :img "imgs/gran_bretania.png"
                      :counter-offset [33 -28]}
    ::b/islandia {:position [854 489]
                  :img "imgs/islandia.png"
