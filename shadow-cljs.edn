@@ -2,7 +2,8 @@
 
  :dependencies [[crate "0.2.5"]
                 [binaryage/oops "0.7.1"]
-                [juji/editscript "0.5.8"]]
+                [juji/editscript "0.5.8"]
+                [djblue/portal "0.64.1"]]
 
  :nrepl {:port 9001
          :middleware []}
