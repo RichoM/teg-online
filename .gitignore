@@ -24,3 +24,6 @@ pom.xml.asc
 
 /public/main/js
 /public/test
+
+.env
+out/

@@ -8,7 +8,7 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ui :as ui]
-            [clojure.edn :as edn]))
+            [teg-online.ai.client :as ai-client]))
 
 (enable-console-print!)
 
@@ -132,12 +132,23 @@
               (oset! js/location :hash "")
               (<! (initialize-network)))))))
 
+(defn initialize-ai []
+  (add-watch game-atom ::ai ai-client/handle-game-update)
+  (let [{user-id :id, user-name :name} @user-atom]
+    (swap! game-atom teg/join-game user-id user-name))
+  (swap! game-atom teg/join-game :ai-1 "AI 1")
+  (swap! game-atom teg/join-game :ai-2 "AI 2")
+  (swap! game-atom teg/join-game :ai-3 "AI 3")
+  (swap! game-atom (comp teg/start-game
+                         teg/distribute-goals
+                         teg/distribute-countries)))
+
 (defn init []
   (go
     (print "HELLO")
     (ui/initialize game-atom user-atom)
     (reset! user-atom (<! (get-this-user)))
-    (<! (initialize-network))
+    (initialize-ai)
     (print "BYE")))
 
 
@@ -156,7 +167,10 @@
   @game-id
   @user-atom
   @game-atom
-  
+
+  (tap> game-atom)
+
+  (go (println (<! (show-main-menu))))
 
   (do
     (bs/hide-modals)
@@ -175,7 +189,7 @@
 
   (teg/get-player-goal @game-atom :p3)
 
-  
+
   (doseq [[i c] (map-indexed vector (teg/player-countries @game-atom (last (@game-atom :turn-order))))]
     (swap! game-atom assoc-in [:countries c :owner] (if (odd? i)
                                                       (first (@game-atom :turn-order))
@@ -191,5 +205,20 @@
     (swap! game-atom assoc-in [:countries country :owner] :p1))
 
   (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1)
-  
+
+
+  (require '[cognitect.transit :as t])
+
+  (def writer (t/writer :json))
+
+
+  (tap> @game-atom)
+  (def game-transit (t/write writer @game-atom))
+
+  (def reader (t/reader :json))
+
+  (/ (count game-transit)
+     (count (js/JSON.stringify @game-atom)))
+  (tap> (t/read reader game-transit))
+
   )

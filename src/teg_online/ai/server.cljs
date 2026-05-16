@@ -1,0 +1,88 @@
+(ns teg-online.ai.server
+  (:require [clojure.core.async :as a :refer [go <!]]
+            [teg-online.utils.async :refer [<?]]
+            [oops.core :refer [oget oget+ oset! ocall! ocall!+]]
+            ["express" :as express]
+            ["body-parser" :as body-parser]
+            ["cors" :as cors]
+            [cognitect.transit :as t]
+            [teg-online.game :as teg]
+            [teg-online.board :as board]
+            [clojure.string :as str]
+            [teg-online.utils.openai :as ai]
+            [teg-online.ai.prompt :refer [make-prompt]]))
+
+
+(defonce server (atom nil))
+
+(defn send-json-string [res json-str]
+  (.type res "text")
+  (.send res json-str))
+
+(defn log [& msg]
+  (apply println (.toISOString (js/Date.)) "-" msg))
+
+(defonce reader (t/reader :json))
+
+(defn parse-game [req]
+  (let [game (t/read reader (oget req :body))]
+    game))
+
+(defn init-ai-controller! [^js app]
+  (-> (.route app "/ai")
+      (.post (fn [req res]
+               (go (try
+                     (let [game (parse-game req)
+                           prompt (make-prompt game)
+                           response (<? (ai/create-response!
+                                         {:model "gpt-4.1-mini"
+                                          :temperature 0
+                                          :input prompt}))]
+                       (send-json-string res (:output_text response)))
+                     (catch :default err
+                       (log "ERROR" err)
+                       (when-not (oget res :?headersSent)
+                         (doto res
+                           (ocall! :status (or (oget err :?statusCode) 500))
+                           (ocall! :send err))))))))))
+
+(defn start-server []
+  (log "Starting server...")
+  (go (let [wait-chan (a/chan)
+            port (or js/process.env.PORT 3000)
+            app (doto (express)
+                  (.use (cors))
+                  ;(.use (express/json))
+                  ;(.use (express/urlencoded #js {:extended true}))
+                  (.use (body-parser/text #js {:type "*/*"}))
+                  #_(.use (body-parser/raw #js {:type "application/octet-stream"
+                                              :limit "2mb"}))
+                  (.get "/" (fn [_ res] (.send res "Hello, world")))
+                  (init-ai-controller!))
+            server (.listen app port
+                            #(do (log "Server listening on port:" port)
+                                 (a/close! wait-chan)))]
+        (<! wait-chan)
+        server)))
+
+(defn stop! []
+  (let [wait-chan (a/chan)
+        [old _] (reset-vals! server nil)]
+    (if old
+      (.close old #(a/close! wait-chan))
+      (a/close! wait-chan))
+    wait-chan))
+
+(defn start! []
+  (go (reset! server (<! (start-server)))))
+
+(defn main []
+  (start!))
+
+(defn ^:dev/before-load-async reload-begin* [done]
+  (go (<! (stop!))
+      (done)))
+
+(defn ^:dev/after-load-async reload-end* [done]
+  (go (<! (start!))
+      (done)))

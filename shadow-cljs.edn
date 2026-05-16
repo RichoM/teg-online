@@ -3,7 +3,8 @@
  :dependencies [[crate "0.2.5"]
                 [binaryage/oops "0.7.1"]
                 [juji/editscript "0.5.8"]
-                [djblue/portal "0.64.1"]]
+                [djblue/portal "0.64.1"]
+                [com.cognitect/transit-cljs "0.8.280"]]
 
  :nrepl {:port 9001
          :middleware []}
@@ -22,6 +23,11 @@
                                     ;:pretty-print true
                                     }
                  :modules {:main {:init-fn teg-online.main/init}}}
+          
+          :ai {:target :node-script
+               :main teg-online.ai.server/main
+               :output-to "out/ai-server.js"}
+
           :test {:target :browser-test
                  :test-dir "public/test"
                  :ns-regexp "-test\\d?$"}}}

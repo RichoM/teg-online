@@ -32,8 +32,9 @@
 
 (defn is-my-turn? [game]
   (and (not (teg/game-over? game))
-       (= (get (get-user) :id)
-          (teg/get-current-player game))))
+       ; HACK(Richo): Just for testing!
+       #_(= (get (get-user) :id)
+            (teg/get-current-player game))))
 
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
