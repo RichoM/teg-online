@@ -37,7 +37,7 @@
                       (cond
                         (= 0 (teg/get-army game defender))
                         (teg/invade game attacker defender
-                                    (min move (dec (teg/get-army game attacker))))
+                                    (min 3 move (dec (teg/get-army game attacker))))
 
                         (> (teg/get-army game attacker) min-army)
                         (recur game)

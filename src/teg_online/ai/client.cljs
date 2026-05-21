@@ -36,7 +36,8 @@
             response (<? (POST "http://localhost:3000/ai" body))
             action (t/read reader response)]
         (println action)
-        (swap! game-atom #(r/apply-action action %))
+        (when (not= :pass action)
+          (swap! game-atom #(r/apply-action action %)))
         (swap! game-atom teg/finish-action))
       (catch :default err
         (println "ERROR" err)))))
@@ -50,3 +51,8 @@
                (when (not= [(:turn prev-state) (:phase prev-state)]
                            [(:turn curr-state) (:phase curr-state)])
                  (update! game-atom)))))
+
+
+(comment
+  
+  )

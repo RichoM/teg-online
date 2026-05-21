@@ -23,11 +23,19 @@
 (defonce writer (t/writer :json))
 
 (defn parse-game [req]
-  (let [game (t/read reader (oget req :body))]
-    game))
+  (try
+    (let [game (t/read reader (oget req :body))]
+      game)
+    (catch :default error
+      (log "ERROR parsing game:" error)
+      (throw error))))
 
 (defn write-response [response]
-  (t/write writer response))
+  (try
+    (t/write writer response)
+    (catch :default error
+      (log "ERROR writing response:" error)
+      (throw error))))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
@@ -35,17 +43,21 @@
                (go (try
                      (let [game (parse-game req)
                            prompt (make-prompt game)
-                           response (<? (ai/create-response!
-                                         {:model "gpt-4.1-mini"
-                                          :temperature 0
-                                          :input prompt}))]
+                           response (when prompt
+                                      (<? (ai/create-response!
+                                           {:model "gpt-4.1-mini"
+                                            :temperature 0
+                                            :input prompt})))]
                        (doto res
                          (.type "text")
-                         (.send (-> game
-                                    (parse-response (:output_text response))
-                                    (write-response)))))
+                         (.send (if response
+                                  (-> game
+                                      (parse-response (:output_text response))
+                                      (write-response))
+                                  (write-response :pass)))))
                      (catch :default err
                        (log "ERROR" err)
+                       (js/console.log "Request:" req)
                        (when-not (oget res :?headersSent)
                          (doto res
                            (ocall! :status (or (oget err :?statusCode) 500))

@@ -20,5 +20,6 @@
       (.then (fn [response]
                (a/put! c (js->clj response :keywordize-keys true)))
              (fn [error]
+               (js/console.log error)
                (a/put! c (promise-error error)))))
     c))
