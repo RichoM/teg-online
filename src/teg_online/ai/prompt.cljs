@@ -102,10 +102,12 @@
          "Si preferís no hacer nada en este turno, respondé con la palabra: paso")))
 
 
-(defn make-prompt [{:keys [players turn] :as game}]
+(defn make-prompt [{:keys [players turn phase] :as game}]
   (when-let [current-player (teg/get-current-player game)]
     (when-let [phase-prompt (game-phase-prompt game)]
       (let [goal (teg/get-player-goal game current-player)]
+        (println)
+        (println turn phase)
         (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
              "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
              "Tu objetivo secreto es: " (:name goal) ".\n"

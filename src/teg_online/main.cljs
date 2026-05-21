@@ -133,7 +133,7 @@
               (<! (initialize-network)))))))
 
 (defn initialize-ai []
-  (add-watch game-atom ::ai ai-client/handle-game-update)
+  (ai-client/initialize game-atom)
   (let [{user-id :id, user-name :name} @user-atom]
     (swap! game-atom teg/join-game user-id user-name))
   (swap! game-atom teg/join-game :ai-1 "AI 1")
@@ -169,6 +169,8 @@
   @game-atom
 
   (tap> game-atom)
+
+  (teg/get-dice-count @game-atom ::b/alemania ::b/alaska)
 
   (go (println (<! (show-main-menu))))
 

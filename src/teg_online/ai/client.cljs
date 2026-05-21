@@ -2,8 +2,11 @@
   (:require [clojure.core.async :as a :refer [go <!]]
             [teg-online.utils.async :refer [<? go-try]]
             [cognitect.transit :as t]
-            [teg-online.game :as teg]))
+            [teg-online.game :as teg]
+            [teg-online.ai.response :as r]))
 
+
+(defonce reader (t/reader :json))
 (defonce writer (t/writer :json))
 
 (defn error-handler [result-chan]
@@ -26,18 +29,24 @@
                  (.catch (error-handler result-chan))))))
     result-chan))
 
-(defn update! [game-state]
+(defn update! [game-atom]
   (go
     (try
-      (let [body (t/write writer game-state)
-            response (<? (POST "http://localhost:3000/ai" body))]
-        (println response))
+      (let [body (t/write writer @game-atom)
+            response (<? (POST "http://localhost:3000/ai" body))
+            action (t/read reader response)]
+        (println action)
+        (swap! game-atom #(r/apply-action action %))
+        (swap! game-atom teg/finish-action))
       (catch :default err
         (println "ERROR" err)))))
 
-(defn handle-game-update [_ _ prev-state curr-state]
-  (println "PREV:" (:turn prev-state) (:phase prev-state))
-  (println "CURR:" (:turn curr-state) (:phase curr-state))
-  (when (not= [(:turn prev-state) (:phase prev-state)]
-              [(:turn curr-state) (:phase curr-state)])
-    (update! curr-state)))
+
+(defn initialize [game-atom]
+  (add-watch game-atom ::ai
+             (fn [_ _ prev-state curr-state]
+               (println "PREV:" (:turn prev-state) (:phase prev-state))
+               (println "CURR:" (:turn curr-state) (:phase curr-state))
+               (when (not= [(:turn prev-state) (:phase prev-state)]
+                           [(:turn curr-state) (:phase curr-state)])
+                 (update! game-atom)))))

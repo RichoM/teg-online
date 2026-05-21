@@ -10,23 +10,24 @@
             [teg-online.board :as board]
             [clojure.string :as str]
             [teg-online.utils.openai :as ai]
-            [teg-online.ai.prompt :refer [make-prompt]]))
+            [teg-online.ai.prompt :refer [make-prompt]]
+            [teg-online.ai.response :refer [parse-response]]))
 
 
 (defonce server (atom nil))
-
-(defn send-json-string [res json-str]
-  (.type res "text")
-  (.send res json-str))
 
 (defn log [& msg]
   (apply println (.toISOString (js/Date.)) "-" msg))
 
 (defonce reader (t/reader :json))
+(defonce writer (t/writer :json))
 
 (defn parse-game [req]
   (let [game (t/read reader (oget req :body))]
     game))
+
+(defn write-response [response]
+  (t/write writer response))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
@@ -38,7 +39,11 @@
                                          {:model "gpt-4.1-mini"
                                           :temperature 0
                                           :input prompt}))]
-                       (send-json-string res (:output_text response)))
+                       (doto res
+                         (.type "text")
+                         (.send (-> game
+                                    (parse-response (:output_text response))
+                                    (write-response)))))
                      (catch :default err
                        (log "ERROR" err)
                        (when-not (oget res :?headersSent)

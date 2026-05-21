@@ -1,4 +1,6 @@
-(ns teg-online.board)
+(ns teg-online.board 
+  (:require
+    [clojure.string :as str]))
 
 (def continents {::asia {:name "Asia" :bonus 7}
                  ::europa {:name "Europa" :bonus 5}
@@ -174,6 +176,15 @@
                 ::australia {:name "Australia"
                              :continent ::oceania
                              :neighbours #{::sumatra ::borneo ::java ::chile}}})
+
+
+(def find-country-by-name 
+  (let [countries-by-name (->> countries
+                               (map (fn [[id {:keys [name]}]]
+                                      [(str/lower-case name) id]))
+                               (into {}))]
+    (fn [name]
+      (countries-by-name (str/trim (str/lower-case name))))))
 
 (def get-countries-by-continent
  (memoize
