@@ -27,6 +27,8 @@
   (when-not (> units 0)
     (throw (ex-info "Units should be more than zero"
                     {:game game, :country-id country :units units})))
+  ;; TODO(Richo): This assertion should be in teg/add-army
+  (teg/assert-country-owner game country (teg/get-current-player game))
   (teg/add-army game country units))
 
 (defn valid-attack? [game attacker defender]
