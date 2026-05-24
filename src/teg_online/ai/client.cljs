@@ -1,5 +1,6 @@
 (ns teg-online.ai.client
   (:require [clojure.core.async :as a :refer [go <!]]
+            [clojure.string :as str]
             [teg-online.utils.async :refer [<? go-try]]
             [cognitect.transit :as t]
             [teg-online.game :as teg]
@@ -72,11 +73,14 @@
 (defn initialize [game-atom next-step-chan]
   (add-watch game-atom ::ai
              (fn [_ _ prev-state curr-state]
-               (println "PREV:" (:turn prev-state) (:phase prev-state))
-               (println "CURR:" (:turn curr-state) (:phase curr-state))
-               (when (not= [(:turn prev-state) (:phase prev-state)]
-                           [(:turn curr-state) (:phase curr-state)])
-                 (update! game-atom next-step-chan)))))
+               (when (str/starts-with?
+                      (str (teg/get-current-player curr-state))
+                      ":ai")
+                 (println "PREV:" (:turn prev-state) (:phase prev-state))
+                 (println "CURR:" (:turn curr-state) (:phase curr-state))
+                 (when (not= [(:turn prev-state) (:phase prev-state)]
+                             [(:turn curr-state) (:phase curr-state)])
+                   (update! game-atom next-step-chan))))))
 
 
 (comment

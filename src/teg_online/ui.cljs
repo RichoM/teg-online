@@ -38,8 +38,7 @@
 (defn is-my-turn? [game]
   (and (not (teg/game-over? game))
        ; HACK(Richo): Just for testing!
-       false
-       #_(= (get (get-user) :id)
+       (= (get (get-user) :id)
             (teg/get-current-player game))))
 
 (defn show-toast [msg]
