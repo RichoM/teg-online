@@ -1,17 +1,30 @@
 (ns teg-online.ai.response
+  (:refer-clojure :exclude [rand-int])
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
+            [teg-online.utils.core :as u]
             [clojure.string :as str]))
+
+(def !rng (atom nil))
+
+(defn rand-int [n]
+  (if-let [rng @!rng]
+    (Math/floor (* (rng) n))
+    (cljs.core/rand-int n)))
+
+(defn rand-seed! [seed]
+  (reset! !rng (js/Math.seedrandom. seed)))
 
 (defmulti apply-action :action)
 
-(defmethod apply-action ::add-army [{:keys [additions]} game]
-  (reduce (fn [game [country-id extra-army]]
-            (if (> extra-army 0)
-              (teg/add-army game country-id extra-army)
-              game))
-          game
-          additions))
+(defmethod apply-action ::pass [_ game]
+  (teg/finish-action game))
+
+(defmethod apply-action ::add-army [{:keys [country units]} game]
+  (when-not (> units 0)
+    (throw (ex-info "Units should be more than zero"
+                    {:game game, :country-id country :units units})))
+  (teg/add-army game country units))
 
 (defn valid-attack? [game attacker defender]
   (and (not= (teg/country-owner game attacker)
@@ -20,52 +33,56 @@
        (= (teg/country-owner game attacker)
           (teg/get-current-player game))))
 
-(defmethod apply-action ::attack [{:keys [attacks]} game]
-  (reduce (fn [game [attacker defender sacrifice move]]
-            (let [min-army (max 1 (- (teg/get-army game attacker) sacrifice))]
-              (loop [game game]
-                (if-not (valid-attack? game attacker defender)
-                  game
-                  (let [[a-count d-count] (teg/get-dice-count game attacker defender)]
-                    (println "Attacking" attacker "->" defender ":" [a-count d-count])
-                    (let [a-throw (sort > (repeatedly a-count (partial rand-int 6)))
-                          d-throw (sort > (repeatedly d-count (partial rand-int 6)))
-                          game (-> game
-                                   (teg/attack
-                                    [attacker a-throw]
-                                    [defender d-throw]))]
-                      (cond
-                        (= 0 (teg/get-army game defender))
-                        (teg/invade game attacker defender
-                                    (min 3 move (dec (teg/get-army game attacker))))
-
-                        (> (teg/get-army game attacker) min-army)
-                        (recur game)
-
-                        :else game)))))))
-          game
-          attacks))
+(defmethod apply-action ::attack [{:keys [attacker defender sacrifice move]} game]
+  (let [min-army (max 1 (- (teg/get-army game attacker) sacrifice))]
+    (loop [game game]
+      (let [[a-count d-count] (teg/get-dice-count game attacker defender)
+            a-throw (sort > (repeatedly a-count (partial rand-int 6)))
+            d-throw (sort > (repeatedly d-count (partial rand-int 6)))
+            game (-> game
+                     (teg/attack
+                      [attacker a-throw]
+                      [defender d-throw]))]
+        (cond
+          (= 0 (teg/get-army game defender))
+          (teg/invade game attacker defender
+                      (min 3 move (dec (teg/get-army game attacker))))
+      
+          (> (teg/get-army game attacker) min-army)
+          (if (valid-attack? game attacker defender)
+            (recur game)
+            game)
+      
+          :else game)))))
 
 (defn valid-regroup? [game src dest]
   (and (= (teg/country-owner game src)
           (teg/country-owner game dest))
        (> (teg/get-army game src) 1)))
 
-(defmethod apply-action ::regroup [{:keys [moves]} game]
-  (reduce (fn [game [src dest move]]
-            (if-not (valid-regroup? game src dest)
-              game
-              (teg/regroup game src dest
-                           (min move (dec (teg/get-army game src))))))
-          game
-          moves))
+(defmethod apply-action ::regroup [{:keys [origin destination move]} game]
+  (when-not (valid-regroup? game origin destination)
+    (throw (ex-info "Invalid regroup"
+                    {:game game :origin origin :destination destination})))
+  (teg/regroup game origin destination
+               (min move (dec (teg/get-army game origin)))))
+
+(defn valid? [game action]
+  (try
+    (apply-action action game)
+    true
+    (catch :default error
+      (println "Invalid action:" (ex-message error))
+      false)))
 
 (defmulti parse-response :phase)
 
 (defmethod parse-response ::teg/add-army [game response]
   (try
     (println response)
-    (let [additions (->> response
+    (let [actions (if (= "paso" (str/trim (str/lower-case response)))
+                    [{:action ::pass}]
+                    (->> response
                          (str/split-lines)
                          (map (fn [line] (str/split line #",")))
                          (keep (fn [[country-name units]]
@@ -73,39 +90,43 @@
                                        units (parse-long (str/trim units))]
                                    (when (and country-id
                                               (pos-int? units))
-                                     [country-id units]))))
-                         (vec))
-          action {:action ::add-army
-                  :additions additions}]
-      (println action)
-      (apply-action action game)
-      action)
+                                     {:action ::add-army
+                                      :country country-id
+                                      :units units}))))
+                         (filterv (partial valid? game))))]
+      (doseq [action actions]
+        (println action))
+      actions)
     (catch :default error
-      (println "ERROR!" error)
+      (println "ERROR parsing-response!" error)
       nil)))
 
 (defmethod parse-response ::teg/attack [game response]
   (try
     (println response)
-    (let [attacks (->> response
-                       (str/split-lines)
-                       (map (fn [line] (str/split line #",")))
-                       (keep (fn [[attacker-name defender-name sacrifice move]]
-                               (let [attacker (board/find-country-by-name attacker-name)
-                                     defender (board/find-country-by-name defender-name)
-                                     sacrifice (parse-long (str/trim sacrifice))
-                                     move (parse-long (str/trim move))]
-                                 (when (and attacker
-                                            defender
-                                            (pos-int? sacrifice)
-                                            (pos-int? move))
-                                   [attacker defender sacrifice move]))))
-                       (vec))
-          action {:action ::attack
-                  :attacks attacks}]
-      (println action)
-      (apply-action action game)
-      action)
+    (let [actions (if (= "paso" (str/trim (str/lower-case response)))
+                    [{:action ::pass}]
+                    (->> response
+                         (str/split-lines)
+                         (map (fn [line] (str/split line #",")))
+                         (keep (fn [[attacker-name defender-name sacrifice move]]
+                                 (let [attacker (board/find-country-by-name attacker-name)
+                                       defender (board/find-country-by-name defender-name)
+                                       sacrifice (parse-long (str/trim sacrifice))
+                                       move (parse-long (str/trim move))]
+                                   (when (and attacker
+                                              defender
+                                              (pos-int? sacrifice)
+                                              (pos-int? move))
+                                     {:action ::attack
+                                      :attacker attacker
+                                      :defender defender
+                                      :sacrifice sacrifice
+                                      :move move}))))
+                         (filterv (partial valid? game))))]
+      (doseq [action actions]
+        (println action))
+      actions)
     (catch :default error
       (println "ERROR!" error)
       nil)))
@@ -113,20 +134,24 @@
 (defmethod parse-response ::teg/regroup [game response]
   (try
     (println response)
-    (let [regroups (->> response
-                        (str/split-lines)
-                        (map (fn [line] (str/split line #",")))
-                        (keep (fn [[src-name dest-name move]]
-                                (let [src (board/find-country-by-name src-name)
-                                      dest (board/find-country-by-name dest-name)
-                                      move (parse-long (str/trim move))]
-                                  (when (and src dest (pos-int? move))
-                                    [src dest move])))))
-          action {:action ::regroup
-                  :moves regroups}]
-      (println action)
-      (apply-action action game)
-      action)
+    (let [actions (if (= "paso" (str/trim response))
+                    [{:action ::pass}]
+                    (->> response
+                         (str/split-lines)
+                         (map (fn [line] (str/split line #",")))
+                         (keep (fn [[src-name dest-name move]]
+                                 (let [src (board/find-country-by-name src-name)
+                                       dest (board/find-country-by-name dest-name)
+                                       move (parse-long (str/trim move))]
+                                   (when (and src dest (pos-int? move))
+                                     {:action ::regroup
+                                      :origin src
+                                      :destination dest
+                                      :move move}))))
+                         (filterv (partial valid? game))))]
+      (doseq [action actions]
+        (println action))
+      actions)
     (catch :default error
       (println "ERROR!" error)
       nil)))

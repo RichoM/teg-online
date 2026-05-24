@@ -77,16 +77,15 @@
 
 (defmethod game-phase-prompt ::teg/attack [game]
   (when-let [options (seq (get-valid-attacks game))]
-    (str "Es tu turno de atacar. Decime qué países querés atacar, cuántos ejércitos estás dispuesto a perder en cada ataque, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
+    (str "Es tu turno de atacar. Decime qué país querés atacar, cuántos ejércitos estás dispuesto a perder, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
          "Tus opciones son:\n"
          (format-options options)
          "\n\n"
-         "Respondé sólo con la lista de países, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea por país).\n"
+         "Respondé sólo con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
          "Por ejemplo:\n"
          "Rusia,Polonia,3,2\n"
-         "India,China,1,1\n"
          "\n"
-         "Si preferís no hacer nada en este turno, respondé con la palabra: paso")))
+         "Si preferís no atacar en este turno, respondé con la palabra: paso")))
 
 (defmethod game-phase-prompt ::teg/regroup [game]
   (when-let [options (seq (get-valid-regroups game))]
@@ -99,7 +98,7 @@
          "Rusia,Polonia,3\n"
          "India,China,1\n"
          "\n"
-         "Si preferís no hacer nada en este turno, respondé con la palabra: paso")))
+         "Si preferís no reagrupar en este turno, respondé con la palabra: paso")))
 
 
 (defn make-prompt [{:keys [players turn phase] :as game}]

@@ -23,7 +23,7 @@ pom.xml.asc
 .hg/
 
 /public/main/js
-/public/test
+/public/test/js
 
 .env
 out/
