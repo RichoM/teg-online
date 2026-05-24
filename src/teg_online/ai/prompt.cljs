@@ -4,6 +4,16 @@
             [teg-online.ai.response :as r]
             [clojure.string :as str]))
 
+;; Ideas:
+;; 1. Explain geography to the LLM. Right now it doesn't really understand how the countries are 
+;;    connected. I could add a short explanation of the board's geography to the system prompt.
+;; 2. Remember the LLM of the advantages of conquering a continent. I can see it sometimes adding
+;;    armies to unrelated countries instead of consolidating the strength into one continent.
+;; 3. Add probability of success to each attack option. That way it might realize some options 
+;;    are not good ideas. It might opt for passing without attacking.
+;; 4. Add a "strategy" LLM. Ask for a long-term strategy first, then ask to summarize the strategy
+;;    into a single action. I could maybe ask two different models for this.
+
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
         player-countries (set (teg/player-countries game player-id))]
@@ -27,6 +37,28 @@
                         (remove player-countries)
                         (map (fn [neighbour]
                                [country-id neighbour]))))))))
+
+(def board-geography
+  (str "El tablero de TEG está dividido en 6 continentes.\n"
+       "Cada continente tiene una cantidad variable de países y cada país limita con países vecinos.\n"
+       "Conquistar todos los países de un mismo continente te permite acceder a una bonificación de ejércitos extra en cada turno.\n"
+       "A continuación, te dejo la lista de continentes con sus respectivas bonificaciones y países:\n\n"
+       (->> (vals board/countries)
+            (group-by :continent)
+            (sort-by (comp count second) >)
+            (map-indexed (fn [idx [continent-id countries]]
+                   (let [continent (board/continents continent-id)]
+                     (str (inc idx) ". "
+                          (:name continent) " (bonificación: " (:bonus continent) " ejércitos extra)\n"
+                          (->> countries
+                               (map (fn [{:keys [name neighbours]}]
+                                      (str "   - " name " (vecinos: "
+                                           (->> neighbours
+                                                (map (comp :name board/countries))
+                                                (str/join ", "))
+                                           ")")))
+                               (str/join "\n"))))))
+            (str/join "\n\n"))))
 
 (defn get-board-state [{:keys [countries turn-order]}]
   (let [countries-by-player (->> countries
@@ -56,6 +88,12 @@
       (str "Es tu turno de incorporar ejércitos. Tenés "
            remaining " ejércitos para incorporar.\n"
            "Decime en qué países querés incorporarlos y cuántos ejércitos en cada país.\n"
+           "Tus opciones son:\n"
+           (str/join "\n"
+                     (map (fn [country-id]
+                            (str "- " (-> board/countries country-id :name)))
+                          (teg/player-countries game (teg/get-current-player game))))
+           "\n\n"
            "Respondé sólo con la lista de países y la cantidad de ejércitos separadas por coma (una línea por país)"))))
 
 (defmethod game-phase-prompt ::teg/add-army-continent [game turn-actions]
@@ -94,8 +132,10 @@
          "\n\n"
          "Si preferís NO atacar en este turno, respondé sólo con la palabra: paso.\n"
          "Caso contrario, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
-         "Por ejemplo:\n"
+         "Ejemplos:\n"
          "Rusia,Polonia,3,2\n"
+         "Argentina,Uruguay,1,1\n"
+         "paso\n"
          "\n"
          "IMPORTANTE: No olvides que podés elegir NO atacar, en cuyo caso, respondé con la palabra: paso")))
 
@@ -143,21 +183,30 @@
         (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
              "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
              "Tu objetivo secreto es: " (:name goal) ".\n"
-             "El estado del tablero es el siguiente.\n"
+             board-geography
+             "\n\n"
+             "El estado del tablero en este momento de la partida es el siguiente.\n"
              (get-board-state game) "\n\n"
              turn-actions-prompt
              phase-prompt)))))
 
 (comment
   (require '[teg-online.main :refer [game-atom user-atom]])
+
+  (-> board/countries ::board/alaska :name)
   
+
+  (tap> *1)
+  (board/continents)
+  board/continents
+  (tap> board/countries)
   (tap> @game-atom)
   (def game @game-atom)
 
   (teg/get-army game ::board/alemania)
 
   (teg/get-current-player game)
-  
-  (println (make-prompt game))
-  
+
+  (println (make-prompt @game-atom []))
+
   )
