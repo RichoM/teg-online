@@ -29,19 +29,42 @@
                  (.catch (error-handler result-chan))))))
     result-chan))
 
+(defn fetch-response 
+  ([data] (fetch-response data 0))
+  ([data retry]
+   (go-try
+    (try
+      (<? (POST "http://localhost:3000/ai" data))
+      (catch :default error
+        (println (str "ERROR fetching response. Retry: " retry) error)
+        (if (< retry 3)
+          (<? (fetch-response data (inc retry)))
+          (throw (ex-info "Too many retries!" {:data data :retry retry}))))))))
+
+(defn try-apply-action [game action]
+  (try
+    (r/apply-action action game)
+    (catch :default err
+      (println "ERROR trying to apply action:" err)
+      game)))
+
 (defn update! [game-atom]
   (go
-    (try
-      (let [body (t/write writer @game-atom)
-            response (<? (POST "http://localhost:3000/ai" body))
-            action (t/read reader response)]
-        (println action)
-        (when (not= :pass action)
-          (swap! game-atom #(r/apply-action action %)))
-        (swap! game-atom teg/finish-action))
-      (catch :default err
-        (println "ERROR" err)))))
-
+    (loop [turn-actions []]
+      (try
+        (let [body (t/write writer {:game @game-atom
+                                    :turn-actions turn-actions})
+              response (<? (fetch-response body))
+              actions (if response
+                        (t/read reader response)
+                        [r/pass])]
+          (doseq [action actions]
+            (println action)
+            (swap! game-atom #(try-apply-action % action)))
+          (when-not (= r/pass (last actions))
+            (recur (apply conj turn-actions actions))))
+        (catch :default err
+          (println "ERROR" err))))))
 
 (defn initialize [game-atom]
   (add-watch game-atom ::ai

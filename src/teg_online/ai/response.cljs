@@ -5,6 +5,8 @@
             [teg-online.utils.core :as u]
             [clojure.string :as str]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hack to make deterministic random
 (def !rng (atom nil))
 
 (defn rand-int [n]
@@ -14,6 +16,7 @@
 
 (defn rand-seed! [seed]
   (reset! !rng (js/Math.seedrandom. seed)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmulti apply-action :action)
 
@@ -67,6 +70,11 @@
   (teg/regroup game origin destination
                (min move (dec (teg/get-army game origin)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def pass {:action ::pass})
+
 (defn valid? [game action]
   (try
     (apply-action action game)
@@ -75,13 +83,25 @@
       (println "Invalid action:" (ex-message error))
       false)))
 
-(defmulti parse-response :phase)
+(defn ensure-valid [game actions]
+  (let [valid-actions (->> actions
+                           (filterv (partial valid? game))
+                           (take-while #(not= pass %))
+                           (vec))]
+    (if (seq valid-actions)
+      valid-actions
+      [pass])))
 
-(defmethod parse-response ::teg/add-army [game response]
+
+(defmulti parse-response
+  (fn [game _turn-actions _response]
+    (:phase game)))
+
+(defmethod parse-response ::teg/add-army [game turn-actions response]
   (try
     (println response)
     (let [actions (if (= "paso" (str/trim (str/lower-case response)))
-                    [{:action ::pass}]
+                    [pass]
                     (->> response
                          (str/split-lines)
                          (map (fn [line] (str/split line #",")))
@@ -93,19 +113,22 @@
                                      {:action ::add-army
                                       :country country-id
                                       :units units}))))
-                         (filterv (partial valid? game))))]
+                         (ensure-valid game)))]
       (doseq [action actions]
         (println action))
-      actions)
+      (if (= (teg/get-extra-army game)
+             (reduce + (map :units (concat turn-actions actions))))
+        (conj actions pass)
+        actions))
     (catch :default error
       (println "ERROR parsing-response!" error)
       nil)))
 
-(defmethod parse-response ::teg/attack [game response]
+(defmethod parse-response ::teg/attack [game turn-actions response]
   (try
     (println response)
     (let [actions (if (= "paso" (str/trim (str/lower-case response)))
-                    [{:action ::pass}]
+                    [pass]
                     (->> response
                          (str/split-lines)
                          (map (fn [line] (str/split line #",")))
@@ -123,7 +146,7 @@
                                       :defender defender
                                       :sacrifice sacrifice
                                       :move move}))))
-                         (filterv (partial valid? game))))]
+                         (ensure-valid game)))]
       (doseq [action actions]
         (println action))
       actions)
@@ -131,11 +154,15 @@
       (println "ERROR!" error)
       nil)))
 
-(defmethod parse-response ::teg/regroup [game response]
+(defmethod parse-response ::teg/regroup [game turn-actions response]
   (try
     (println response)
-    (let [actions (if (= "paso" (str/trim response))
-                    [{:action ::pass}]
+    (let [invalid-regroups (->> turn-actions
+                                (map (fn [{:keys [origin destination]}]
+                                       [destination origin]))
+                                (set))
+          actions (if (= "paso" (str/trim response))
+                    [pass]
                     (->> response
                          (str/split-lines)
                          (map (fn [line] (str/split line #",")))
@@ -143,21 +170,28 @@
                                  (let [src (board/find-country-by-name src-name)
                                        dest (board/find-country-by-name dest-name)
                                        move (parse-long (str/trim move))]
-                                   (when (and src dest (pos-int? move))
+                                   (when (and src dest (pos-int? move)
+                                              (not (invalid-regroups [src dest])))
                                      {:action ::regroup
                                       :origin src
                                       :destination dest
                                       :move move}))))
-                         (filterv (partial valid? game))))]
+                         (ensure-valid game)))]
       (doseq [action actions]
         (println action))
-      actions)
+      (if (not= pass (last actions))
+        (conj actions pass)
+        actions))
     (catch :default error
       (println "ERROR!" error)
       nil)))
 
 (comment
   
+  
+  (take-while #(not= pass %)
+              [1 2 3
+               ])
 
   (def response "Alemania,Polonia,3,2
 Japón,China,2,2
