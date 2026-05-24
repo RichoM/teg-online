@@ -132,8 +132,8 @@
               (oset! js/location :hash "")
               (<! (initialize-network)))))))
 
-(defn initialize-ai []
-  (ai-client/initialize game-atom)
+(defn initialize-ai [next-step-chan]
+  (ai-client/initialize game-atom next-step-chan)
   (let [{user-id :id, user-name :name} @user-atom]
     (swap! game-atom teg/join-game user-id user-name))
   (swap! game-atom teg/join-game :ai-1 "AI 1")
@@ -148,7 +148,7 @@
     (print "HELLO")
     (ui/initialize game-atom user-atom)
     (reset! user-atom (<! (get-this-user)))
-    (initialize-ai)
+    (initialize-ai ui/next-step-chan)
     (print "BYE")))
 
 

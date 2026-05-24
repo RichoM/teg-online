@@ -48,10 +48,13 @@
       (println "ERROR trying to apply action:" err)
       game)))
 
-(defn update! [game-atom]
+(defn update! [game-atom next-step-chan]
   (go
     (loop [turn-actions []]
       (try
+        (println "Waiting on next-step")
+        (<! next-step-chan)
+        (println "Updating now!")
         (let [body (t/write writer {:game @game-atom
                                     :turn-actions turn-actions})
               response (<? (fetch-response body))
@@ -66,14 +69,14 @@
         (catch :default err
           (println "ERROR" err))))))
 
-(defn initialize [game-atom]
+(defn initialize [game-atom next-step-chan]
   (add-watch game-atom ::ai
              (fn [_ _ prev-state curr-state]
                (println "PREV:" (:turn prev-state) (:phase prev-state))
                (println "CURR:" (:turn curr-state) (:phase curr-state))
                (when (not= [(:turn prev-state) (:phase prev-state)]
                            [(:turn curr-state) (:phase curr-state)])
-                 (update! game-atom)))))
+                 (update! game-atom next-step-chan)))))
 
 
 (comment

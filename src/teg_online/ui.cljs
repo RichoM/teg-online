@@ -9,6 +9,11 @@
             [teg-online.board :as b]
             [crate.core :as crate]))
 
+
+; HACK(Richo): This channel will allow me to slow down the AI update process, the idea is
+; to have a button connected to the AI update process by this channel
+(defonce next-step-chan (a/chan))
+
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
 (defonce state (atom {}))
@@ -750,13 +755,20 @@
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? game))}
-                            (finish-btn-label game)]]]))
+                            (finish-btn-label game)]]
+                          [:div.col-auto
+                           [:button#next-step-button.btn.btn-primary.btn-lg
+                            {:type "button"}
+                            "Next!"]]]))
           (.addEventListener (js/document.querySelector "#menu-button")
                              "click"
                              #(show-menu! game-atom))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
                              #(finish-turn! game-atom))
+          (.addEventListener (js/document.querySelector "#next-step-button")
+                             "click"
+                             #(a/put! next-step-chan true))
           (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
             (.addEventListener exchange-btn
                                "click"
