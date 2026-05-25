@@ -23,6 +23,15 @@
                   (callback result))
     result)))
 
+(defn read-file
+  ([path] (read-file path {}))
+  ([path options]
+   (let [result (a/promise-chan)]
+     (fs/readFile path
+                   (clj->js options)
+                   (fn [err data] (a/put! result (or err data))))
+     result)))
+
 (defn exists? [file]
   (let [result (a/promise-chan)]
     (fs/access file (fn [err] (a/put! result (nil? err))))

@@ -2,6 +2,7 @@
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.response :as r]
+            [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
 
 ;; Ideas:
@@ -128,7 +129,17 @@
   (when-let [options (seq (get-valid-attacks game))]
     (str "Es tu turno de atacar. En caso de que quieras atacar, tenés que decidir qué país querés atacar, cuántos ejércitos estás dispuesto a perder, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
          "Tus opciones son:\n"
-         (format-options options)
+         (str/join "\n" (->> options
+                             (map (fn [[country-a country-b]]
+                                    (str "* "
+                                         (country-name country-a)
+                                         " -> "
+                                         (country-name country-b)
+                                         " ("
+                                         (calculate-win-chance
+                                          (teg/get-army game country-a)
+                                          (teg/get-army game country-b))
+                                         "% probabilidad de éxito)")))))
          "\n\n"
          "Si preferís NO atacar en este turno, respondé sólo con la palabra: paso.\n"
          "Caso contrario, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"

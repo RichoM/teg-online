@@ -53,9 +53,9 @@
   (go
     (loop [turn-actions []]
       (try
-        (println "Waiting on next-step")
-        (<! next-step-chan)
-        (println "Updating now!")
+        #_(do (println "Waiting on next-step")
+            (<! next-step-chan)
+            (println "Updating now!"))
         (let [body (t/write writer {:game @game-atom
                                     :turn-actions turn-actions})
               response (<? (fetch-response body))

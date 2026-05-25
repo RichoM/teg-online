@@ -8,6 +8,7 @@
             [cognitect.transit :as t]
             [teg-online.game :as teg]
             [teg-online.board :as board]
+            [teg-online.ai.attack-prob :refer [initialize-chances]]
             [clojure.string :as str]
             [teg-online.utils.openai :as ai]
             [teg-online.ai.prompt :refer [make-prompt]]
@@ -61,7 +62,6 @@
                                         turn-actions
                                         (:output_text response))
                                        [response/pass])]
-                         (println "TURN ACTIONS:" turn-actions)
                          (<! (log prompt))
                          (<! (log response))
                          (<! (log actions))
@@ -78,24 +78,25 @@
 
 (defn start-server []
   (println "Starting server...")
-  (go 
+  (go
     (<! (fs/mkdir "logs"))
+    (<! (initialize-chances))
     (let [wait-chan (a/chan)
-            port (or js/process.env.PORT 3000)
-            app (doto (express)
-                  (.use (cors))
+          port (or js/process.env.PORT 3000)
+          app (doto (express)
+                (.use (cors))
                   ;(.use (express/json))
                   ;(.use (express/urlencoded #js {:extended true}))
-                  (.use (body-parser/text #js {:type "*/*"}))
-                  #_(.use (body-parser/raw #js {:type "application/octet-stream"
+                (.use (body-parser/text #js {:type "*/*"}))
+                #_(.use (body-parser/raw #js {:type "application/octet-stream"
                                               :limit "2mb"}))
-                  (.get "/" (fn [_ res] (.send res "Hello, world")))
-                  (init-ai-controller!))
-            server (.listen app port
-                            #(do (println "Server listening on port:" port)
-                                 (a/close! wait-chan)))]
-        (<! wait-chan)
-        server)))
+                (.get "/" (fn [_ res] (.send res "Hello, world")))
+                (init-ai-controller!))
+          server (.listen app port
+                          #(do (println "Server listening on port:" port)
+                               (a/close! wait-chan)))]
+      (<! wait-chan)
+      server)))
 
 (defn stop! []
   (let [wait-chan (a/chan)
