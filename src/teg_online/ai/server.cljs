@@ -12,6 +12,7 @@
             [clojure.string :as str]
             [teg-online.utils.openai :as ai]
             [teg-online.ai.prompt :refer [make-prompt]]
+            [teg-online.ai.strategy :refer [strategy-prompt action-prompt]]
             [teg-online.ai.response :as response]
             [teg-online.utils.fs :as fs]))
 
@@ -44,27 +45,61 @@
       (println "ERROR writing response:" error)
       (throw error))))
 
+(defn get-basic-actions! [game turn-actions log]
+  (go
+    (let [prompt (make-prompt game turn-actions)
+          response (when prompt
+                     (<? (ai/create-response!
+                          {:model "gpt-4.1-mini"
+                           :temperature 0
+                           :input prompt})))
+          actions (if response
+                    (response/parse-response
+                     game
+                     turn-actions
+                     (:output_text response))
+                    [response/pass])]
+      (<? (log prompt))
+      (<? (log response))
+      (<? (log actions))
+      actions)))
+
+(defn get-strategy! [game turn-actions log]
+  (go
+    (let [prompt (strategy-prompt game turn-actions)
+          strat-response (when prompt
+                           (<? (ai/create-response!
+                                {:model "gpt-4.1-mini"
+                                 :temperature 0
+                                 :input prompt})))
+          action-response (when strat-response
+                            (<? (ai/create-response!
+                                 {:model "gpt-4.1-mini"
+                                  :temperature 0
+                                  :input (action-prompt game (:output_text strat-response))})))
+          actions (if action-response
+                    (response/parse-response
+                     game
+                     turn-actions
+                     (:output_text action-response))
+                    [response/pass])]
+      (when strat-response
+        (<? (log (:output_text strat-response))))
+      (when action-response
+        (<? (log (:output_text action-response))))
+      (when actions
+        (<? (log actions)))
+      actions)))
+
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
       (.post (fn [req res]
                (let [log (partial log (.toISOString (js/Date.)))]
                  (go (try
                        (let [{:keys [game turn-actions]} (parse-request req)
-                             prompt (make-prompt game turn-actions)
-                             response (when prompt
-                                        (<? (ai/create-response!
-                                             {:model "gpt-4.1-mini"
-                                              :temperature 0
-                                              :input prompt})))
-                             actions (if response
-                                       (response/parse-response
-                                        game
-                                        turn-actions
-                                        (:output_text response))
-                                       [response/pass])]
-                         (<! (log prompt))
-                         (<! (log response))
-                         (<! (log actions))
+                             actions (if (= :ai-2 (teg/get-current-player game))
+                                       (<? (get-strategy! game turn-actions log))
+                                       (<? (get-basic-actions! game turn-actions log)))]
                          (doto res
                            (.type "text")
                            (.send (write-response actions))))

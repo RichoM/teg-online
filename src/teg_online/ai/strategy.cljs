@@ -1,19 +1,9 @@
-(ns teg-online.ai.prompt
+(ns teg-online.ai.strategy
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.response :as r]
             [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
-
-;; Ideas:
-;; 1. Explain geography to the LLM. Right now it doesn't really understand how the countries are 
-;;    connected. I could add a short explanation of the board's geography to the system prompt.
-;; 2. Remember the LLM of the advantages of conquering a continent. I can see it sometimes adding
-;;    armies to unrelated countries instead of consolidating the strength into one continent.
-;; 3. Add probability of success to each attack option. That way it might realize some options 
-;;    are not good ideas. It might opt for passing without attacking.
-;; 4. Add a "strategy" LLM. Ask for a long-term strategy first, then ask to summarize the strategy
-;;    into a single action. I could maybe ask two different models for this.
 
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
@@ -88,14 +78,11 @@
     (when (> remaining 0)
       (str "Es tu turno de incorporar ejércitos. Tenés "
            remaining " ejércitos para incorporar.\n"
-           "Decime en qué países querés incorporarlos y cuántos ejércitos en cada país.\n"
            "Tus opciones son:\n"
            (str/join "\n"
                      (map (fn [country-id]
                             (str "- " (-> board/countries country-id :name)))
-                          (teg/player-countries game (teg/get-current-player game))))
-           "\n\n"
-           "Respondé sólo con la lista de países y la cantidad de ejércitos separadas por coma (una línea por país)"))))
+                          (teg/player-countries game (teg/get-current-player game))))))))
 
 (defmethod game-phase-prompt ::teg/add-army-continent [game turn-actions]
   (let [continent (case (:phase game)
@@ -110,9 +97,7 @@
     (when (> remaining 0)
       (str "Es tu turno de incorporar ejércitos en "
            (board/get-continent-name continent) ". Tenés "
-           remaining " ejércitos para incorporar.\n"
-           "Decime en qué países querés incorporarlos y cuántos ejércitos en cada país.\n"
-           "Respondé sólo con la lista de países y la cantidad de ejércitos separadas por coma (una línea por país)"))))
+           remaining " ejércitos para incorporar.\n"))))
 
 (defn country-name [country-id]
   (-> board/countries country-id :name))
@@ -139,30 +124,14 @@
                                          (calculate-win-chance
                                           (teg/get-army game country-a)
                                           (teg/get-army game country-b))
-                                         "% probabilidad de éxito)")))))
-         "\n\n"
-         "Si preferís NO atacar en este turno, respondé sólo con la palabra: paso.\n"
-         "Caso contrario, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
-         "Ejemplos:\n"
-         "Rusia,Polonia,3,2\n"
-         "Argentina,Uruguay,1,1\n"
-         "paso\n"
-         "\n"
-         "IMPORTANTE: No olvides que podés elegir NO atacar, en cuyo caso, respondé con la palabra: paso")))
+                                         "% probabilidad de éxito)"))))))))
 
 (defmethod game-phase-prompt ::teg/regroup [game turn-actions]
   (when-let [options (seq (get-valid-regroups game))]
     (str "Es tu turno de reagrupar. En caso de que quieras reagrupar, tenés que decidir de qué países a qué países vas a mover tus tropas y cuántos ejércitos en cada país.\n"
          "Tus opciones son:\n"
          (format-options options)
-         "\n\n"
-         "Si preferís NO reagrupar en este turno, respondé sólo con la palabra: paso.\n"
-         "Caso contrario, respondé con la lista de países origen, destino, y la cantidad de ejércitos separadas por coma (una línea por cada par de países).\n"
-         "Por ejemplo:\n"
-         "Rusia,Polonia,3\n"
-         "India,China,1\n"
-         "\n"
-         "IMPORTANTE: No olvides que podés elegir NO reagrupar, en cuyo caso, respondé con la palabra: paso")))
+         )))
 
 (defn turn-actions-prompt [actions]
   (if (seq actions)
@@ -184,7 +153,8 @@
     ""))
 
 
-(defn make-prompt [{:keys [players turn phase] :as game} turn-actions]
+(defn strategy-prompt 
+  [{:keys [players turn phase] :as game} turn-actions]
   (when-let [current-player (teg/get-current-player game)]
     (when-let [phase-prompt (game-phase-prompt game turn-actions)]
       (let [turn-actions-prompt (turn-actions-prompt turn-actions)
@@ -199,7 +169,45 @@
              "El estado del tablero en este momento de la partida es el siguiente.\n"
              (get-board-state game) "\n\n"
              turn-actions-prompt
-             phase-prompt)))))
+             phase-prompt
+             "Teniendo en cuenta el estado actual del tablero y los objetivos a mediano plazo, describí *brevemente* qué harías a continuación y por qué.\n\n"
+             "Consideraciones importantes:\n"
+             "1. Si lo que vas a hacer es _incorporar o reagrupar ejércitos_, tené en cuenta los ejércitos de países enemigos y los posibles ataques que podrías recibir.\n"
+             "2. Si lo que vas a hacer es _atacar_, tené en cuenta que los ataques fallidos pueden dejar el país desprotegido para el próximo turno.\n"
+             "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.")))))
+
+(defmulti action-prompt (fn [game _strat] (:phase game)))
+
+(defmethod action-prompt ::teg/add-army [game strat]
+  (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
+       "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
+       "Estrategia:\n" strat "\n\n"
+       "Tené en cuenta que es tu turno de incorporar ejércitos. Decime en qué países deberías incorporarlos en base a la estrategia mencionada previamente.\n"
+       "Respondé sólo con la lista de países y la cantidad de ejércitos separadas por coma (una línea por país)"))
+
+(defmethod action-prompt ::teg/attack [game strat]
+  (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
+       "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
+       "Estrategia:\n" strat "\n\n"
+       "Tené en cuenta que es tu turno de atacar. En base a la estrategia mencionada previamente, decime si conviene atacar o no.\n"
+       "En caso de que convenga atacar, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
+       "Ejemplos:\n"
+       "Rusia,Polonia,3,2\n"
+       "Argentina,Uruguay,1,1\n"
+       "\n"
+       "En caso de que convenga NO atacar en este turno, respondé sólo con la palabra: paso"))
+
+(defmethod action-prompt ::teg/regroup [game strat]
+  (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
+       "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
+       "Estrategia:\n" strat "\n\n"
+       "Tené en cuenta que es tu turno de reagrupar ejércitos. En base a la estrategia mencionada previamente, decime si conviene reagrupar o no.\n"
+       "En caso de que convenga reagrupar, respondé con la lista de países origen, destino, y la cantidad de ejércitos separadas por coma (una línea por cada par de países).\n"
+       "Por ejemplo:\n"
+       "Rusia,Polonia,3\n"
+       "India,China,1\n"
+       "\n"
+       "En caso de que convenga NO reagrupar en este turno, respondé sólo con la palabra: paso"))
 
 (comment
   (require '[teg-online.main :refer [game-atom user-atom]])
@@ -218,6 +226,5 @@
 
   (teg/get-current-player game)
 
-  (println (make-prompt @game-atom []))
 
   )

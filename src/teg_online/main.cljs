@@ -134,11 +134,12 @@
 
 (defn initialize-ai [next-step-chan]
   (ai-client/initialize game-atom next-step-chan)
-  (let [{user-id :id, user-name :name} @user-atom]
+  #_(let [{user-id :id, user-name :name} @user-atom]
     (swap! game-atom teg/join-game user-id user-name))
   (swap! game-atom teg/join-game :ai-1 "AI 1")
   (swap! game-atom teg/join-game :ai-2 "AI 2")
   (swap! game-atom teg/join-game :ai-3 "AI 3")
+  (swap! game-atom teg/join-game :ai-4 "AI 4")
   (swap! game-atom (comp teg/start-game
                          teg/distribute-goals
                          teg/distribute-countries)))
