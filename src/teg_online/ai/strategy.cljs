@@ -38,17 +38,27 @@
             (group-by :continent)
             (sort-by (comp count second) >)
             (map-indexed (fn [idx [continent-id countries]]
-                   (let [continent (board/continents continent-id)]
-                     (str (inc idx) ". "
-                          (:name continent) " (bonificación: " (:bonus continent) " ejércitos extra)\n"
-                          (->> countries
-                               (map (fn [{:keys [name neighbours]}]
-                                      (str "   - " name " (vecinos: "
-                                           (->> neighbours
-                                                (map (comp :name board/countries))
-                                                (str/join ", "))
-                                           ")")))
-                               (str/join "\n"))))))
+                           (let [continent (board/continents continent-id)]
+                             (str (inc idx) ". "
+                                  (:name continent) " (bonificación: " (:bonus continent) " ejércitos extra)\n"
+                                  (->> countries
+                                       (map (fn [{:keys [name neighbours]}]
+                                              (let [neighbours (mapv board/countries neighbours)
+                                                    same-continent (group-by #(= continent-id (:continent %))
+                                                                             neighbours)]
+                                                (str "   - " name
+                                                     " (vecinos dentro del MISMO continente: "
+                                                     (->> (same-continent true)
+                                                          (map :name)
+                                                          (str/join ", "))
+                                                     (if (seq (same-continent false))
+                                                       (str "; vecinos de OTROS continentes: "
+                                                            (->> (same-continent false)
+                                                                 (map :name)
+                                                                 (str/join ", ")))
+                                                       "; ningún vecino de OTRO continente")
+                                                     ")"))))
+                                       (str/join "\n"))))))
             (str/join "\n\n"))))
 
 (defn get-board-state [{:keys [countries turn-order]}]
@@ -74,7 +84,7 @@
 
 (defmethod game-phase-prompt ::teg/add-army [game turn-actions]
   (let [remaining (- (teg/get-extra-army game)
-           (reduce + (map :units turn-actions)))]
+                     (reduce + (map :units turn-actions)))]
     (when (> remaining 0)
       (str "Es tu turno de incorporar ejércitos. Tenés "
            remaining " ejércitos para incorporar.\n"
@@ -108,7 +118,7 @@
                              (str "* "
                                   (country-name country-a)
                                   " -> "
-                                  (country-name country-b )))))))
+                                  (country-name country-b)))))))
 
 (defmethod game-phase-prompt ::teg/attack [game turn-actions]
   (when-let [options (seq (get-valid-attacks game))]
@@ -130,8 +140,7 @@
   (when-let [options (seq (get-valid-regroups game))]
     (str "Es tu turno de reagrupar. En caso de que quieras reagrupar, tenés que decidir de qué países a qué países vas a mover tus tropas y cuántos ejércitos en cada país.\n"
          "Tus opciones son:\n"
-         (format-options options)
-         )))
+         (format-options options))))
 
 (defn turn-actions-prompt [actions]
   (if (seq actions)
@@ -152,8 +161,17 @@
          "\n\n")
     ""))
 
+(defn replace-player-name [goal players]
+  (let [name->idx (->> (vals players)
+                       (map-indexed (fn [idx {:keys [name]}]
+                                      [name (inc idx)]))
+                       (into {}))]
+    (reduce (fn [goal [name idx]]
+              (str/replace goal name (str idx)))
+            (:name goal)
+            name->idx)))
 
-(defn strategy-prompt 
+(defn strategy-prompt
   [{:keys [players turn phase] :as game} turn-actions]
   (when-let [current-player (teg/get-current-player game)]
     (when-let [phase-prompt (game-phase-prompt game turn-actions)]
@@ -163,18 +181,22 @@
         (println turn phase)
         (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
              "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
-             "Tu objetivo secreto es: " (:name goal) ".\n"
+             "Tu objetivo es: Ocupar 30 países o " (replace-player-name goal players) ".\n"
+             "\n"
              board-geography
              "\n\n"
              "El estado del tablero en este momento de la partida es el siguiente.\n"
-             (get-board-state game) "\n\n"
+             (get-board-state game) 
+             "\n\n"
              turn-actions-prompt
              phase-prompt
+             "\n\n"
              "Teniendo en cuenta el estado actual del tablero y los objetivos a mediano plazo, describí *brevemente* qué harías a continuación y por qué.\n\n"
              "Consideraciones importantes:\n"
              "1. Si lo que vas a hacer es _incorporar o reagrupar ejércitos_, tené en cuenta los ejércitos de países enemigos y los posibles ataques que podrías recibir.\n"
              "2. Si lo que vas a hacer es _atacar_, tené en cuenta que los ataques fallidos pueden dejar el país desprotegido para el próximo turno.\n"
-             "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.")))))
+             "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.\n"
+             "4. Algunos países limitan con otros países de otros continentes, es importante reforzar los ejércitos de estos países cuando queremos conquistar (y defender) un continente.\n ")))))
 
 (defmulti action-prompt (fn [game _strat] (:phase game)))
 
@@ -213,7 +235,7 @@
   (require '[teg-online.main :refer [game-atom user-atom]])
 
   (-> board/countries ::board/alaska :name)
-  
+
 
   (tap> *1)
   (board/continents)
@@ -224,7 +246,4 @@
 
   (teg/get-army game ::board/alemania)
 
-  (teg/get-current-player game)
-
-
-  )
+  (teg/get-current-player game))

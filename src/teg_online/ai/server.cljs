@@ -83,10 +83,14 @@
                      turn-actions
                      (:output_text action-response))
                     [response/pass])]
+      (when prompt
+        (<? (log (str ">>> PROMPT:\n" prompt))))
       (when strat-response
-        (<? (log (:output_text strat-response))))
+        (<? (log (str ">>> STRATEGY:\n" 
+                      (:output_text strat-response)))))
       (when action-response
-        (<? (log (:output_text action-response))))
+        (<? (log (str ">>> ACTION:\n"
+                      (:output_text action-response)))))
       (when actions
         (<? (log actions)))
       actions)))

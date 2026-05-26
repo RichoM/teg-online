@@ -53,7 +53,7 @@
   (go
     (loop [turn-actions []]
       (try
-        #_(do (println "Waiting on next-step")
+        (do (println "Waiting on next-step")
             (<! next-step-chan)
             (println "Updating now!"))
         (let [body (t/write writer {:game @game-atom
@@ -84,5 +84,5 @@
 
 
 (comment
-  
+
   )

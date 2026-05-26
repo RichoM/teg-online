@@ -8,7 +8,8 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ui :as ui]
-            [teg-online.ai.client :as ai-client]))
+            [teg-online.ai.client :as ai-client]
+            [teg-online.board :as board]))
 
 (enable-console-print!)
 
@@ -170,6 +171,12 @@
   @game-atom
 
   (tap> game-atom)
+  (tap> board/countries)
+
+  
+  
+  (def game @game-atom)
+  (def players (:players game))
 
   (teg/get-dice-count @game-atom ::b/alemania ::b/alaska)
 
