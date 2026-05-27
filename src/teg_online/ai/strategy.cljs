@@ -120,6 +120,15 @@
                                   " -> "
                                   (country-name country-b)))))))
 
+(defn calculate-risk [attacker-army defender-army]
+  (let [win-chance (calculate-win-chance attacker-army defender-army)]
+    (cond
+      (>= win-chance 98) "riesgo muy bajo"
+      (>= win-chance 80) "riesgo bajo"
+      (>= win-chance 50) "riesgo moderado"
+      (>= win-chance 30) "riesgo alto"
+      :else "riesgo muy alto")))
+
 (defmethod game-phase-prompt ::teg/attack [game turn-actions]
   (when-let [options (seq (get-valid-attacks game))]
     (str "Es tu turno de atacar. En caso de que quieras atacar, tenés que decidir qué país querés atacar, cuántos ejércitos estás dispuesto a perder, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
@@ -134,7 +143,11 @@
                                          (calculate-win-chance
                                           (teg/get-army game country-a)
                                           (teg/get-army game country-b))
-                                         "% probabilidad de éxito)"))))))))
+                                         "% probabilidad de éxito, "
+                                         (calculate-risk
+                                          (teg/get-army game country-a)
+                                          (teg/get-army game country-b))
+                                         ")"))))))))
 
 (defmethod game-phase-prompt ::teg/regroup [game turn-actions]
   (when-let [options (seq (get-valid-regroups game))]
@@ -196,7 +209,8 @@
              "1. Si lo que vas a hacer es _incorporar o reagrupar ejércitos_, tené en cuenta los ejércitos de países enemigos y los posibles ataques que podrías recibir.\n"
              "2. Si lo que vas a hacer es _atacar_, tené en cuenta que los ataques fallidos pueden dejar el país desprotegido para el próximo turno.\n"
              "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.\n"
-             "4. Algunos países limitan con otros países de otros continentes, es importante reforzar los ejércitos de estos países cuando queremos conquistar (y defender) un continente.\n ")))))
+             "4. Algunos países limitan con otros países de otros continentes, es importante reforzar los ejércitos de estos países cuando queremos conquistar (y defender) un continente.\n"
+             "5. No intentes ir directamente al objetivo, a veces conviene primero ganar fuerza conquistando todos los países de un continente mientras avanzás hacia cumplir el objetivo.\n")))))
 
 (defmulti action-prompt (fn [game _strat] (:phase game)))
 
