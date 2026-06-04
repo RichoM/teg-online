@@ -49,51 +49,67 @@
   (go
     (let [prompt (make-prompt game turn-actions)
           response (when prompt
-                     (<? (ai/create-response!
-                          {:model "gpt-4.1-mini"
-                           :temperature 0
-                           :input prompt})))
+                     (:output_text
+                      (<? (ai/create-response!
+                           {:model "gpt-4.1-mini"
+                            :temperature 0
+                            :input prompt}))))
           actions (if response
-                    (response/parse-response
-                     game
-                     turn-actions
-                     (:output_text response))
+                    (response/parse-response game
+                                             turn-actions
+                                             response)
                     [response/pass])]
-      (<? (log prompt))
-      (<? (log response))
+      (<? (log (str "Basic action\n"
+                    (:turn game) ". " (:phase game)
+                    " / "
+                    (teg/get-current-player-name game))))
+      (<? (log (str ">>> PROMPT:\n" prompt)))
+      (<? (log (str ">>> RESPONSE:\n" response)))
       (<? (log actions))
-      actions)))
+      {:actions actions
+       :conversation ["BASIC" prompt response]})))
 
 (defn get-strategy! [game turn-actions log]
   (go
-    (let [prompt (strategy-prompt game turn-actions)
-          strat-response (when prompt
-                           (<? (ai/create-response!
-                                {:model "gpt-4.1-mini"
-                                 :temperature 0
-                                 :input prompt})))
-          action-response (when strat-response
+    (let [initial-prompt (strategy-prompt game turn-actions)
+          strat-response (when initial-prompt
+                           (:output_text
                             (<? (ai/create-response!
                                  {:model "gpt-4.1-mini"
                                   :temperature 0
-                                  :input (action-prompt game (:output_text strat-response))})))
+                                  :input initial-prompt}))))
+          second-prompt (action-prompt game strat-response)
+          action-response (when strat-response
+                            (:output_text
+                             (<? (ai/create-response!
+                                  {:model "gpt-4.1-mini"
+                                   :temperature 0
+                                   :input second-prompt}))))
           actions (if action-response
-                    (response/parse-response
-                     game
-                     turn-actions
-                     (:output_text action-response))
+                    (response/parse-response game
+                                             turn-actions
+                                             action-response)
                     [response/pass])]
-      (when prompt
-        (<? (log (str ">>> PROMPT:\n" prompt))))
+      (<? (log (str "Strategy\n"
+                    (:turn game) ". " (:phase game)
+                    " / "
+                    (teg/get-current-player-name game))))
+      (when initial-prompt
+        (<? (log (str ">>> INITIAL PROMPT:\n" initial-prompt))))
       (when strat-response
-        (<? (log (str ">>> STRATEGY:\n" 
-                      (:output_text strat-response)))))
+        (<? (log (str ">>> STRATEGY:\n" strat-response))))
+      (when second-prompt
+        (<? (log (str ">>> SECOND PROMPT:\n" second-prompt))))
       (when action-response
-        (<? (log (str ">>> ACTION:\n"
-                      (:output_text action-response)))))
+        (<? (log (str ">>> ACTION:\n" action-response))))
       (when actions
         (<? (log actions)))
-      actions)))
+      {:conversation ["STRATEGY"
+                      initial-prompt
+                      strat-response
+                      second-prompt
+                      action-response]
+       :actions actions})))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")

@@ -53,17 +53,24 @@
   (go
     (loop [turn-actions []]
       (try
-        (do (println "Waiting on next-step")
+        #_(do (println "Waiting on next-step")
             (<! next-step-chan)
             (println "Updating now!"))
-        (let [body (t/write writer {:game @game-atom
+        (let [game @game-atom
+              body (t/write writer {:game game
                                     :turn-actions turn-actions})
               response (<? (fetch-response body))
-              actions (if response
-                        (t/read reader response)
-                        [r/pass])]
+              {:keys [actions conversation]}
+              (if response
+                (t/read reader response)
+                {:actions [r/pass]})]
+          (let [game @game-atom]
+            (println (:turn game) ". " (:phase game)
+                     " / "
+                     (teg/get-current-player-name game)))
+          (doseq [t conversation]
+            (println t))
           (doseq [action actions]
-            (println action)
             (swap! game-atom #(try-apply-action % action)))
           (when-not (= r/pass (last actions))
             (recur (apply conj turn-actions actions))))
@@ -76,8 +83,6 @@
                (when (str/starts-with?
                       (str (teg/get-current-player curr-state))
                       ":ai")
-                 (println "PREV:" (:turn prev-state) (:phase prev-state))
-                 (println "CURR:" (:turn curr-state) (:phase curr-state))
                  (when (not= [(:turn prev-state) (:phase prev-state)]
                              [(:turn curr-state) (:phase curr-state)])
                    (update! game-atom next-step-chan))))))
