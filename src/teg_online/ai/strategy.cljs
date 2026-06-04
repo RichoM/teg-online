@@ -5,6 +5,14 @@
             [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
 
+;; IDEAS:
+;; 1. Explain how many armies can be regrouped from each country.
+;; 2. Split attack turn in two requests, first for the attack (no armies involved)
+;;    then for the invasion (if successfull): how many armies to move
+;; 3. Make it obvious that if a country is completely surrounded by countries of 
+;;    your own, it's not really necessary to add armies, it's better to make those
+;;    armies stronger instead.
+
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
         player-countries (set (teg/player-countries game player-id))]
@@ -129,6 +137,15 @@
       (>= win-chance 30) "riesgo alto"
       :else "riesgo muy alto")))
 
+(defn format-win-chance [attacker-army defender-army]
+  (let [win-chance (calculate-win-chance attacker-army defender-army)]
+    (cond
+      (>= win-chance 98) "muy alta"
+      (>= win-chance 80) "alta"
+      (>= win-chance 50) "media"
+      (>= win-chance 30) "baja"
+      :else "muy baja")))
+
 (defmethod game-phase-prompt ::teg/attack [game turn-actions]
   (when-let [options (seq (get-valid-attacks game))]
     (str "Es tu turno de atacar. En caso de que quieras atacar, tenés que decidir qué país querés atacar, cuántos ejércitos estás dispuesto a perder, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
@@ -140,11 +157,8 @@
                                          " -> "
                                          (country-name country-b)
                                          " ("
-                                         (calculate-win-chance
-                                          (teg/get-army game country-a)
-                                          (teg/get-army game country-b))
-                                         "% probabilidad de éxito, "
-                                         (calculate-risk
+                                         "probabilidad de éxito: "
+                                         (format-win-chance
                                           (teg/get-army game country-a)
                                           (teg/get-army game country-b))
                                          ")"))))))))
@@ -217,14 +231,14 @@
 (defmethod action-prompt ::teg/add-army [game strat]
   (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
        "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
-       "Estrategia:\n" strat "\n\n"
+       "\n<strategy>\n" strat "\n</strategy>\n\n"
        "Tené en cuenta que es tu turno de incorporar ejércitos. Decime en qué países deberías incorporarlos en base a la estrategia mencionada previamente.\n"
        "Respondé sólo con la lista de países y la cantidad de ejércitos separadas por coma (una línea por país)"))
 
 (defmethod action-prompt ::teg/attack [game strat]
   (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
        "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
-       "Estrategia:\n" strat "\n\n"
+       "\n<strategy>\n" strat "\n</strategy>\n\n"
        "Tené en cuenta que es tu turno de atacar. En base a la estrategia mencionada previamente, decime si conviene atacar o no.\n"
        "En caso de que convenga atacar, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
        "Ejemplos:\n"
@@ -236,7 +250,7 @@
 (defmethod action-prompt ::teg/regroup [game strat]
   (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
        "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
-       "Estrategia:\n" strat "\n\n"
+       "\n<strategy>\n" strat "\n</strategy>\n\n"
        "Tené en cuenta que es tu turno de reagrupar ejércitos. En base a la estrategia mencionada previamente, decime si conviene reagrupar o no.\n"
        "En caso de que convenga reagrupar, respondé con la lista de países origen, destino, y la cantidad de ejércitos separadas por coma (una línea por cada par de países).\n"
        "Por ejemplo:\n"
