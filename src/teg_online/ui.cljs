@@ -20,9 +20,11 @@
 
 (defn resize-board []
   (let [board-panel (js/document.querySelector "#board-panel")
-        top-bar (js/document.querySelector "#top-bar")]
+        top-bar (js/document.querySelector "#top-bar")
+        new-height (u/format "calc(100% - %1px)"
+                             (oget top-bar :offsetHeight))]
     (oset! board-panel :style.height
-           (u/format "calc(100% - %1px)" (oget top-bar :offsetHeight)))))
+           new-height)))
 
 (.addEventListener js/window "resize" resize-board)
 (resize-board)
@@ -775,11 +777,32 @@
             (oset! exchange-btn :disabled
                    (not (teg/can-exchange? game (get (get-user) :id)))))))))
 
+(defn update-debug-panel [game]
+  (let [debug-panel (js/document.querySelector "#debug-panel")]
+    (oset! debug-panel :innerHTML "")
+    (.appendChild
+     debug-panel
+     (crate/html
+      [:div#bottom-bar.row.text-center.py-2.bg-light.justify-content-center.align-items-center.border.border-4
+       [:div.col-auto
+        [:button#snapshot-print.btn.btn-lg.btn-outline-dark [:i.fas.fa-terminal]]
+        [:span.mx-1]
+        [:button#snapshot-copy.btn.btn-lg.btn-outline-dark [:i.fa.fa-copy]]]
+       [:div.col
+        [:input#snapshot-range.form-range {:type "range" :min 0 :max 0 :step 1}]]
+       [:div.col-auto
+        [:div.btn-group.btn-group-lg {:role "group"}
+         [:button#snapshot-previous.btn.btn-outline-dark [:i.fas.fa-step-backward]]
+         [:button#snapshot-play.btn.btn-outline-dark [:i.fas.fa-play]]
+         [:button#snapshot-pause.btn.btn-outline-dark [:i.fas.fa-pause]]
+         [:button#snapshot-next.btn.btn-outline-dark [:i.fas.fa-step-forward]]]]
+       ]))))
 
 (defn update-ui [game]
   (go (<! (update-players game))
       (<! (update-countries game))
       (<! (update-status-panel game))
+      (<! (update-debug-panel game))
       (resize-board)))
 
 (defn start-update-loop []
