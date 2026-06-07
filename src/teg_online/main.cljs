@@ -9,7 +9,7 @@
             [teg-online.board :as b]
             [teg-online.ui :as ui]
             [teg-online.ai.client :as ai-client]
-            [teg-online.board :as board]))
+            [teg-online.history :as h]))
 
 (enable-console-print!)
 
@@ -148,6 +148,7 @@
 (defn init []
   (go
     (print "HELLO")
+    (h/initialize game-atom)
     (ui/initialize game-atom user-atom)
     (reset! user-atom (<! (get-this-user)))
     (initialize-ai ui/next-step-chan)
