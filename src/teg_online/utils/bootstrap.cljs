@@ -10,6 +10,9 @@
 (defn on-click [element callback]
   (doto element (.addEventListener "click" callback)))
 
+(defn on-input [element callback]
+  (doto element (.addEventListener "input" callback)))
+
 (defn on-keypress [element keycode callback]
   (doto element
     (.addEventListener "keypress"
@@ -170,7 +173,7 @@
 (defn on-toast-hidden [toast callback]
   (doto toast (.addEventListener "hidden.bs.toast" (partial callback toast))))
 
-(defn show-toast 
+(defn show-toast
   ([toast] (show-toast toast {}))
   ([toast options]
    (let [result (a/chan)
@@ -183,6 +186,13 @@
        (on-toast-shown #(a/close! result))
        (on-toast-hidden #(do (.remove html-toast))))
      result)))
+
+(defn show-toast-msg [msg & [icon]]
+  (-> (make-toast :header (list (when icon
+                                  [:span.me-3 icon])
+                                [:strong.me-auto msg]
+                                close-toast-btn))
+      (show-toast)))
 
 (comment
   (hide-modals)
@@ -198,6 +208,12 @@
                   (show-toast {:delay 2500})))
           (<! (a/timeout 50))
           (recur (inc i)))))
+
+  (doto (make-toast :header (list [:strong.me-auto "Bootstrap"]
+                                  [:small "11 mins ago"]
+                                  [:button.btn-close {:type "button" :data-bs-dismiss "toast" :aria-label "Close"}])
+                    :body "Hellow, world! This is a toast message.")
+    (show-toast))
 
   (let [toast (crate/html
                [:div.toast {:role "alert" :aria-live "assertive" :aria-atomic "true"}
