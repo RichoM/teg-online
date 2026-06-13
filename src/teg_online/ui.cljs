@@ -7,6 +7,7 @@
             [teg-online.ui-constants :refer [country-data player-colors dice-images card-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
+            [teg-online.history :as h]
             [crate.core :as crate]
             [clojure.string :as str]))
 
@@ -778,59 +779,88 @@
             (oset! exchange-btn :disabled
                    (not (teg/can-exchange? game (get (get-user) :id)))))))))
 
+(defn init-debug-panel [debug-panel game-atom ]
+  (doto debug-panel
+    (.appendChild
+     (crate/html
+      [:div#bottom-bar.row.text-center.py-2.bg-light.justify-content-center.align-items-center.border.border-4
+       [:div.col-auto
+        [:button#snapshot-print.btn.btn-lg.btn-outline-dark [:i.fas.fa-terminal]]
+        [:span.mx-1]
+        [:button#snapshot-copy.btn.btn-lg.btn-outline-dark [:i.fa.fa-copy]]]
+       [:div.col
+        [:input#snapshot-range.form-range {:type "range" :min 0 :max 10 :step 1}]]
+       [:div.col-auto
+        [:div.btn-group.btn-group-lg {:role "group"}
+         [:button#snapshot-previous.btn.btn-outline-dark [:i.fas.fa-step-backward]]
+         [:button#snapshot-play.btn.btn-outline-dark [:i.fas.fa-play]]
+         [:button#snapshot-pause.btn.btn-outline-dark [:i.fas.fa-pause]]
+         [:button#snapshot-next.btn.btn-outline-dark [:i.fas.fa-step-forward]]]]])))
+  (let [snapshot-previous (js/document.getElementById "snapshot-previous")]
+    (bs/on-click snapshot-previous #_(swap! state-atom update :selected-snapshot
+                                            (fn [n] (dec (or n (h/count (:history @state-atom))))))
+                 #(bs/show-toast-msg "Previous snapshot!")))
+  (let [snapshot-next (js/document.getElementById "snapshot-next")]
+    (bs/on-click snapshot-next #_(swap! state-atom update :selected-snapshot inc)
+                 #(bs/show-toast-msg "Next snapshot!")))
+  (let [snapshot-play (js/document.getElementById "snapshot-play")]
+    (oset! snapshot-play :hidden true)
+    (bs/on-click snapshot-play #_(swap! state-atom assoc :selected-snapshot nil)
+                 #(bs/show-toast-msg "Play!")))
+  (let [snapshot-pause (js/document.getElementById "snapshot-pause")]
+    (bs/on-click snapshot-pause #_(swap! state-atom assoc :selected-snapshot
+                                         (dec (h/count (:history @state-atom))))
+                 #(bs/show-toast-msg "Pause!")))
+  (let [snapshot-range (js/document.getElementById "snapshot-range")]
+    (bs/on-input snapshot-range #_(swap! state-atom assoc :selected-snapshot
+                                         (int (oget snapshot-range :value)))
+                 #(bs/show-toast-msg (int (oget snapshot-range :value)))))
+  (let [snapshot-print (js/document.getElementById "snapshot-print")]
+    (bs/on-click snapshot-print
+                 #(do
+                    (bs/show-toast-msg "Current snapshot printed to the console"
+                                       [:i.fas.fa-terminal])
+                    (js/console.log (clj->js @game-atom)))))
+  (let [snapshot-copy (js/document.getElementById "snapshot-copy")]
+    (bs/on-click snapshot-copy
+                 #(let [str (pr-str @game-atom)]
+                    (bs/show-modal
+                     (bs/make-modal :header (list bs/close-modal-btn)
+                                    :body [:div.font-monospace
+                                           {:style "user-select: all;"}
+                                           str]))))))
+
 (defn update-debug-panel [game]
   (go (let [game-atom (@state :game-atom)
             debug-panel (js/document.querySelector "#debug-panel")]
         (when (str/blank? (oget debug-panel :innerHTML))
-          (doto debug-panel
-            (.appendChild
-             (crate/html
-              [:div#bottom-bar.row.text-center.py-2.bg-light.justify-content-center.align-items-center.border.border-4
-               [:div.col-auto
-                [:button#snapshot-print.btn.btn-lg.btn-outline-dark [:i.fas.fa-terminal]]
-                [:span.mx-1]
-                [:button#snapshot-copy.btn.btn-lg.btn-outline-dark [:i.fa.fa-copy]]]
-               [:div.col
-                [:input#snapshot-range.form-range {:type "range" :min 0 :max 10 :step 1}]]
-               [:div.col-auto
-                [:div.btn-group.btn-group-lg {:role "group"}
-                 [:button#snapshot-previous.btn.btn-outline-dark [:i.fas.fa-step-backward]]
-                 [:button#snapshot-play.btn.btn-outline-dark [:i.fas.fa-play]]
-                 [:button#snapshot-pause.btn.btn-outline-dark [:i.fas.fa-pause]]
-                 [:button#snapshot-next.btn.btn-outline-dark [:i.fas.fa-step-forward]]]]])))
-          (let [snapshot-previous (js/document.getElementById "snapshot-previous")]
-            (bs/on-click snapshot-previous #_(swap! state-atom update :selected-snapshot
-                                                  (fn [n] (dec (or n (h/count (:history @state-atom))))))
-                         #(bs/show-toast-msg "Previous snapshot!")))
-          (let [snapshot-next (js/document.getElementById "snapshot-next")]
-            (bs/on-click snapshot-next #_(swap! state-atom update :selected-snapshot inc)
-                         #(bs/show-toast-msg "Next snapshot!")))
-          (let [snapshot-play (js/document.getElementById "snapshot-play")]
-            (oset! snapshot-play :hidden true)
-            (bs/on-click snapshot-play #_(swap! state-atom assoc :selected-snapshot nil)
-                         #(bs/show-toast-msg "Play!")))
-          (let [snapshot-pause (js/document.getElementById "snapshot-pause")]
-            (bs/on-click snapshot-pause #_(swap! state-atom assoc :selected-snapshot
-                                               (dec (h/count (:history @state-atom))))
-                         #(bs/show-toast-msg "Pause!")))
-          (let [snapshot-range (js/document.getElementById "snapshot-range")]
-            (bs/on-input snapshot-range #_(swap! state-atom assoc :selected-snapshot
-                                               (int (oget snapshot-range :value)))
-                         #(bs/show-toast-msg (int (oget snapshot-range :value)))))
-          (let [snapshot-print (js/document.getElementById "snapshot-print")]
-            (bs/on-click snapshot-print
-                        #(do
-                           (bs/show-toast-msg "Current snapshot printed to the console"
-                                             [:i.fas.fa-terminal])
-                           (js/console.log (clj->js @game-atom)))))
-          (let [snapshot-copy (js/document.getElementById "snapshot-copy")]
-            (bs/on-click snapshot-copy
-                        #(let [str (pr-str @game-atom)]
-                           (bs/show-modal
-                            (bs/make-modal :header (list bs/close-modal-btn)
-                                           :body [:div.font-monospace
-                                                  {:style "user-select: all;"}
-                                                  str])))))))))
+          (init-debug-panel debug-panel game-atom))
+        (let [max (dec (h/count))
+              disabled? (h/empty?)
+              selected-snapshot 0]
+          (doto (js/document.getElementById "snapshot-print")
+            (oset! :disabled disabled?))
+          (doto (js/document.getElementById "snapshot-copy")
+            (oset! :disabled disabled?))
+          (doto (js/document.getElementById "snapshot-range")
+            (oset! :disabled disabled?)
+            (oset! :max max)
+            (oset! :value (or selected-snapshot max)))
+          (doto (js/document.getElementById "snapshot-play")
+            (oset! :disabled disabled?)
+            (oset! :hidden (nil? selected-snapshot)))
+          (doto (js/document.getElementById "snapshot-pause")
+            (oset! :disabled disabled?)
+            (oset! :hidden (some? selected-snapshot)))
+          (doto (js/document.getElementById "snapshot-previous")
+            (oset! :disabled (or disabled?
+                                 (and (some? selected-snapshot)
+                                      (<= selected-snapshot 0)))))
+          (doto (js/document.getElementById "snapshot-next")
+            (oset! :disabled (or disabled?
+                                 (nil? selected-snapshot)
+                                 (>= selected-snapshot max))))))
+      ))
 
 (defn update-ui [game]
   (go (<! (update-players game))
