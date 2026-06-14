@@ -49,14 +49,14 @@
       (println "ERROR trying to apply action:" err)
       game)))
 
-(defn update! [game-atom next-step-chan]
+(defn update! [state next-step-chan]
   (go
     (loop [turn-actions []]
       (try
-        (do (println "Waiting on next-step")
+       (do (println "Waiting on next-step")
             (<! next-step-chan)
             (println "Updating now!"))
-        (let [game @game-atom
+        (let [game (:game @state)
               body (t/write writer {:game game
                                     :turn-actions turn-actions})
               response (<? (fetch-response body))
@@ -64,28 +64,29 @@
               (if response
                 (t/read reader response)
                 {:actions [r/pass]})]
-          (let [game @game-atom]
-            (println (:turn game) ". " (:phase game)
-                     " / "
-                     (teg/get-current-player-name game)))
+          (println (:turn game) ". " (:phase game)
+                   " / "
+                   (teg/get-current-player-name game))
           (doseq [t conversation]
             (println t))
           (doseq [action actions]
-            (swap! game-atom #(try-apply-action % action)))
+            (swap! state update :game #(try-apply-action % action)))
           (when-not (= r/pass (last actions))
             (recur (apply conj turn-actions actions))))
         (catch :default err
           (println "ERROR" err))))))
 
-(defn initialize [game-atom next-step-chan]
-  (add-watch game-atom ::ai
-             (fn [_ _ prev-state curr-state]
-               (when (str/starts-with?
-                      (str (teg/get-current-player curr-state))
-                      ":ai")
-                 (when (not= [(:turn prev-state) (:phase prev-state)]
-                             [(:turn curr-state) (:phase curr-state)])
-                   (update! game-atom next-step-chan))))))
+(defn initialize [state next-step-chan]
+  (add-watch state ::ai
+             (fn [_ _ old new]
+               (let [old-game (:game old)
+                     new-game (:game new)]
+                 (when (str/starts-with?
+                        (str (teg/get-current-player new-game))
+                        ":ai")
+                   (when (not= [(:turn old-game) (:phase old-game)]
+                               [(:turn new-game) (:phase new-game)])
+                     (update! state next-step-chan)))))))
 
 
 (comment

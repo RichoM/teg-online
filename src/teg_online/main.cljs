@@ -13,9 +13,9 @@
 
 (enable-console-print!)
 
-(defonce game-atom (atom (teg/new-game)))
-(defonce game-id (atom nil))
-(defonce user-atom (atom nil))
+(defonce state (atom {:game (teg/new-game)
+                      :user nil
+                      :game-id nil}))
 
 (defn ask-user-name []
   (go (let [user-name (str/trim (or (<! (bs/prompt "Nombre de usuario:" "")) ""))]
@@ -55,14 +55,25 @@
                             :keyboard false}))
         @action)))
 
-(defn try-to-join [game]
-  (let [{user-id :id, user-name :name} @user-atom]
-    (when-not (contains? (game :players) user-id)
-      (swap! game-atom teg/join-game user-id user-name))))
+(comment
+  
+  (def s {:game 1})
+  (def a (atom {:game 1}))
+  (swap! a update :game inc)
+  
+  )
 
-(defn show-waiting-dialog []
-  (go (let [host? (= (:id @user-atom)
-                     (:id (first (teg/get-players @game-atom))))
+(defn try-to-join [state]
+  (let [{:keys [game user]} @state
+        {user-id :id, user-name :name} user]
+    (when-not (contains? (game :players) user-id)
+      (swap! state update :game 
+             teg/join-game user-id user-name))))
+
+(defn show-waiting-dialog [state]
+  (go (let [{:keys [user game game-id]} @state
+            host? (= (:id user)
+                     (:id (first (teg/get-players game))))
             start-game-btn (crate/html [:button.btn.btn-primary.btn-lg
                                         {:type "button" :data-bs-dismiss "modal"}
                                         "Iniciar partida"])
@@ -74,7 +85,7 @@
                                                  [:span.fw-bolder.text-nowrap
                                                   {:style "user-select: all;"}
                                                   [:a {:href (oget js/location :href)}
-                                                   (str @game-id)]]]]
+                                                   (str game-id)]]]]
                           [:div.row.m-2]
                           [:div.row.text-center [:h3 "Esperando jugadores..."]]
                           [:div.row.fs-3
@@ -88,110 +99,80 @@
                                            (crate/html [:li.list-group-item (inc idx) ". " name])))
                            (when (teg/game-started? game)
                              (bs/hide-modal modal)))]
-        (add-watch game-atom ::waiting-for-players
-                   (fn [_ _ _ game]
+        (add-watch state ::waiting-for-players
+                   (fn [_ _ _ {:keys [game]}]
                      (update-modal game)
                      ;; HACK(Richo): We try to join again just in case some other player got there first...
-                     (try-to-join game)))
-        (update-modal @game-atom)
+                     (try-to-join state)))
+        (update-modal (:game @state))
         (bs/on-click start-game-btn
-                     #(swap! game-atom (comp teg/start-game
-                                             teg/distribute-goals
-                                             teg/distribute-countries)))
+                     #(swap! state update :game
+                             (comp teg/start-game
+                                   teg/distribute-goals
+                                   teg/distribute-countries)))
         (<! (bs/show-modal modal
                            {:backdrop "static"
                             :keyboard false}))
-        (remove-watch game-atom ::waiting-for-players))))
+        (remove-watch state ::waiting-for-players))))
 
-(defn initialize-network []
-  (go (let [hash (subs (or (oget js/location :?hash) "") 1)
-            action (if (empty? hash)
-                     (<! (show-main-menu))
-                     :hash-game)
-            doc-id (reset! game-id
-                           (case action
-                             :new-game (do (-> (bs/make-modal
-                                                :body [:div.container.overflow-hidden
-                                                       [:div.row.text-center [:h3 "Creando partida..."]]
-                                                       [:div.row.m-1]
-                                                       [:div.row.text-center [:i.fas.fa-circle-notch.fa-spin.fa-4x]]])
-                                               (bs/show-modal {:backdrop "static"
-                                                               :keyboard false}))
-                                           (<! (fb/create-game!)))
-                             :join-game (<! (bs/prompt "Código:" ""))
-                             :hash-game hash))]
-        (if (<! (fb/connect! doc-id game-atom))
-          (do (oset! js/location :!hash doc-id)
-              (let [game @game-atom]
-                (when-not (teg/game-started? game)
-                  (try-to-join game)
-                  (<! (show-waiting-dialog)))))
-          (do (<! (bs/alert "ERROR" 
-                            (list [:span "La partida "]
-                                  [:span.fw-bolder.text-nowrap doc-id]
-                                  [:span " NO existe"])))
-              (oset! js/location :hash "")
-              (<! (initialize-network)))))))
-
-(defn initialize-ai [next-step-chan]
-  (ai-client/initialize game-atom next-step-chan)
-  #_(let [{user-id :id, user-name :name} @user-atom]
-    (swap! game-atom teg/join-game user-id user-name))
-  (swap! game-atom teg/join-game :ai-1 "AI 1")
-  (swap! game-atom teg/join-game :ai-2 "AI 2")
-  (swap! game-atom teg/join-game :ai-3 "AI 3")
-  (swap! game-atom teg/join-game :ai-4 "AI 4")
-  (swap! game-atom (comp teg/start-game
-                         teg/distribute-goals
-                         teg/distribute-countries)))
+(defn initialize-ai [state next-step-chan]
+  (ai-client/initialize state next-step-chan)
+  (swap! state update :game
+         (fn [game]
+           (let [{user-id :id, user-name :name} (:user @state)]
+             (-> game
+                 #_(teg/join-game user-id user-name)
+                 (teg/join-game :ai-1 "AI 1")
+                 (teg/join-game :ai-2 "AI 2")
+                 (teg/join-game :ai-3 "AI 3")
+                 (teg/join-game :ai-4 "AI 4")
+                 teg/start-game
+                 teg/distribute-goals
+                 teg/distribute-countries)))))
 
 (defn init []
   (go
     (print "HELLO")
-    (h/initialize game-atom)
-    (ui/initialize game-atom user-atom)
-    (reset! user-atom (<! (get-this-user)))
-    (initialize-ai ui/next-step-chan)
+    (h/initialize state)
+    (ui/initialize state)
+    (swap! state assoc :user (<! (get-this-user)))
+    (initialize-ai state ui/next-step-chan)
     (print "BYE")))
 
 
 (defn ^:dev/before-load-async reload-begin* [done]
-  (go (<! (ui/terminate))
-      (fb/disconnect!)
+  (go (fb/disconnect!)
       (done)))
 
 (defn ^:dev/after-load-async reload-end* [done]
-  (go (when-let [id @game-id]
-        (fb/connect! id game-atom))
-      (<! (ui/initialize game-atom user-atom))
+  (go (<! (ui/initialize state))
       (done)))
 
 (comment
-  @game-id
-  @user-atom
-  @game-atom
+  @state
 
-  (tap> game-atom)
+  (tap> state)
   (tap> board/countries)
 
-  
-  
-  (def game @game-atom)
+
+
+  (def game (:game @state))
   (def players (:players game))
 
-  (teg/get-dice-count @game-atom ::b/alemania ::b/alaska)
+  (teg/get-dice-count (:game @state) ::b/alemania ::b/alaska)
 
   (go (println (<! (show-main-menu))))
 
   (do
     (bs/hide-modals)
-    (reset! game-atom (teg/new-game))
-    (swap! game-atom teg/join-game :p1 "Richo")
-    (swap! game-atom teg/join-game :p2 "Lechu")
-    (swap! game-atom teg/join-game :p3 "Diego")
-    (swap! game-atom teg/distribute-countries (sort (keys b/countries)))
-    (swap! game-atom teg/distribute-goals)
-    (swap! game-atom teg/start-game))
+    (swap! state assoc :game
+           (-> (teg/new-game)
+               (teg/join-game :p1 "Richo")
+               (teg/join-game :p2 "Lechu")
+               (teg/join-game :p3 "Diego")
+               (teg/distribute-countries (sort (keys b/countries)))
+               (teg/distribute-goals)
+               (teg/start-game))))
 
   (map (fn [player-id]
          (let [{:keys [name goal]} (teg/get-player @game-atom player-id)]
