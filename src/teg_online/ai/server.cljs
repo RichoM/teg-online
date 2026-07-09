@@ -117,7 +117,8 @@
                (let [log (partial log (.toISOString (js/Date.)))]
                  (go (try
                        (let [{:keys [game turn-actions]} (parse-request req)
-                             actions (if (= :ai-2 (teg/get-current-player game))
+                             ;; TODO(Richo): Just for testing
+                             actions (if (and false (= :ai-2 (teg/get-current-player game)))
                                        (<? (get-strategy! game turn-actions log))
                                        (<? (get-basic-actions! game turn-actions log)))]
                          (doto res
