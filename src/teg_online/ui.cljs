@@ -341,10 +341,10 @@
 
 (defmethod finish-turn! ::teg/add-army [state]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar incorporación de ejércitos?"))
-        (let [additions (get-in @state [:user-data :additions] {})]
+        (let [additions (get-in @state [:ui :user-data :additions] {})]
           (swap! state
                  #(-> %
-                      (dissoc :user-data)
+                      (update :ui dissoc :user-data)
                       (update :game (fn [game]
                                       (teg/finish-action
                                        (reduce (fn [game [country-id extra-army]]
@@ -357,11 +357,11 @@
 (defmethod finish-turn! ::teg/add-army-continent [state]
   (go (when (<! (bs/confirm "Confirmar"
                             (u/format "¿Terminar incorporación de ejércitos en %1?"
-                                      (b/get-continent-name (get-in @state [:user-data :continent])))))
-        (let [additions (get-in @state [:user-data :additions] {})]
+                                      (b/get-continent-name (get-in @state [:ui :user-data :continent])))))
+        (let [additions (get-in @state [:ui :user-data :additions] {})]
           (swap! state
                  #(-> %1
-                      (dissoc :user-data)
+                      (update :ui dissoc :user-data)
                       (update :game (fn [game]
                                       (teg/finish-action
                                        (reduce (fn [game [country-id extra-army]]
@@ -377,10 +377,10 @@
 
 (defmethod finish-turn! ::teg/regroup [state]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
-        (let [regroups (get-in @state [:user-data :regroups] [])]
+        (let [regroups (get-in @state [:ui :user-data :regroups] [])]
           (swap! state 
                  #(-> %
-                      (dissoc :user-data)
+                      (update :ui dissoc :user-data)
                       (update :game (fn [game]
                                       (reduce (fn [game [country-a country-b moving-army]]
                                                 (if (> moving-army 0)
@@ -405,7 +405,7 @@
   (= player-id (teg/country-owner (:game @state) country-id)))
 
 (defmethod can-interact-with-country? ::teg/add-army-continent [state country-id player-id]
-  (and (= (get-in @state [:user-data :continent])
+  (and (= (get-in @state [:ui :user-data :continent])
           (-> b/countries country-id :continent))
        (= player-id (teg/country-owner (:game @state) country-id))))
 
@@ -413,7 +413,7 @@
   (let [game (:game @state)]
     (if (= player-id (teg/country-owner game country-id))
       (> (teg/get-army game country-id) 1)
-      (when-let [selected-country (get-in @state [:user-data :selected-country])]
+      (when-let [selected-country (get-in @state [:ui :user-data :selected-country])]
         (contains? (get-in b/countries [selected-country :neighbours]) country-id)))))
 
 (defmethod can-interact-with-country? ::teg/regroup [state country-id player-id]
@@ -423,7 +423,7 @@
 
 (defn moved-army-effect [state country-id value]
   (let [{:strs [x y]} (-> @state
-                          (get-in [:countries country-id :counter])
+                          (get-in [:ui :countries country-id :counter])
                           (oget :center)
                           js->clj)
         label (-> (mm/make-label (u/format "%1%2"
@@ -443,8 +443,8 @@
             country-name (:name (b/countries country-id))
             initial-army (teg/get-army game country-id)
             current-army (+ initial-army
-                            (get-in @state [:user-data :additions country-id] 0))
-            remaining (get-in @state [:user-data :remaining] 0)
+                            (get-in @state [:ui :user-data :additions country-id] 0))
+            remaining (get-in @state [:ui :user-data :remaining] 0)
             addition (<! (show-add-army-dialog
                           :title (list [:span "Incorporar ejércitos a "]
                                        [:span.fw-bolder.text-nowrap country-name])
@@ -454,9 +454,9 @@
         (print addition)
         (when-not (zero? addition)
           (swap! state #(-> %
-                            (update-in [:user-data :remaining] - addition)
-                            (update-in [:user-data :additions country-id] + addition)))
-          (when (zero? (-> @state :user-data :remaining))
+                            (update-in [:ui :user-data :remaining] - addition)
+                            (update-in [:ui :user-data :additions country-id] + addition)))
+          (when (zero? (-> @state :ui :user-data :remaining))
             (<! (finish-turn! state)))))))
 
 (defn attack! [state attacker defender]
@@ -487,31 +487,31 @@
         :cancel :nop)
       (let [new-attacker-army (teg/get-army (:game @state) attacker)]
         (when (<= new-attacker-army 1)
-          (swap! state assoc-in [:user-data :selected-country] nil)))))
+          (swap! state assoc-in [:ui :user-data :selected-country] nil)))))
 
 (defmethod click-country! ::teg/attack [state country-id]
-  (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
+  (go (if-let [selected-country (get-in @state [:ui :user-data :selected-country])]
         (if (= selected-country country-id)
-          (swap! state assoc-in [:user-data :selected-country] nil)
+          (swap! state assoc-in [:ui :user-data :selected-country] nil)
           (let [game (:game @state)]
             (if (= (teg/country-owner game selected-country)
                    (teg/country-owner game country-id))
-              (swap! state assoc-in [:user-data :selected-country] country-id)
+              (swap! state assoc-in [:ui :user-data :selected-country] country-id)
               (attack! state selected-country country-id))))
-        (swap! state assoc-in [:user-data :selected-country] country-id))))
+        (swap! state assoc-in [:ui :user-data :selected-country] country-id))))
 
 (defmethod click-country! ::teg/regroup [state country-id]
-  (go (if-let [selected-country (get-in @state [:user-data :selected-country])]
+  (go (if-let [selected-country (get-in @state [:ui :user-data :selected-country])]
         (if (= selected-country country-id)
-          (swap! state assoc-in [:user-data :selected-country] nil)
+          (swap! state assoc-in [:ui :user-data :selected-country] nil)
           (if (contains? (get-in b/countries [selected-country :neighbours]) country-id)
             (let [initial-army (teg/get-army (:game @state) selected-country)
                   substractions (reduce + (map (fn [[_ _ v]] v)
                                                (filter (fn [[c]] (= c selected-country))
-                                                       (get-in @state [:user-data :regroups]))))
+                                                       (get-in @state [:ui :user-data :regroups]))))
                   additions (reduce + (map (fn [[_ _ v]] v)
                                            (filter (fn [[_ c]] (= c selected-country))
-                                                   (get-in @state [:user-data :regroups]))))
+                                                   (get-in @state [:ui :user-data :regroups]))))
                   current-army (+ (- initial-army substractions) additions)
                   max-out (- initial-army substractions)
                   army (<! (show-add-army-dialog
@@ -529,10 +529,10 @@
                                          max-out
                                          (dec max-out))))]
               (when (> army 0)
-                (swap! state update-in [:user-data :regroups] conj [selected-country country-id army]))
-              (swap! state assoc-in [:user-data :selected-country] nil))
-            (swap! state assoc-in [:user-data :selected-country] country-id)))
-        (swap! state assoc-in [:user-data :selected-country] country-id))))
+                (swap! state update-in [:ui :user-data :regroups] conj [selected-country country-id army]))
+              (swap! state assoc-in [:ui :user-data :selected-country] nil))
+            (swap! state assoc-in [:ui :user-data :selected-country] country-id)))
+        (swap! state assoc-in [:ui :user-data :selected-country] country-id))))
 
 (defn init-country [state [country-id {[x y] :position, img :img, [ox oy] :counter-offset}]]
   (go
@@ -565,7 +565,7 @@
                                  (<! (click-country! state country-id))
                                  (oset! morph :alpha 0.5))))))
       (swap! state
-             assoc-in [:countries country-id]
+             assoc-in [:ui :countries country-id]
              {:morph morph
               :counter counter}))))
 
@@ -610,8 +610,8 @@
 
 (defn update-country [state player-indices {:keys [id owner army]}]
   (go (when-let [{:keys [morph counter]}
-                 (get-in @state [:countries id])]
-        (let [user-data (:user-data @state)
+                 (get-in @state [:ui :countries id])]
+        (let [user-data (-> @state :ui :user-data)
               player-idx (player-indices owner)
               color (get player-colors player-idx "white")
               original-form (oget morph :originalForm)
@@ -690,7 +690,7 @@
 (defmethod finish-turn-enabled? ::teg/add-army [state]
   (and (is-my-turn? (:user @state)
                     (:game @state))
-       (= 0 (get-in @state [:user-data :remaining] 0))))
+       (= 0 (get-in @state [:ui :user-data :remaining] 0))))
 
 (defmethod finish-turn-enabled? :default [state]
   (is-my-turn? (:user @state) 
@@ -702,7 +702,7 @@
   (let [game (:game @state)
         user (:user @state)
         remaining (if (is-my-turn? user game) ; TODO(Richo): I think this is a bug
-                    (get-in @state [:user-data :remaining] 0)
+                    (get-in @state [:ui :user-data :remaining] 0)
                     (get-in game [:current-turn :extra-army] 0))]
     (list [:span "Incorporando ejércitos "]
           [:span.text-nowrap
@@ -714,9 +714,9 @@
   (let [game (:game @state)
         user (:user @state)
         remaining (if (is-my-turn? user game) ; TODO(Richo): I think this is a bug
-                    (get-in @state [:user-data :remaining] 0)
+                    (get-in @state [:ui :user-data :remaining] 0)
                     (get-in game [:current-turn :extra-army] 0))
-        continent (get-in @state [:user-data :continent])]
+        continent (get-in @state [:ui :user-data :continent])]
     (list [:span "Incorporando ejércitos en "]
           [:span.fw-bolder.text-nowrap (b/get-continent-name continent)]
           [:span " "]
@@ -740,7 +740,7 @@
           (swap! state
                  #(-> %
                       (update :game teg/exchange-cards (seq countries))
-                      (update-in [:user-data :remaining] + exchange-bonus)))))))
+                      (update-in [:ui :user-data :remaining] + exchange-bonus)))))))
 
 (defn update-status-panel [state]
   (go (let [{:keys [turn] :as game} (:game @state)
@@ -788,10 +788,11 @@
                    (not (teg/can-exchange? game (get user :id)))))))))
 
 (defn set-current-snapshot! [state snapshot-idx]
-  (when-let [snapshot (nth (-> @state :snapshots) snapshot-idx nil)]
-    (swap! state assoc
-           :selected-snapshot snapshot-idx
-           :game snapshot)))
+  (when-let [snapshot (nth (-> @state :debug :snapshots) snapshot-idx nil)]
+    (swap! state
+           #(-> %
+                (assoc-in [:debug :selected-snapshot] snapshot-idx)
+                (assoc :game snapshot)))))
 
 (defn init-debug-panel [debug-panel state]
   (doto debug-panel
@@ -847,7 +848,7 @@
   (go (let [debug-panel (js/document.querySelector "#debug-panel")]
         (when (str/blank? (oget debug-panel :innerHTML))
           (init-debug-panel debug-panel state))
-        (let [history (:snapshots @state)
+        (let [history (-> @state :debug :snapshots)
               max (-> history count dec)
               disabled? (empty? history)
               selected-snapshot 0]
@@ -934,7 +935,7 @@
    {new-turn :turn, new-phase :phase, :as new-game}]
   (when-not (= [old-phase old-turn]
                [new-phase new-turn])
-    (swap! state assoc :user-data
+    (swap! state assoc-in [:ui :user-data]
            (reset-user-data new-game))))
 
 (defn start-fireworks []
@@ -1007,7 +1008,7 @@
   [state {old-turn :turn} {new-turn :turn, :as new-game}]
   (when-not (teg/game-over? new-game)
     (when-not (= old-turn new-turn)
-      (when (nil? (-> @state :selected-snapshot))
+      (when (nil? (-> @state :debug :selected-snapshot))
         (show-toast (if (is-my-turn? (:user @state) new-game)
                       "¡Es tu turno!"
                       (list [:span "Es el turno de "]
@@ -1024,8 +1025,8 @@
       (when (and (is-my-turn? (:user @state) new-game)
                  (isa? new-phase ::teg/add-army-continent))
         (show-toast (u/format "Incorporar %1 ejércitos en %2"
-                              (get-in @state [:user-data :remaining])
-                              (b/get-continent-name (get-in @state [:user-data :continent]))))))))
+                              (get-in @state [:ui :user-data :remaining])
+                              (b/get-continent-name (get-in @state [:ui :user-data :continent]))))))))
 
 (defn maybe-show-exchange-notification [state old-game new-game]
   (when-not (teg/game-over? new-game)
@@ -1055,10 +1056,10 @@
 
 (defn on-game-change
   [state old-game new-game]
-  (when (and (nil? (-> @state :selected-snapshot))
+  (when (and (nil? (-> @state :debug :selected-snapshot))
              (not= [(:turn old-game) (:phase old-game)]
                    [(:turn new-game) (:phase new-game)]))
-    (swap! state update :snapshots conj new-game))
+    (swap! state update-in [:debug :snapshots] conj new-game))
   (maybe-reset-user-data state old-game new-game)
   (maybe-show-forced-exchange-dialog state old-game new-game)
   (maybe-show-secret-goal-dialog state old-game new-game)
@@ -1073,16 +1074,15 @@
   (go (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries state))
-      (swap! state assoc 
-             :snapshots []
-             :selected-snapshot nil)
+      (swap! state assoc :debug {:snapshots []
+                                 :selected-snapshot nil})
       (add-watch state :state-change
                  (fn [_ _ old new]
                    (let [old-game (:game old)
                          new-game (:game new)]
                      (when (or (not= old-game new-game)
-                               (not= (:user-data old)
-                                     (:user-data new)))
+                               (not= (-> old :ui :user-data)
+                                     (-> new :ui :user-data)))
                        (on-game-change state old-game new-game)))))
       (on-game-change state {} (:game @state)) ; Force update now
       ))
