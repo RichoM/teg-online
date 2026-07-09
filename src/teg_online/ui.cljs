@@ -390,11 +390,23 @@
               (show-draw-card-dialog (:game @state) random-card)))
           (swap! state update :game (comp teg/finish-action teg/check-unused-cards))))))
 
+(defn last-snapshot? [{:keys [snapshots selected-snapshot]}]
+  (= selected-snapshot (dec (count snapshots))))
+
+(comment
+  
+  (tap> @teg-online.main/state)
+  
+  (last-snapshot? (-> @teg-online.main/state :debug))
+
+  )
+
 (defmulti can-interact-with-country?
   (fn [state _country _player]
     (let [{:keys [phase] :as game} (:game @state)
           user (:user @state)]
-      (when (is-my-turn? user game)
+      (when (and (last-snapshot? (:debug @state))
+                 (is-my-turn? user game))
         phase))))
 
 (defmethod can-interact-with-country? ::teg/add-army [state country-id player-id]
@@ -741,7 +753,8 @@
 (defn update-status-panel [state]
   (go (let [{:keys [turn] :as game} (:game @state)
             user (:user @state)
-            status-bar (js/document.querySelector "#status-bar")]
+            status-bar (js/document.querySelector "#status-bar")
+            show-buttons? (last-snapshot? (:debug @state))]
         (oset! status-bar :innerHTML "")
         (if (is-my-turn? user game)
           (.add (oget status-bar :classList) "player-turn")
@@ -756,19 +769,22 @@
                           [:div.col.text-center
                            [:h4 (when-not (teg/game-over? game)
                                   (status-panel-title state))]]
-                          (when (exchange-button-visible? user game)
+                          (when (and show-buttons?
+                                     (exchange-button-visible? user game))
                             [:div.col-auto
                              [:button#exchange-button.btn.btn-secondary.btn-lg {:type "button"} "Canje"]])
-                          [:div.col-auto
-                           [:button#finish-turn-button.btn.btn-primary.btn-lg
-                            {:type "button" :disabled (not (finish-turn-enabled? state))}
-                            (finish-btn-label game)]]]))
+                          (when show-buttons?
+                            [:div.col-auto
+                             [:button#finish-turn-button.btn.btn-primary.btn-lg
+                              {:type "button" :disabled (not (finish-turn-enabled? state))}
+                              (finish-btn-label game)]])]))
           (.addEventListener (js/document.querySelector "#menu-button")
                              "click"
                              #(show-menu! state))
-          (.addEventListener (js/document.querySelector "#finish-turn-button")
-                             "click"
-                             #(finish-turn! state))
+          (when-let [finish-turn-btn (js/document.querySelector "#finish-turn-button")]
+            (.addEventListener finish-turn-btn
+                               "click"
+                               #(finish-turn! state)))
           (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
             (.addEventListener exchange-btn
                                "click"
@@ -777,11 +793,12 @@
                    (not (teg/can-exchange? game (get user :id)))))))))
 
 (defn set-current-snapshot! [state snapshot-idx]
-  (when-let [snapshot (nth (-> @state :debug :snapshots) snapshot-idx nil)]
-    (swap! state
-           #(-> %
-                (assoc-in [:debug :selected-snapshot] snapshot-idx)
-                (assoc :game snapshot)))))
+  (let [snapshots (-> @state :debug :snapshots)]
+    (when-let [snapshot (nth snapshots snapshot-idx nil)]
+      (swap! state
+             #(-> %
+                  (assoc-in [:debug :selected-snapshot] snapshot-idx)
+                  (assoc :game snapshot))))))
 
 (defn init-debug-panel [debug-panel state]
   (doto debug-panel
@@ -837,10 +854,11 @@
   (go (let [debug-panel (js/document.querySelector "#debug-panel")]
         (when (str/blank? (oget debug-panel :innerHTML))
           (init-debug-panel debug-panel state))
-        (let [history (-> @state :debug :snapshots)
+        (let [debug-data (-> @state :debug)
+              history (:snapshots debug-data)
               max (-> history count dec)
               disabled? (empty? history)
-              selected-snapshot 0]
+              selected-snapshot (:selected-snapshot debug-data)]
           (doto (js/document.getElementById "snapshot-print")
             (oset! :disabled disabled?))
           (doto (js/document.getElementById "snapshot-copy")
@@ -851,7 +869,7 @@
             (oset! :value (or selected-snapshot max)))
           (doto (js/document.getElementById "snapshot-play")
             (oset! :disabled disabled?)
-            (oset! :hidden (nil? selected-snapshot)))
+            (oset! :hidden (last-snapshot? debug-data)))
           (doto (js/document.getElementById "snapshot-pause")
             (oset! :disabled disabled?)
             (oset! :hidden (some? selected-snapshot)))
@@ -861,7 +879,7 @@
                                       (<= selected-snapshot 0)))))
           (doto (js/document.getElementById "snapshot-next")
             (oset! :disabled (or disabled?
-                                 (nil? selected-snapshot)
+                                 (last-snapshot? debug-data)
                                  (>= selected-snapshot max))))))
       ))
 
@@ -970,14 +988,17 @@
                  (nil? (teg/get-player-goal old-game user-id)))
         (bs/alert "Objetivo secreto" secret-goal)))))
 
+(:richo nil)
+
+
 (defn maybe-show-game-over-dialog [state old-game new-game]
-  (when (and (nil? (old-game :winner))
-             (new-game :winner))
+  (when (and (nil? (:winner old-game))
+             (:winner new-game))
     (when (= (get (:user @state) :id)
-             (new-game :winner))
+             (:winner new-game))
       #_(start-fireworks))
     (bs/alert "Fin del juego"
-              (let [winner (new-game :winner)
+              (let [winner (:winner new-game)
                     winner-name (:name (teg/get-player new-game winner))
                     secret-goal (teg/get-player-goal new-game winner)]
                 [:div.container
@@ -997,7 +1018,7 @@
   [state {old-turn :turn} {new-turn :turn, :as new-game}]
   (when-not (teg/game-over? new-game)
     (when-not (= old-turn new-turn)
-      (when (nil? (-> @state :debug :selected-snapshot))
+      (when (last-snapshot? (-> @state :debug))
         (show-toast (if (is-my-turn? (:user @state) new-game)
                       "¡Es tu turno!"
                       (list [:span "Es el turno de "]
@@ -1038,47 +1059,67 @@
 (defn maybe-show-moving-army-effect [state old-game new-game]
   (when-not (teg/game-over? new-game)
     (doseq [country (keys b/countries)]
-      (let [delta-army (- (teg/get-army new-game country)
-                          (teg/get-army old-game country))]
+      (when-let [delta-army (- (teg/get-army new-game country)
+                               (teg/get-army old-game country))]
         (when-not (zero? delta-army)
           (moved-army-effect state country delta-army))))))
 
-(defn on-game-change
-  [state old-game new-game]
-  (when (and (nil? (-> @state :debug :selected-snapshot))
-             (not= [(:turn old-game) (:phase old-game)]
-                   [(:turn new-game) (:phase new-game)]))
-    (swap! state update-in [:debug :snapshots] conj new-game))
-  (maybe-reset-user-data state old-game new-game)
-  (maybe-show-forced-exchange-dialog state old-game new-game)
-  (maybe-show-secret-goal-dialog state old-game new-game)
-  (maybe-show-game-over-dialog state old-game new-game)
-  (maybe-show-turn-notification state old-game new-game)
-  (maybe-show-phase-notification state old-game new-game)
-  (maybe-show-exchange-notification state old-game new-game)
-  (maybe-show-moving-army-effect state old-game new-game)
-  (update-ui state))
+(defn on-state-change
+  [state old new]
+  (let [old-game (:game old)
+        new-game (:game new)]
+    ;; Append new snapshot
+    (when (and (last-snapshot? (-> @state :debug))
+               (not= [(:turn old-game) (:phase old-game)]
+                     [(:turn new-game) (:phase new-game)])
+               (not= new-game (-> @state :debug :snapshots peek)))
+      (swap! state #(-> %
+                        (update-in [:debug :snapshots] conj new-game)
+                        (update-in [:debug :selected-snapshot] inc))))
+    ;; Update UI
+    (when (or (not= old-game new-game)
+              (not= (-> old :ui :user-data)
+                    (-> new :ui :user-data)))
+      (maybe-reset-user-data state old-game new-game)
+      (maybe-show-forced-exchange-dialog state old-game new-game)
+      (maybe-show-secret-goal-dialog state old-game new-game)
+      (maybe-show-game-over-dialog state old-game new-game)
+      (maybe-show-turn-notification state old-game new-game)
+      (maybe-show-phase-notification state old-game new-game)
+      (maybe-show-exchange-notification state old-game new-game)
+      (maybe-show-moving-army-effect state old-game new-game)
+      (update-ui state))
+    ;; Maybe update AI
+    (when (and (last-snapshot? (:debug new))
+               (str/starts-with?
+                (str (teg/get-current-player new-game))
+                ":ai")
+               (not= [(:turn old-game) (:phase old-game)]
+                     [(:turn new-game) (:phase new-game)]))
+      (ai/update! state))))
 
 (defn initialize [state]
   (go (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries state))
-      (swap! state assoc :debug {:snapshots []
-                                 :selected-snapshot nil})
       (add-watch state :state-change
                  (fn [_ _ old new]
-                   (let [old-game (:game old)
-                         new-game (:game new)]
-                     (when (or (not= old-game new-game)
-                               (not= (-> old :ui :user-data)
-                                     (-> new :ui :user-data)))
-                       (on-game-change state old-game new-game))
-                     (when (str/starts-with?
-                            (str (teg/get-current-player new-game))
-                            ":ai")
-                       (when (not= [(:turn old-game) (:phase old-game)]
-                                   [(:turn new-game) (:phase new-game)])
-                         (ai/update! state))))))
-      (on-game-change state {} (:game @state)) ; Force update now
+                   (on-state-change state old new)))
+      (swap! state update :debug
+             #(or % {:snapshots []
+                     :selected-snapshot -1}))
+      (on-state-change state {} @state) ; Force update now
       ))
 
+(comment
+  
+  (inc nil)
+  
+
+  (def state teg-online.main/state)
+
+  [(-> @state :debug :snapshots count)
+   (-> @state :debug :selected-snapshot)]
+
+  (tap> @state)
+  )
