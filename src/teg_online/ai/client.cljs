@@ -53,39 +53,23 @@
   (go
     (loop [turn-actions []]
       (try
-       (let [game (:game @state)
+        (let [game (:game @state)
               body (t/write writer {:game game
                                     :turn-actions turn-actions})
-              response (<? (fetch-response body))
-              {:keys [actions conversation]}
-              (if response
-                (t/read reader response)
-                {:actions [r/pass]})]
-          (println (:turn game) ". " (:phase game)
-                   " / "
-                   (teg/get-current-player-name game))
-          (doseq [t conversation]
-            (println t))
-          (doseq [action actions]
-            (swap! state update :game #(try-apply-action % action)))
-          (when-not (= r/pass (last actions))
-            (recur (apply conj turn-actions actions))))
+              response (<? (fetch-response body))]
+          (when (= game (:game @state))
+            (let [{:keys [actions conversation]}
+                  (if response
+                    (t/read reader response)
+                    {:actions [r/pass]})]
+              (println (:turn game) ". " (:phase game)
+                       " / "
+                       (teg/get-current-player-name game))
+              (doseq [t conversation]
+                (println t))
+              (doseq [action actions]
+                (swap! state update :game #(try-apply-action % action)))
+              (when-not (= r/pass (last actions))
+                (recur (apply conj turn-actions actions))))))
         (catch :default err
           (println "ERROR" err))))))
-
-(defn initialize [state]
-  (add-watch state ::ai
-             (fn [_ _ old new]
-               (let [old-game (:game old)
-                     new-game (:game new)]
-                 (when (str/starts-with?
-                        (str (teg/get-current-player new-game))
-                        ":ai")
-                   (when (not= [(:turn old-game) (:phase old-game)]
-                               [(:turn new-game) (:phase new-game)])
-                     (update! state)))))))
-
-
-(comment
-
-  )

@@ -7,8 +7,7 @@
             [teg-online.firebase :as fb]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.ui :as ui]
-            [teg-online.ai.client :as ai-client]))
+            [teg-online.ui :as ui]))
 
 (enable-console-print!)
 
@@ -115,7 +114,6 @@
         (remove-watch state ::waiting-for-players))))
 
 (defn initialize-ai [state]
-  (ai-client/initialize state)
   (swap! state update :game
          (fn [game]
            (let [{user-id :id, user-name :name} (:user @state)]

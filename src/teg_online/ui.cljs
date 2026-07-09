@@ -1,14 +1,15 @@
 (ns teg-online.ui
   (:require [clojure.core.async :as a :refer [go <!]]
+            [clojure.string :as str]
             [oops.core :refer [oget oset!]]
+            [crate.core :as crate]
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bs]
             [teg-online.utils.core :as u]
             [teg-online.ui-constants :refer [country-data player-colors dice-images card-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [crate.core :as crate]
-            [clojure.string :as str]))
+            [teg-online.ai.client :as ai]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
@@ -1071,7 +1072,13 @@
                      (when (or (not= old-game new-game)
                                (not= (-> old :ui :user-data)
                                      (-> new :ui :user-data)))
-                       (on-game-change state old-game new-game)))))
+                       (on-game-change state old-game new-game))
+                     (when (str/starts-with?
+                            (str (teg/get-current-player new-game))
+                            ":ai")
+                       (when (not= [(:turn old-game) (:phase old-game)]
+                                   [(:turn new-game) (:phase new-game)])
+                         (ai/update! state))))))
       (on-game-change state {} (:game @state)) ; Force update now
       ))
 
