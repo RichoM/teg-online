@@ -86,6 +86,8 @@
       false)))
 
 (defn ensure-valid [game actions]
+  ; TODO(Richo): Some game states cannot be passed! If we have an invalid action for
+  ; add-army we fail with a pass when we should retry first!
   (let [valid-actions (->> actions
                            (filterv (partial valid? game))
                            (take-while #(not= pass %))
