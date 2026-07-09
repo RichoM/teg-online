@@ -10,11 +10,6 @@
             [crate.core :as crate]
             [clojure.string :as str]))
 
-
-; HACK(Richo): This channel will allow me to slow down the AI update process, the idea is
-; to have a button connected to the AI update process by this channel
-(defonce next-step-chan (a/chan))
-
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
 (defn resize-board []
@@ -747,15 +742,15 @@
             user (:user @state)
             status-bar (js/document.querySelector "#status-bar")]
         (oset! status-bar :innerHTML "")
-        (if (is-my-turn? user game) 
+        (if (is-my-turn? user game)
           (.add (oget status-bar :classList) "player-turn")
           (.remove (oget status-bar :classList) "player-turn"))
         (when turn
           (.appendChild status-bar
                         (crate/html
                          [:div.row.align-items-center.py-1.g-1
-                          [:div.col-auto 
-                           [:button#menu-button.btn.btn-lg.btn-outline-dark {:type "button"} 
+                          [:div.col-auto
+                           [:button#menu-button.btn.btn-lg.btn-outline-dark {:type "button"}
                             [:i.fas.fa-bars]]]
                           [:div.col.text-center
                            [:h4 (when-not (teg/game-over? game)
@@ -766,20 +761,13 @@
                           [:div.col-auto
                            [:button#finish-turn-button.btn.btn-primary.btn-lg
                             {:type "button" :disabled (not (finish-turn-enabled? state))}
-                            (finish-btn-label game)]]
-                          [:div.col-auto
-                           [:button#next-step-button.btn.btn-primary.btn-lg
-                            {:type "button"}
-                            "Next!"]]]))
+                            (finish-btn-label game)]]]))
           (.addEventListener (js/document.querySelector "#menu-button")
                              "click"
                              #(show-menu! state))
           (.addEventListener (js/document.querySelector "#finish-turn-button")
                              "click"
                              #(finish-turn! state))
-          (.addEventListener (js/document.querySelector "#next-step-button")
-                             "click"
-                             #(a/put! next-step-chan true))
           (when-let [exchange-btn (js/document.querySelector "#exchange-button")]
             (.addEventListener exchange-btn
                                "click"

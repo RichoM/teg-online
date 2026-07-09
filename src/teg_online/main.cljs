@@ -114,17 +114,17 @@
                             :keyboard false}))
         (remove-watch state ::waiting-for-players))))
 
-(defn initialize-ai [state next-step-chan]
-  (ai-client/initialize state next-step-chan)
+(defn initialize-ai [state]
+  (ai-client/initialize state)
   (swap! state update :game
          (fn [game]
            (let [{user-id :id, user-name :name} (:user @state)]
              (-> game
-                 ;(teg/join-game user-id user-name)
+                 (teg/join-game user-id user-name)
                  (teg/join-game :ai-1 "AI 1")
                  (teg/join-game :ai-2 "AI 2")
-                 (teg/join-game :ai-3 "AI 3")
-                 (teg/join-game :ai-4 "AI 4")
+                 ;(teg/join-game :ai-3 "AI 3")
+                 ;(teg/join-game :ai-4 "AI 4")
                  teg/start-game
                  teg/distribute-goals
                  teg/distribute-countries)))))
@@ -134,7 +134,7 @@
     (print "HELLO")
     (ui/initialize state)
     (swap! state assoc :user (<! (get-this-user)))
-    (initialize-ai state ui/next-step-chan)
+    (initialize-ai state)
     (print "BYE")))
 
 
