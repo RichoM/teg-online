@@ -49,27 +49,32 @@
       (println "ERROR trying to apply action:" err)
       game)))
 
+(def counter (atom 0))
+
 (defn update! [state]
   (go
-    (loop [turn-actions []]
-      (try
-        (let [game (:game @state)
-              body (t/write writer {:game game
-                                    :turn-actions turn-actions})
-              response (<? (fetch-response body))]
-          (when (= game (:game @state))
-            (let [{:keys [actions conversation]}
-                  (if response
-                    (t/read reader response)
-                    {:actions [r/pass]})]
-              (println (:turn game) ". " (:phase game)
-                       " / "
-                       (teg/get-current-player-name game))
-              (doseq [t conversation]
-                (println t))
-              (doseq [action actions]
-                (swap! state update :game #(try-apply-action % action)))
-              (when-not (= r/pass (last actions))
-                (recur (apply conj turn-actions actions))))))
-        (catch :default err
-          (println "ERROR" err))))))
+    (let [id (swap! counter inc)]
+      (loop [turn-actions []]
+        (try
+          (println id "- asking AI...")
+          (let [game (:game @state)
+                body (t/write writer {:game game
+                                      :turn-actions turn-actions})
+                response (<? (fetch-response body))]
+            (if (= game (:game @state))
+              (let [{:keys [actions conversation]}
+                    (if response
+                      (t/read reader response)
+                      {:actions [r/pass]})]
+                (println id "-" (:turn game) ". " (:phase game)
+                         "/"
+                         (teg/get-current-player-name game))
+                (doseq [t conversation]
+                  (println t))
+                (doseq [action actions]
+                  (swap! state update :game #(try-apply-action % action)))
+                (when-not (= r/pass (last actions))
+                  (recur (apply conj turn-actions actions))))
+              (println id "- Different game! Ignoring AI response...")))
+          (catch :default err
+            (println id "- ERROR" err)))))))
