@@ -8,8 +8,7 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ui :as ui]
-            [teg-online.ai.client :as ai-client]
-            [teg-online.history :as h]))
+            [teg-online.ai.client :as ai-client]))
 
 (enable-console-print!)
 
@@ -121,7 +120,7 @@
          (fn [game]
            (let [{user-id :id, user-name :name} (:user @state)]
              (-> game
-                 #_(teg/join-game user-id user-name)
+                 ;(teg/join-game user-id user-name)
                  (teg/join-game :ai-1 "AI 1")
                  (teg/join-game :ai-2 "AI 2")
                  (teg/join-game :ai-3 "AI 3")
@@ -133,7 +132,6 @@
 (defn init []
   (go
     (print "HELLO")
-    (h/initialize state)
     (ui/initialize state)
     (swap! state assoc :user (<! (get-this-user)))
     (initialize-ai state ui/next-step-chan)
@@ -151,6 +149,7 @@
 (comment
   @state
 
+  (count (:history @state))
   (tap> state)
   (tap> board/countries)
 

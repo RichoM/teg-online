@@ -7,7 +7,6 @@
             [teg-online.ui-constants :refer [country-data player-colors dice-images card-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.history :as h]
             [crate.core :as crate]
             [clojure.string :as str]))
 
@@ -843,8 +842,9 @@
   (go (let [debug-panel (js/document.querySelector "#debug-panel")]
         (when (str/blank? (oget debug-panel :innerHTML))
           (init-debug-panel debug-panel state))
-        (let [max (dec (h/count))
-              disabled? (h/empty?)
+        (let [history (:history @state)
+              max (-> history count dec)
+              disabled? (empty? history)
               selected-snapshot 0]
           (doto (js/document.getElementById "snapshot-print")
             (oset! :disabled disabled?))
@@ -1049,6 +1049,9 @@
 
 (defn on-game-change
   [state old-game new-game]
+  (when (not= [(:turn old-game) (:phase old-game)]
+              [(:turn new-game) (:phase new-game)])
+    (swap! state update :history conj new-game))
   (maybe-reset-user-data state old-game new-game)
   (maybe-show-forced-exchange-dialog state old-game new-game)
   (maybe-show-secret-goal-dialog state old-game new-game)
@@ -1063,13 +1066,15 @@
   (go (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries state))
+      (swap! state assoc :history [])
       (add-watch state :state-change
                  (fn [_ _ old new]
-                   ; TODO(Richo): Maybe some other differences force an update?
-                   (when-not (= old new)
-                     (on-game-change state
-                                     (:game old) 
-                                     (:game new)))))
+                   (let [old-game (:game old)
+                         new-game (:game new)]
+                     (when (or (not= old-game new-game)
+                               (not= (:user-data old)
+                                     (:user-data new)))
+                       (on-game-change state old-game new-game)))))
       (on-game-change state {} (:game @state)) ; Force update now
       ))
 
