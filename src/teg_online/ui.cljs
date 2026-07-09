@@ -787,6 +787,12 @@
             (oset! exchange-btn :disabled
                    (not (teg/can-exchange? game (get user :id)))))))))
 
+(defn set-current-snapshot! [state snapshot-idx]
+  (when-let [snapshot (nth (-> @state :snapshots) snapshot-idx nil)]
+    (swap! state assoc
+           :selected-snapshot snapshot-idx
+           :game snapshot)))
+
 (defn init-debug-panel [debug-panel state]
   (doto debug-panel
     (.appendChild
@@ -820,9 +826,8 @@
                                          (dec (h/count (:history @state-atom))))
                  #(bs/show-toast-msg "Pause!")))
   (let [snapshot-range (js/document.getElementById "snapshot-range")]
-    (bs/on-input snapshot-range #_(swap! state-atom assoc :selected-snapshot
-                                         (int (oget snapshot-range :value)))
-                 #(bs/show-toast-msg (int (oget snapshot-range :value)))))
+    (bs/on-input snapshot-range
+                 #(set-current-snapshot! state (int (oget snapshot-range :value)))))
   (let [snapshot-print (js/document.getElementById "snapshot-print")]
     (bs/on-click snapshot-print
                  #(do
@@ -842,7 +847,7 @@
   (go (let [debug-panel (js/document.querySelector "#debug-panel")]
         (when (str/blank? (oget debug-panel :innerHTML))
           (init-debug-panel debug-panel state))
-        (let [history (:history @state)
+        (let [history (:snapshots @state)
               max (-> history count dec)
               disabled? (empty? history)
               selected-snapshot 0]
@@ -1002,11 +1007,12 @@
   [state {old-turn :turn} {new-turn :turn, :as new-game}]
   (when-not (teg/game-over? new-game)
     (when-not (= old-turn new-turn)
-      (show-toast (if (is-my-turn? (:user @state) new-game)
-                    "¡Es tu turno!"
-                    (list [:span "Es el turno de "]
-                          [:span.fw-bolder.text-nowrap
-                           (teg/get-current-player-name new-game)]))))))
+      (when (nil? (-> @state :selected-snapshot))
+        (show-toast (if (is-my-turn? (:user @state) new-game)
+                      "¡Es tu turno!"
+                      (list [:span "Es el turno de "]
+                            [:span.fw-bolder.text-nowrap
+                             (teg/get-current-player-name new-game)])))))))
 
 (defn maybe-show-phase-notification
   [state
@@ -1049,9 +1055,10 @@
 
 (defn on-game-change
   [state old-game new-game]
-  (when (not= [(:turn old-game) (:phase old-game)]
-              [(:turn new-game) (:phase new-game)])
-    (swap! state update :history conj new-game))
+  (when (and (nil? (-> @state :selected-snapshot))
+             (not= [(:turn old-game) (:phase old-game)]
+                   [(:turn new-game) (:phase new-game)]))
+    (swap! state update :snapshots conj new-game))
   (maybe-reset-user-data state old-game new-game)
   (maybe-show-forced-exchange-dialog state old-game new-game)
   (maybe-show-secret-goal-dialog state old-game new-game)
@@ -1066,7 +1073,9 @@
   (go (.removeAllSubmorphs world)
       (<! (init-map))
       (<! (init-countries state))
-      (swap! state assoc :history [])
+      (swap! state assoc 
+             :snapshots []
+             :selected-snapshot nil)
       (add-watch state :state-change
                  (fn [_ _ old new]
                    (let [old-game (:game old)

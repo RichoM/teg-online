@@ -149,6 +149,9 @@
 (comment
   @state
 
+  
+  (swap! state assoc :selected-snapshot nil)
+
   (count (:history @state))
   (tap> state)
   (tap> board/countries)
