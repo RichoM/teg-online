@@ -1,7 +1,7 @@
 (ns teg-online.ui
   (:require [clojure.core.async :as a :refer [go <!]]
             [clojure.string :as str]
-            [oops.core :refer [oget oset!]]
+            [oops.core :refer [oget oset! ocall!]]
             [crate.core :as crate]
             [teg-online.utils.minimorphic :as mm]
             [teg-online.utils.bootstrap :as bs]
@@ -800,8 +800,19 @@
                   (assoc-in [:debug :selected-snapshot] snapshot-idx)
                   (assoc :game snapshot))))))
 
-(defn init-debug-panel [debug-panel state]
-  (doto debug-panel
+(defn set-previous-snapshot! [state]
+  (let [selected-snapshot (-> @state :debug :selected-snapshot)]
+    (when (> selected-snapshot 0)
+      (set-current-snapshot! state (dec selected-snapshot)))))
+
+(defn set-next-snapshot! [state]
+  (let [selected-snapshot (-> @state :debug :selected-snapshot)]
+    (when (< selected-snapshot (dec (count (-> @state :debug :snapshots))))
+      (set-current-snapshot! state (inc selected-snapshot)))))
+
+(defn init-debug-panel! [state]
+  (doto (js/document.querySelector "#debug-panel")
+    (oset! :innerHTML "")
     (.appendChild
      (crate/html
       [:div#bottom-bar.row.text-center.py-2.bg-light.justify-content-center.align-items-center.border.border-4
@@ -818,15 +829,11 @@
          [:button#snapshot-pause.btn.btn-outline-dark [:i.fas.fa-pause]]
          [:button#snapshot-next.btn.btn-outline-dark [:i.fas.fa-step-forward]]]]])))
   (let [snapshot-previous (js/document.getElementById "snapshot-previous")]
-    (bs/on-click snapshot-previous #_(swap! state-atom update :selected-snapshot
-                                            (fn [n] (dec (or n (h/count (:history @state-atom))))))
-                 #(bs/show-toast-msg "Previous snapshot!")))
+    (bs/on-click snapshot-previous #(set-previous-snapshot! state)))
   (let [snapshot-next (js/document.getElementById "snapshot-next")]
-    (bs/on-click snapshot-next #_(swap! state-atom update :selected-snapshot inc)
-                 #(bs/show-toast-msg "Next snapshot!")))
+    (bs/on-click snapshot-next #(set-next-snapshot! state)))
   (let [snapshot-play (js/document.getElementById "snapshot-play")]
-    (oset! snapshot-play :hidden true)
-    (bs/on-click snapshot-play #_(swap! state-atom assoc :selected-snapshot nil)
+    (bs/on-click snapshot-play
                  #(bs/show-toast-msg "Play!")))
   (let [snapshot-pause (js/document.getElementById "snapshot-pause")]
     (bs/on-click snapshot-pause #_(swap! state-atom assoc :selected-snapshot
@@ -851,37 +858,33 @@
                                            str]))))))
 
 (defn update-debug-panel [state]
-  (go (let [debug-panel (js/document.querySelector "#debug-panel")]
-        (when (str/blank? (oget debug-panel :innerHTML))
-          (init-debug-panel debug-panel state))
-        (let [debug-data (-> @state :debug)
-              history (:snapshots debug-data)
-              max (-> history count dec)
-              disabled? (empty? history)
-              selected-snapshot (:selected-snapshot debug-data)]
-          (doto (js/document.getElementById "snapshot-print")
-            (oset! :disabled disabled?))
-          (doto (js/document.getElementById "snapshot-copy")
-            (oset! :disabled disabled?))
-          (doto (js/document.getElementById "snapshot-range")
-            (oset! :disabled disabled?)
-            (oset! :max max)
-            (oset! :value (or selected-snapshot max)))
-          (doto (js/document.getElementById "snapshot-play")
-            (oset! :disabled disabled?)
-            (oset! :hidden (last-snapshot? debug-data)))
-          (doto (js/document.getElementById "snapshot-pause")
-            (oset! :disabled disabled?)
-            (oset! :hidden (some? selected-snapshot)))
-          (doto (js/document.getElementById "snapshot-previous")
-            (oset! :disabled (or disabled?
-                                 (and (some? selected-snapshot)
-                                      (<= selected-snapshot 0)))))
-          (doto (js/document.getElementById "snapshot-next")
-            (oset! :disabled (or disabled?
-                                 (last-snapshot? debug-data)
-                                 (>= selected-snapshot max))))))
-      ))
+  (go (let [debug-data (-> @state :debug)
+            history (:snapshots debug-data)
+            max (-> history count dec)
+            disabled? (empty? history)
+            selected-snapshot (:selected-snapshot debug-data)]
+        (doto (js/document.getElementById "snapshot-print")
+          (oset! :disabled disabled?))
+        (doto (js/document.getElementById "snapshot-copy")
+          (oset! :disabled disabled?))
+        (doto (js/document.getElementById "snapshot-range")
+          (oset! :disabled disabled?)
+          (oset! :max max)
+          (oset! :value (or selected-snapshot max)))
+        (doto (js/document.getElementById "snapshot-play")
+          (oset! :disabled (or disabled?
+                               (last-snapshot? debug-data))))
+        (doto (js/document.getElementById "snapshot-pause")
+          (oset! :disabled disabled?)
+          (oset! :hidden (some? selected-snapshot)))
+        (doto (js/document.getElementById "snapshot-previous")
+          (oset! :disabled (or disabled?
+                               (and (some? selected-snapshot)
+                                    (<= selected-snapshot 0)))))
+        (doto (js/document.getElementById "snapshot-next")
+          (oset! :disabled (or disabled?
+                               (last-snapshot? debug-data)
+                               (>= selected-snapshot max)))))))
 
 (defn update-ui [state]
   (go (<! (update-players state))
@@ -1100,6 +1103,7 @@
 
 (defn initialize [state]
   (go (.removeAllSubmorphs world)
+      (init-debug-panel! state)
       (<! (init-map))
       (<! (init-countries state))
       (add-watch state :state-change
