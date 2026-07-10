@@ -1049,7 +1049,7 @@
 (defn maybe-show-exchange-notification [state old-game new-game]
   (when-not (teg/game-over? new-game)
     (when-not (is-my-turn? (:user @state) new-game)
-      (when (= (old-game :turn) (new-game :turn))
+      (when (= (:turn old-game) (:turn new-game))
         (let [player-id (teg/get-current-player new-game)]
           (when (> (get-in new-game [:players player-id :exchanges])
                    (get-in old-game [:players player-id :exchanges]))
