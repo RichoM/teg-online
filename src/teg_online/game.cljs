@@ -116,9 +116,11 @@
   (when-let [goal-idx (get-in game [:players player-id :goal])]
     (if (< goal-idx (count occupation-goals))
       (get occupation-goals goal-idx)
-      (destruction-goal (nth (get-players game)
-                             (- goal-idx
-                                (count occupation-goals)))))))
+      (let [players (get-players game)
+            player-idx (- goal-idx
+                          (count occupation-goals))]
+        (destruction-goal (nth players player-idx)
+                          player-idx)))))
 
 (defn draw-card? [game]
   (get-in game [:current-turn :draw-card?]))
@@ -263,12 +265,16 @@
                                (-> ::board/africa board/get-countries-by-continent count))
                            (>= (-> ::board/north-america countries count) 5))))}])
 
-(defn destruction-goal [{:keys [id name]}]
-  {:name (u/format "Destruir al ejército del jugador %1" name)
-   :validator-fn (fn [old-game new-game _]
-                   (and (or (nil? (get-player old-game id))
-                            (seq (player-countries old-game id)))
-                        (empty? (player-countries new-game id))))})
+(defn destruction-goal
+  ([{:keys [id name]}]
+   {:name (u/format "Destruir al ejército del jugador %1" name)
+    :validator-fn (fn [old-game new-game _]
+                    (and (or (nil? (get-player old-game id))
+                             (seq (player-countries old-game id)))
+                         (empty? (player-countries new-game id))))})
+  ([player player-idx]
+   (assoc (destruction-goal player)
+          :secret-name (u/format "Destruir al ejército del jugador %1" (inc player-idx)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Assertions

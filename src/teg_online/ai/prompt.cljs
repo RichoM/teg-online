@@ -193,31 +193,12 @@
         (println turn phase)
         (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
              "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
-             "Tu objetivo secreto es: " (:name goal) ".\n"
+             "Tu objetivo secreto es: " (or (:secret-name goal)
+                                            (:name goal)) 
+             ".\n"
              board-geography
              "\n\n"
              "El estado del tablero en este momento de la partida es el siguiente.\n"
              (get-board-state game) "\n\n"
              turn-actions-prompt
              phase-prompt)))))
-
-(comment
-  (require '[teg-online.main :refer [game-atom user-atom]])
-
-  (-> board/countries ::board/alaska :name)
-  
-
-  (tap> *1)
-  (board/continents)
-  board/continents
-  (tap> board/countries)
-  (tap> @game-atom)
-  (def game @game-atom)
-
-  (teg/get-army game ::board/alemania)
-
-  (teg/get-current-player game)
-
-  (println (make-prompt @game-atom []))
-
-  )
