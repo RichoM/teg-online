@@ -390,22 +390,11 @@
               (show-draw-card-dialog (:game @state) random-card)))
           (swap! state update :game (comp teg/finish-action teg/check-unused-cards))))))
 
-(defn last-snapshot? [{:keys [snapshots selected-snapshot]}]
-  (= selected-snapshot (dec (count snapshots))))
-
-(comment
-  
-  (tap> @teg-online.main/state)
-  
-  (last-snapshot? (-> @teg-online.main/state :debug))
-
-  )
-
 (defmulti can-interact-with-country?
   (fn [state _country _player]
     (let [{:keys [phase] :as game} (:game @state)
           user (:user @state)]
-      (when (and (last-snapshot? (:debug @state))
+      (when (and (nil? (-> @state :debug :selected-snapshot))
                  (is-my-turn? user game))
         phase))))
 
@@ -754,7 +743,7 @@
   (go (let [{:keys [turn] :as game} (:game @state)
             user (:user @state)
             status-bar (js/document.querySelector "#status-bar")
-            show-buttons? (last-snapshot? (:debug @state))]
+            show-buttons? (nil? (-> @state :debug :selected-snapshot))]
         (oset! status-bar :innerHTML "")
         (if (is-my-turn? user game)
           (.add (oget status-bar :classList) "player-turn")
@@ -801,14 +790,32 @@
                   (assoc :game snapshot))))))
 
 (defn set-previous-snapshot! [state]
-  (let [selected-snapshot (-> @state :debug :selected-snapshot)]
+  (if-let [selected-snapshot (-> @state :debug :selected-snapshot)]
     (when (> selected-snapshot 0)
-      (set-current-snapshot! state (dec selected-snapshot)))))
+      (set-current-snapshot! state (dec selected-snapshot)))
+    (set-current-snapshot! state (- (count (-> @state :debug :snapshots)) 2))))
 
 (defn set-next-snapshot! [state]
   (let [selected-snapshot (-> @state :debug :selected-snapshot)]
     (when (< selected-snapshot (dec (count (-> @state :debug :snapshots))))
       (set-current-snapshot! state (inc selected-snapshot)))))
+
+(defn restart-from-current-snapshot! [state]
+  (let [selected-snapshot (-> @state :debug :selected-snapshot)]
+    (println selected-snapshot)
+    (when-let [snapshot (nth (-> @state :debug :snapshots)
+                             selected-snapshot nil)]
+      (println snapshot)
+      (let [old @state
+            new (swap! state #(-> %
+                                  (update-in [:debug :snapshots] subvec 0 (inc selected-snapshot))
+                                  (assoc-in [:debug :selected-snapshot] nil)
+                                  (assoc :game snapshot)))]
+        (println (= old new))))))
+
+(defn pause-from-current-snapshot! [state]
+  (swap! state assoc-in [:debug :selected-snapshot] 
+         (dec (count (-> @state :debug :snapshots)))))
 
 (defn init-debug-panel! [state]
   (doto (js/document.querySelector "#debug-panel")
@@ -833,12 +840,9 @@
   (let [snapshot-next (js/document.getElementById "snapshot-next")]
     (bs/on-click snapshot-next #(set-next-snapshot! state)))
   (let [snapshot-play (js/document.getElementById "snapshot-play")]
-    (bs/on-click snapshot-play
-                 #(bs/show-toast-msg "Play!")))
+    (bs/on-click snapshot-play #(restart-from-current-snapshot! state)))
   (let [snapshot-pause (js/document.getElementById "snapshot-pause")]
-    (bs/on-click snapshot-pause #_(swap! state-atom assoc :selected-snapshot
-                                         (dec (h/count (:history @state-atom))))
-                 #(bs/show-toast-msg "Pause!")))
+    (bs/on-click snapshot-pause #(pause-from-current-snapshot! state)))
   (let [snapshot-range (js/document.getElementById "snapshot-range")]
     (bs/on-input snapshot-range
                  #(set-current-snapshot! state (int (oget snapshot-range :value)))))
@@ -872,8 +876,9 @@
           (oset! :max max)
           (oset! :value (or selected-snapshot max)))
         (doto (js/document.getElementById "snapshot-play")
+          (oset! :hidden (nil? selected-snapshot))
           (oset! :disabled (or disabled?
-                               (last-snapshot? debug-data))))
+                               (nil? (:selected-snapshot debug-data)))))
         (doto (js/document.getElementById "snapshot-pause")
           (oset! :disabled disabled?)
           (oset! :hidden (some? selected-snapshot)))
@@ -883,7 +888,7 @@
                                     (<= selected-snapshot 0)))))
         (doto (js/document.getElementById "snapshot-next")
           (oset! :disabled (or disabled?
-                               (last-snapshot? debug-data)
+                               (nil? (:selected-snapshot debug-data))
                                (>= selected-snapshot max)))))))
 
 (defn update-ui [state]
@@ -1021,7 +1026,7 @@
   [state {old-turn :turn} {new-turn :turn, :as new-game}]
   (when-not (teg/game-over? new-game)
     (when-not (= old-turn new-turn)
-      (when (last-snapshot? (-> @state :debug))
+      (when (nil? (-> @state :debug :selected-snapshot))
         (show-toast (if (is-my-turn? (:user @state) new-game)
                       "¡Es tu turno!"
                       (list [:span "Es el turno de "]
@@ -1072,17 +1077,17 @@
   (let [old-game (:game old)
         new-game (:game new)]
     ;; Append new snapshot
-    (when (and (last-snapshot? (-> @state :debug))
+    (when (and (nil? (-> @state :debug :selected-snapshot))
                (not= [(:turn old-game) (:phase old-game)]
                      [(:turn new-game) (:phase new-game)])
                (not= new-game (-> @state :debug :snapshots peek)))
-      (swap! state #(-> %
-                        (update-in [:debug :snapshots] conj new-game)
-                        (update-in [:debug :selected-snapshot] inc))))
+      (swap! state update-in [:debug :snapshots] conj new-game))
     ;; Update UI
     (when (or (not= old-game new-game)
               (not= (-> old :ui :user-data)
-                    (-> new :ui :user-data)))
+                    (-> new :ui :user-data))
+              (not= (-> old :debug)
+                    (-> new :debug)))
       (maybe-reset-user-data state old-game new-game)
       (maybe-show-forced-exchange-dialog state old-game new-game)
       (maybe-show-secret-goal-dialog state old-game new-game)
@@ -1093,13 +1098,14 @@
       (maybe-show-moving-army-effect state old-game new-game)
       (update-ui state))
     ;; Maybe update AI
-    (when (and (last-snapshot? (:debug new))
-               (str/starts-with?
-                (str (teg/get-current-player new-game))
-                ":ai")
-               (not= [(:turn old-game) (:phase old-game)]
-                     [(:turn new-game) (:phase new-game)]))
-      (ai/update! state))))
+    (when (and (nil? (-> new :debug :selected-snapshot))
+               (or (some? (-> old :debug :selected-snapshot))
+                   (not= [(:turn old-game) (:phase old-game)]
+                         [(:turn new-game) (:phase new-game)])))
+      (when (str/starts-with?
+             (str (teg/get-current-player new-game))
+             ":ai")
+        (ai/update! state)))))
 
 (defn initialize [state]
   (go (.removeAllSubmorphs world)
@@ -1111,7 +1117,7 @@
                    (on-state-change state old new)))
       (swap! state update :debug
              #(or % {:snapshots []
-                     :selected-snapshot -1}))
+                     :selected-snapshot nil}))
       (on-state-change state {} @state) ; Force update now
       ))
 
@@ -1121,6 +1127,10 @@
   
 
   (def state teg-online.main/state)
+  (-> @state :debug :selected-snapshot)
+
+  (restart-from-current-snapshot! state)
+  (update-debug-panel state)
 
   [(-> @state :debug :snapshots count)
    (-> @state :debug :selected-snapshot)]
