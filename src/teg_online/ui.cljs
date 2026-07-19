@@ -9,7 +9,8 @@
             [teg-online.ui-constants :refer [country-data player-colors dice-images card-images]]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.ai.client :as ai]))
+            [teg-online.ai.client :as ai]
+            [teg-online.ai.scoring :refer [player-score]]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
 
@@ -676,7 +677,10 @@
                               [:span (count (teg/player-countries game pid))]]
                              [:div.col-auto
                               [:i.fas.fa-shield-alt.me-1 {:style icon-style}]
-                              [:span (teg/player-army-count game pid)]]]])))))))
+                              [:span (teg/player-army-count game pid)]]
+                             [:div.col-auto
+                              [:i.fas.fa-star.me-1 {:style icon-style}]
+                              [:span (player-score game pid)]]]])))))))
 
 (defn exchange-button-visible? [user game]
   (and (is-my-turn? user game)
