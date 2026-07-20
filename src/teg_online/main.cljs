@@ -147,70 +147,7 @@
 (comment
   @state
 
+  ()
+
   
-  (swap! state assoc :selected-snapshot nil)
-
-  (count (:history @state))
-  (tap> state)
-  (tap> board/countries)
-
-
-
-  (def game (:game @state))
-  (def players (:players game))
-
-  (teg/get-dice-count (:game @state) ::b/alemania ::b/alaska)
-
-  (go (println (<! (show-main-menu))))
-
-  (do
-    (bs/hide-modals)
-    (swap! state assoc :game
-           (-> (teg/new-game)
-               (teg/join-game :p1 "Richo")
-               (teg/join-game :p2 "Lechu")
-               (teg/join-game :p3 "Diego")
-               (teg/distribute-countries (sort (keys b/countries)))
-               (teg/distribute-goals)
-               (teg/start-game))))
-
-  (map (fn [player-id]
-         (let [{:keys [name goal]} (teg/get-player @game-atom player-id)]
-           [name goal (:name (teg/get-player-goal @game-atom player-id))]))
-       (@game-atom :turn-order))
-
-  (teg/get-player-goal @game-atom :p3)
-
-
-  (doseq [[i c] (map-indexed vector (teg/player-countries @game-atom (last (@game-atom :turn-order))))]
-    (swap! game-atom assoc-in [:countries c :owner] (if (odd? i)
-                                                      (first (@game-atom :turn-order))
-                                                      (second (@game-atom :turn-order)))))
-
-  (swap! game-atom assoc :phase ::teg/add-army-europa)
-
-  (doseq [country (-> (b/get-countries-by-continent ::b/europa)
-                      (disj ::b/rusia))]
-    (swap! game-atom assoc-in [:countries country :owner] :p1))
-
-  (doseq [country (b/get-countries-by-continent ::b/africa)]
-    (swap! game-atom assoc-in [:countries country :owner] :p1))
-
-  (swap! game-atom assoc-in [:countries ::b/argentina :owner] :p1)
-
-
-  (require '[cognitect.transit :as t])
-
-  (def writer (t/writer :json))
-
-
-  (tap> @game-atom)
-  (def game-transit (t/write writer @game-atom))
-
-  (def reader (t/reader :json))
-
-  (/ (count game-transit)
-     (count (js/JSON.stringify @game-atom)))
-  (tap> (t/read reader game-transit))
-
   )
