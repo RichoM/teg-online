@@ -187,14 +187,12 @@
 (defn make-prompt [{:keys [players turn phase] :as game} turn-actions]
   (when-let [current-player (teg/get-current-player game)]
     (when-let [phase-prompt (game-phase-prompt game turn-actions)]
-      (let [turn-actions-prompt (turn-actions-prompt turn-actions)
-            goal (teg/get-player-goal game current-player)]
+      (let [turn-actions-prompt (turn-actions-prompt turn-actions)]
         (println)
         (println turn phase)
         (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
              "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
-             "Tu objetivo secreto es: " (or (:secret-name goal)
-                                            (:name goal)) 
+             "Todos los jugadores tienen el mismo objetivo: conquistar 30 países para ganar la partida."
              ".\n"
              board-geography
              "\n\n"

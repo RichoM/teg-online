@@ -45,6 +45,8 @@
 
   (teg/player-continents game player-id)
 
+  (player-score game player-id)
+
   (tap> (-> @state :game))
 
   (->> (vals (:players game))

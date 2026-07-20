@@ -477,7 +477,7 @@
                         (recur)
                         goal)))
         temp (atom game)]
-    (doseq [player-id (game :turn-order)]
+    #_(doseq [player-id (game :turn-order)]
       (let [goal (let [rnd (rand-goal)]
                    (if (< rnd (count occupation-goals))
                      rnd
