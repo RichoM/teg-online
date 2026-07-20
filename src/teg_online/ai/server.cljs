@@ -118,7 +118,7 @@
                  (go (try
                        (let [{:keys [game turn-actions]} (parse-request req)
                              ;; TODO(Richo): Just for testing
-                             actions (if (and false (= :ai-2 (teg/get-current-player game)))
+                             actions (if (or true (= :ai-2 (teg/get-current-player game)))
                                        (<? (get-strategy! game turn-actions log))
                                        (<? (get-basic-actions! game turn-actions log)))]
                          (doto res
