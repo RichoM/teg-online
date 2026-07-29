@@ -1,5 +1,6 @@
 (ns teg-online.ui
   (:require [clojure.core.async :as a :refer [go <!]]
+            [teg-online.utils.async :refer [<? go-try]]
             [clojure.string :as str]
             [oops.core :refer [oget oset! ocall!]]
             [crate.core :as crate]
@@ -1076,6 +1077,27 @@
         (when-not (zero? delta-army)
           (moved-army-effect state country delta-army))))))
 
+(defn try-update-ai! [state]
+  (go
+    (loop [turn-actions []]
+      (try
+        (println "Asking AI")
+        (let [{:keys [original-state pass? conversation
+                      actions mutation]}
+              (<? (ai/ask! @state turn-actions))]
+          (if (= (:game @state)
+                 (:game original-state))
+            (if (nil? (-> @state :debug :selected-snapshot))
+              (do (doseq [t conversation]
+                    (println t))
+                  (swap! state update :game mutation)
+                  (when-not pass?
+                    (recur (apply conj turn-actions actions))))
+              (println "Game is paused! Ignoring AI response..."))
+            (println "Different game! Ignoring AI response...")))
+        (catch :error err
+          (println "ERROR!" err))))))
+
 (defn on-state-change
   [state old new]
   (let [old-game (:game old)
@@ -1109,7 +1131,7 @@
       (when (str/starts-with?
              (str (teg/get-current-player new-game))
              ":ai")
-        (ai/update! state)))))
+        (try-update-ai! state)))))
 
 (defn initialize [state]
   (go (.removeAllSubmorphs world)
