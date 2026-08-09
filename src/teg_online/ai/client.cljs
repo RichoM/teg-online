@@ -4,7 +4,8 @@
             [teg-online.utils.async :refer [<? go-try]]
             [cognitect.transit :as t]
             [teg-online.game :as teg]
-            [teg-online.ai.response :as r]))
+            [teg-online.ai.response :as r]
+            [teg-online.ai.models :refer [models]]))
 
 
 (defonce reader (t/reader :json))
@@ -51,27 +52,51 @@
 
 (def counter (atom 0))
 
+(comment
+
+  (def game (@teg-online.main/state :game))
+  (def turn-actions [])
+
+  (doseq [body (->> (keys models)
+                    (map (fn [model]
+                           (t/write writer {:game game
+                                            :turn-actions turn-actions
+                                            :model model}))))]
+    (foo! body (fn [response]
+                 (println response))))
+
+  (defn foo! [body action!]
+    (go (let [response (<? (fetch-response body))]
+          (action! response))))
+
+
+  )
+
 (defn ask! [state turn-actions]
-  (go
-    (try
-      (let [game (:game state)
-            body (t/write writer {:game game
-                                  :turn-actions turn-actions})
-            response (<? (fetch-response body))
-            {:keys [actions conversation]}
-            (if response
-              (t/read reader response)
-              {:actions [r/pass]})]
-        {:original-state state
-         :conversation conversation
-         :actions actions
-         :pass? (= r/pass (last actions))
-         ;; TODO(Richo): Before applying the mutation we need to check that the new game state
-         ;; is equal the original game state, and also that we don't have a selected-snapshot!
-         :mutation (fn [game]
-                     (reduce (fn [game action]
-                               (try-apply-action game action))
-                             game
-                             actions))})
-      (catch :default err
-        (println "ERROR asking AI!" err)))))
+  (let [game (:game state)]
+    (->> (keys models)
+         (map (fn [model]
+                (let [body (t/write writer {:game game
+                                            :turn-actions turn-actions
+                                            :model model})]
+                  [model
+                   (go (try
+                         (let [response (<? (fetch-response body))
+                               {:keys [actions conversation]}
+                               (if response
+                                 (t/read reader response)
+                                 {:actions [r/pass]})]
+                           {:original-state state
+                            :conversation conversation
+                            :actions actions
+                            :pass? (= r/pass (last actions))
+                            ;; TODO(Richo): Before applying the mutation we need to check that the new game state
+                            ;; is equal the original game state, and also that we don't have a selected-snapshot!
+                            :mutation (fn [game]
+                                        (reduce (fn [game action]
+                                                  (try-apply-action game action))
+                                                game
+                                                actions))})
+                         (catch :default err
+                           {:error err})))])))
+         (into {}))))

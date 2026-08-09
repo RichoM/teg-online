@@ -59,6 +59,5 @@
                  (->> (-> b/countries country-id :neighbours)
                       (filter player-countries)
                       (seq)))))
-  
-  
+
   )

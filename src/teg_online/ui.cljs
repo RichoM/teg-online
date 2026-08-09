@@ -1,5 +1,6 @@
 (ns teg-online.ui
   (:require [clojure.core.async :as a :refer [go <!]]
+            [clojure.pprint :as pp]
             [teg-online.utils.async :refer [<? go-try]]
             [clojure.string :as str]
             [oops.core :refer [oget oset! ocall!]]
@@ -11,6 +12,7 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ai.client :as ai]
+            [teg-online.ai.models :refer [models]]
             [teg-online.ai.scoring :refer [player-score]]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
@@ -1077,26 +1079,137 @@
         (when-not (zero? delta-army)
           (moved-army-effect state country delta-army))))))
 
+(defn show-ai-response-modal [responses]
+  (go (let [result-chan (a/promise-chan)
+            response-content (->> responses
+                                  (map-indexed
+                                   (fn [i [model response-chan]]
+                                     (let [model-name (models model)
+                                           header (crate/html
+                                                   [:div.d-flex.align-items-center.w-100
+                                                    [:strong {:role "status"} model-name]
+                                                    [:div.spinner-border.spinner-border-sm.ms-auto.me-3 ]])
+                                           body (crate/html
+                                                 [:div.accordion-body
+                                                  "Thinking..."
+                                                  ])
+                                           item
+                                           [:div.accordion-item
+                                            [:h2.accordion-header
+                                             {:id (str "heading" i)}
+                                             [:button.accordion-button.collapsed
+                                              {:type "button"
+                                               :data-bs-toggle "collapse"
+                                               :data-bs-target (str "#collapse" i)
+                                               :aria-expanded "false"
+                                               :aria-controls (str "collapse" i)}
+                                              header]]
+                                            [:div.accordion-collapse.collapse
+                                             {:id (str "collapse" i)
+                                              :aria-labelledby (str "heading" i)
+                                              :data-bs-parent "#accordionExample"}
+                                             body]]]
+                                       (go (let [response (<? response-chan)]
+                                             (doto header
+                                               (oset! :innerText "")
+                                               (.appendChild (crate/html [:strong model-name])))
+                                             (if-let [error (:error response)]
+                                               (doto body
+                                                 (oset! :innerText (str "ERROR: " error)))
+                                               (do
+                                                 (doto body
+                                                   (oset! :innerText ""))
+                                                 (doseq [[idx [prompt resp]] (->> (:conversation response)
+                                                                                  (partition-all 2)
+                                                                                  (map-indexed vector))]
+                                                   (doto body
+                                                     (.appendChild (crate/html
+                                                                    [:details
+                                                                     [:summary (str "Prompt #" (inc idx))]
+                                                                     [:p [:pre prompt]]]))
+                                                     (.appendChild (crate/html
+                                                                    [:details
+                                                                     [:summary (str "Response #" (inc idx))]
+                                                                     [:p [:pre resp]]]))))
+                                                 (doto body
+                                                   (.appendChild (crate/html
+                                                                  [:p.my-2
+                                                                   [:strong "Actions"]
+                                                                   (->> (:actions response)
+                                                                        (map (fn [action]
+                                                                               [:pre (pp/write action :stream nil)])))]))
+                                                   (.appendChild (doto (crate/html [:button.btn.btn-primary "Aplicar"])
+                                                                   (bs/on-click #(a/put! result-chan response)))))))))
+                                       item))))
+
+            modal (-> (bs/make-modal :header (list [:h2 "Preguntando a la IA..."]
+                                                   bs/close-modal-btn)
+                                     :body [:div.container.overflow-hidden
+                                            [:div.row
+                                             [:div#accordionExample.accordion.font-monospace
+                                              response-content]]]))]
+        (bs/show-modal modal {:backdrop "static"
+                              :keyboard false})
+        (let [result (<? result-chan)]
+          (bs/hide-modal modal)
+          result))))
+
 (defn try-update-ai! [state]
   (go
     (loop [turn-actions []]
-      (try
-        (println "Asking AI")
-        (let [{:keys [original-state pass? conversation
-                      actions mutation]}
-              (<? (ai/ask! @state turn-actions))]
-          (if (= (:game @state)
-                 (:game original-state))
-            (if (nil? (-> @state :debug :selected-snapshot))
-              (do (doseq [t conversation]
-                    (println t))
-                  (swap! state update :game mutation)
-                  (when-not pass?
-                    (recur (apply conj turn-actions actions))))
-              (println "Game is paused! Ignoring AI response..."))
-            (println "Different game! Ignoring AI response...")))
-        (catch :error err
-          (println "ERROR!" err))))))
+      (let [responses (ai/ask! @state turn-actions)
+            {:keys [original-state pass?
+                    actions mutation]}
+            (<? (show-ai-response-modal responses))]
+        (if (= (:game @state)
+               (:game original-state))
+          (if (nil? (-> @state :debug :selected-snapshot))
+            (do (swap! state update :game mutation)
+                (when-not pass?
+                  (recur (apply conj turn-actions actions))))
+            (println "Game is paused! Ignoring AI response..."))
+          (println "Different game! Ignoring AI response..."))))))
+
+(comment
+  
+  (def responses (atom []))
+  (def modal-content (crate/html [:div.container.overflow-hidden
+                                  [:div.row.text-center [:i.fas.fa-circle-notch.fa-spin.fa-5x]]]))
+  (def modal (bs/make-modal :body modal-content))
+  
+
+  (-> modal
+      (bs/show-modal {:backdrop "static"
+                      :keyboard false}))
+  
+  (bs/hide-modals)
+  
+  (doto modal-content
+    (oset! :innerText "")
+    (.appendChild (crate/html
+                   [:div.container.overflow-hidden
+                    [:div.row
+                     [:div#accordionExample.accordion.font-monospace
+                      (->> (range 20)
+                           (map (fn [i]
+                                  [:div.accordion-item
+                                   [:h2.accordion-header
+                                    {:id (str "heading" i)}
+                                    [:button.accordion-button.collapsed {:type "button"
+                                                               :data-bs-toggle "collapse"
+                                                               :data-bs-target (str "#collapse" i)
+                                                               :aria-expanded "false"
+                                                               :aria-controls (str "collapse" i)}
+                                     [:strong "Accordion Item #" (inc i)]]]
+                                   [:div.accordion-collapse.collapse
+                                    {:id (str "collapse" i)
+                                     :aria-labelledby (str "heading" i)
+                                     :data-bs-parent "#accordionExample"}
+                                    [:div.accordion-body
+                                     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc in nulla purus. Proin augue enim, aliquam nec pulvinar in, ornare a odio. Vestibulum feugiat sem sit amet nisl imperdiet viverra. Cras viverra ex eu eleifend vulputate. Morbi placerat ornare risus vel tincidunt. Quisque sit amet sapien arcu. Maecenas ullamcorper auctor est sit amet condimentum. Sed in augue sit amet odio tincidunt dapibus."
+                                     "Fusce risus quam, dictum ut leo vitae, eleifend ultricies eros. Duis eu ullamcorper nisi. Nunc viverra tellus varius augue feugiat, sed malesuada massa eleifend. Morbi bibendum magna in turpis tempor, sit amet pretium leo condimentum. Nullam fringilla justo eu nisl varius, sed mollis dolor feugiat. Donec ut neque sodales, viverra nisi et, sodales tortor. Curabitur cursus metus turpis, nec tristique elit gravida quis. Vivamus vehicula enim ipsum, ac sollicitudin tellus commodo et."]]])))]]])))
+  
+  )
 
 (defn on-state-change
   [state old new]

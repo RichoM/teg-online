@@ -14,6 +14,7 @@
             [teg-online.ai.prompt :refer [make-prompt]]
             [teg-online.ai.strategy :refer [strategy-prompt action-prompt]]
             [teg-online.ai.response :as response]
+            [teg-online.ai.models :refer [models]]
             [teg-online.utils.fs :as fs]))
 
 (defonce server (atom nil))
@@ -67,59 +68,76 @@
       (<? (log (str ">>> RESPONSE:\n" response)))
       (<? (log actions))
       {:actions actions
-       :conversation ["BASIC" prompt response]})))
+       :conversation [prompt response]})))
 
-(defn get-strategy! [game turn-actions log]
+(defn get-strategy! [game turn-actions model log]
   (go
-    (let [initial-prompt (strategy-prompt game turn-actions)
-          strat-response (when initial-prompt
-                           (:output_text
-                            (<? (ai/create-response!
-                                 {:model "gpt-4.1-mini"
-                                  :temperature 0
-                                  :input initial-prompt}))))
-          second-prompt (action-prompt game strat-response)
-          action-response (when strat-response
-                            (:output_text
-                             (<? (ai/create-response!
-                                  {:model "gpt-4.1-mini"
-                                   :temperature 0
-                                   :input second-prompt}))))
-          actions (if action-response
-                    (response/parse-response game
-                                             turn-actions
-                                             action-response)
-                    [response/pass])]
-      (<? (log (str "Strategy\n"
-                    (:turn game) ". " (:phase game)
-                    " / "
-                    (teg/get-current-player-name game))))
-      (when initial-prompt
-        (<? (log (str ">>> INITIAL PROMPT:\n" initial-prompt))))
-      (when strat-response
-        (<? (log (str ">>> STRATEGY:\n" strat-response))))
-      (when second-prompt
-        (<? (log (str ">>> SECOND PROMPT:\n" second-prompt))))
-      (when action-response
-        (<? (log (str ">>> ACTION:\n" action-response))))
-      (when actions
-        (<? (log actions)))
-      {:conversation ["STRATEGY"
-                      initial-prompt
-                      strat-response
-                      second-prompt
-                      action-response]
-       :actions actions})))
+    (if false
+      (do (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
+          {:conversation [(strategy-prompt game turn-actions)
+                          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
+
+Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
+                          "ACAACA second prompt"
+                          "ACAACA actions"]
+           :actions [{:action ::response/add-army
+                      :country ::board/argentina
+                      :units 2}
+                     {:action ::response/add-army
+                      :country ::board/brazil
+                      :units 2}
+                     {:action ::response/add-army
+                      :country ::board/peru
+                      :units 1}
+                     response/pass]})
+      (let [initial-prompt (strategy-prompt game turn-actions)
+            strat-response (when initial-prompt
+                             (:output_text
+                              (<? (ai/create-response!
+                                   {:model (models model)
+                                    :temperature 0
+                                    :input initial-prompt}))))
+            second-prompt (action-prompt game strat-response)
+            action-response (when strat-response
+                              (:output_text
+                               (<? (ai/create-response!
+                                    {:model "gpt-4.1-mini"
+                                     :temperature 0
+                                     :input second-prompt}))))
+            actions (if action-response
+                      (response/parse-response game
+                                               turn-actions
+                                               action-response)
+                      [response/pass])]
+        (<? (log (str "Strategy\n"
+                      (:turn game) ". " (:phase game)
+                      " / "
+                      (teg/get-current-player-name game))))
+        (when initial-prompt
+          (<? (log (str ">>> INITIAL PROMPT:\n" initial-prompt))))
+        (when strat-response
+          (<? (log (str ">>> STRATEGY:\n" strat-response))))
+        (when second-prompt
+          (<? (log (str ">>> SECOND PROMPT:\n" second-prompt))))
+        (when action-response
+          (<? (log (str ">>> ACTION:\n" action-response))))
+        (when actions
+          (<? (log actions)))
+        {:conversation [initial-prompt
+                        strat-response
+                        second-prompt
+                        action-response]
+         :actions actions}))))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
       (.post (fn [req res]
                (let [log (partial log (.toISOString (js/Date.)))]
                  (go (try
-                       (let [{:keys [game turn-actions]} (parse-request req)
+                       (let [{:keys [game turn-actions model]} (parse-request req)
                              ;; TODO(Richo): Just for testing
                              actions (if (or true (= :ai-2 (teg/get-current-player game)))
-                                       (<? (get-strategy! game turn-actions log))
+                                       (<? (get-strategy! game turn-actions model log))
                                        (<? (get-basic-actions! game turn-actions log)))]
                          (doto res
                            (.type "text")
