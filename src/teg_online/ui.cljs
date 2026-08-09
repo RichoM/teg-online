@@ -1089,7 +1089,9 @@
       (oset! :innerText (str "ERROR: " error)))
     (do
       (doto body
-        (oset! :innerText ""))
+        (oset! :innerText "")
+        (oset! :style.max-height "500px")
+        (oset! :style.overflow "scroll"))
       (doseq [[idx [prompt resp]] (->> (:conversation response)
                                        (partition-all 2)
                                        (map-indexed vector))]
@@ -1118,8 +1120,7 @@
                  [:strong {:role "status"} model-name]
                  [:div.spinner-border.spinner-border-sm.ms-auto.me-3]])
         body (crate/html
-              [:div.accordion-body
-               "Thinking..."])
+              [:div.accordion-body "Thinking..."])
         item
         [:div.accordion-item
          [:h2.accordion-header
@@ -1134,7 +1135,7 @@
          [:div.accordion-collapse.collapse
           {:id (str "collapse" idx)
            :aria-labelledby (str "heading" idx)
-           :data-bs-parent "#accordionExample"}
+           :data-bs-parent "#accordion"}
           body]]]
     (go ;; Wait for response async and update UI when it arrives
       (let [response (<? response-chan)]
@@ -1149,19 +1150,19 @@
   (let [selected-response (a/promise-chan)
         select-response! #(a/put! selected-response %)
         modal (-> (bs/make-modal
-                   :header (list [:h2 "Preguntando a la IA..."]
-                                 bs/close-modal-btn)
+                   :header [:h2 "Preguntando a la IA..."]
                    :body [:div.container.overflow-hidden
                           [:div.row
-                           [:div#accordionExample.accordion.font-monospace
+                           [:div#accordion.accordion.font-monospace
                             (->> responses
                                  (map-indexed
                                   (fn [i [model response-chan]]
                                     (make-response-item! i (models model)
                                                          response-chan
                                                          select-response!))))]]]))]
-    (bs/show-modal modal {:backdrop "static"
-                          :keyboard false})
+    (doto modal
+      (js/makeDraggable)
+      (bs/show-modal {:backdrop "static" :keyboard false}))
     (go ; Wait until the user chooses an option, then return
       (let [result (<? selected-response)]
         (bs/hide-modal modal)
