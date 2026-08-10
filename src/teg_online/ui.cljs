@@ -1171,18 +1171,19 @@
 (defn try-update-ai! [state]
   (go
     (loop [turn-actions []]
-      (let [responses (ai/ask! @state turn-actions)
-            {:keys [original-state pass?
-                    actions mutation]}
-            (<? (show-ai-response-modal responses))]
-        (if (= (:game @state)
-               (:game original-state))
-          (if (nil? (-> @state :debug :selected-snapshot))
-            (do (swap! state update :game mutation)
-                (when-not pass?
-                  (recur (apply conj turn-actions actions))))
-            (println "Game is paused! Ignoring AI response..."))
-          (println "Different game! Ignoring AI response..."))))))
+      (let [responses (ai/ask! @state turn-actions)]
+        (<! (a/timeout 1000)) ; Small delay before showing the modal
+        (let [{:keys [original-state pass?
+                      actions mutation]}
+              (<? (show-ai-response-modal responses))]
+          (if (= (:game @state)
+                 (:game original-state))
+            (if (nil? (-> @state :debug :selected-snapshot))
+              (do (swap! state update :game mutation)
+                  (when-not pass?
+                    (recur (apply conj turn-actions actions))))
+              (println "Game is paused! Ignoring AI response..."))
+            (println "Different game! Ignoring AI response...")))))))
 
 (defn on-state-change
   [state old new]
