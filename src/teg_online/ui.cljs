@@ -1150,7 +1150,7 @@
   (let [selected-response (a/promise-chan)
         select-response! #(a/put! selected-response %)
         modal (-> (bs/make-modal
-                   :header [:h2 "Preguntando a la IA..."]
+                   :header [:h5.font-monospace "Preguntando a la IA"]
                    :body [:div.container.overflow-hidden
                           [:div.row
                            [:div#accordion.accordion.font-monospace
