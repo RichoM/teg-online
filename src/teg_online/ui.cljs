@@ -1172,7 +1172,7 @@
   (go
     (loop [turn-actions []]
       (let [responses (ai/ask! @state turn-actions)]
-        (<! (a/timeout 1000)) ; Small delay before showing the modal
+        (<! (a/timeout 1500)) ; Small delay before showing the modal
         (let [{:keys [original-state pass?
                       actions mutation]}
               (<? (show-ai-response-modal responses))]
