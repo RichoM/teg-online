@@ -39,6 +39,9 @@
           (teg/get-current-player game))))
 
 (defmethod apply-action ::attack [{:keys [attacker defender move]} game]
+  (when-not (valid-attack? game attacker defender)
+    (throw (ex-info "Invalid attack"
+                    {:game game :attacker attacker :defender defender})))
   (let [[a-count d-count] (teg/get-dice-count game attacker defender)
         a-throw (sort > (repeatedly a-count (partial rand-int 6)))
         d-throw (sort > (repeatedly d-count (partial rand-int 6)))
