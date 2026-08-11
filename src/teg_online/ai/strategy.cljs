@@ -148,7 +148,7 @@
 
 (defmethod game-phase-prompt ::teg/attack [game turn-actions]
   (when-let [options (seq (get-valid-attacks game))]
-    (str "Es tu turno de atacar. En caso de que quieras atacar, tenés que decidir qué país querés atacar, cuántos ejércitos estás dispuesto a perder, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
+    (str "Es tu turno de atacar. En caso de que quieras atacar, tenés que decidir qué país querés atacar, y cuántos ejércitos moverías al país destino (en caso de ganar el ataque).\n"
          "Tus opciones son:\n"
          (str/join "\n" (->> options
                              (map (fn [[country-a country-b]]
@@ -239,10 +239,10 @@
        "Necesito que resumas la siguiente estrategia en una acción concreta.\n"
        "\n<strategy>\n" strat "\n</strategy>\n\n"
        "Tené en cuenta que es tu turno de atacar. En base a la estrategia mencionada previamente, decime si conviene atacar o no.\n"
-       "En caso de que convenga atacar, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
+       "En caso de que convenga atacar, respondé con el país atacante, el país defensor, y la cantidad de ejércitos a mover (en caso de que la invasión sea exitosa), separadas por coma (una línea).\n"
        "Ejemplos:\n"
-       "Rusia,Polonia,3,2\n"
-       "Argentina,Uruguay,1,1\n"
+       "Rusia,Polonia,2\n"
+       "Argentina,Uruguay,1\n"
        "\n"
        "En caso de que convenga NO atacar en este turno, respondé sólo con la palabra: paso"))
 

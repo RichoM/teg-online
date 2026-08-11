@@ -38,27 +38,18 @@
        (= (teg/country-owner game attacker)
           (teg/get-current-player game))))
 
-(defmethod apply-action ::attack [{:keys [attacker defender sacrifice move]} game]
-  (let [min-army (max 1 (- (teg/get-army game attacker) sacrifice))]
-    (loop [game game]
-      (let [[a-count d-count] (teg/get-dice-count game attacker defender)
-            a-throw (sort > (repeatedly a-count (partial rand-int 6)))
-            d-throw (sort > (repeatedly d-count (partial rand-int 6)))
-            game (-> game
-                     (teg/attack
-                      [attacker a-throw]
-                      [defender d-throw]))]
-        (cond
-          (= 0 (teg/get-army game defender))
-          (teg/invade game attacker defender
-                      (min 3 move (dec (teg/get-army game attacker))))
-      
-          (> (teg/get-army game attacker) min-army)
-          (if (valid-attack? game attacker defender)
-            (recur game)
-            game)
-      
-          :else game)))))
+(defmethod apply-action ::attack [{:keys [attacker defender move]} game]
+  (let [[a-count d-count] (teg/get-dice-count game attacker defender)
+        a-throw (sort > (repeatedly a-count (partial rand-int 6)))
+        d-throw (sort > (repeatedly d-count (partial rand-int 6)))
+        game (-> game
+                 (teg/attack
+                  [attacker a-throw]
+                  [defender d-throw]))]
+    (if (= 0 (teg/get-army game defender))
+      (teg/invade game attacker defender
+                  (min 3 move (dec (teg/get-army game attacker))))
+      game)))
 
 (defn valid-regroup? [game src dest]
   (and (= (teg/country-owner game src)
@@ -136,19 +127,16 @@
                     (->> response
                          (str/split-lines)
                          (map (fn [line] (str/split line #",")))
-                         (keep (fn [[attacker-name defender-name sacrifice move]]
+                         (keep (fn [[attacker-name defender-name move]]
                                  (let [attacker (board/find-country-by-name attacker-name)
                                        defender (board/find-country-by-name defender-name)
-                                       sacrifice (parse-long (str/trim sacrifice))
                                        move (parse-long (str/trim move))]
                                    (when (and attacker
                                               defender
-                                              (pos-int? sacrifice)
                                               (pos-int? move))
                                      {:action ::attack
                                       :attacker attacker
                                       :defender defender
-                                      :sacrifice sacrifice
                                       :move move}))))
                          (ensure-valid game)))]
       (doseq [action actions]

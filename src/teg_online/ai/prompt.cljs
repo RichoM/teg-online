@@ -5,16 +5,6 @@
             [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
 
-;; Ideas:
-;; 1. Explain geography to the LLM. Right now it doesn't really understand how the countries are 
-;;    connected. I could add a short explanation of the board's geography to the system prompt.
-;; 2. Remember the LLM of the advantages of conquering a continent. I can see it sometimes adding
-;;    armies to unrelated countries instead of consolidating the strength into one continent.
-;; 3. Add probability of success to each attack option. That way it might realize some options 
-;;    are not good ideas. It might opt for passing without attacking.
-;; 4. Add a "strategy" LLM. Ask for a long-term strategy first, then ask to summarize the strategy
-;;    into a single action. I could maybe ask two different models for this.
-
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
         player-countries (set (teg/player-countries game player-id))]
@@ -142,10 +132,10 @@
                                          "% probabilidad de éxito)")))))
          "\n\n"
          "Si preferís NO atacar en este turno, respondé sólo con la palabra: paso.\n"
-         "Caso contrario, respondé con el país atacante, el país defensor, la cantidad de ejércitos a sacrificar, y la cantidad de ejércitos a mover, separadas por coma (una línea).\n"
+         "Caso contrario, respondé con el país atacante, el país defensor, y la cantidad de ejércitos a mover (en caso de que la invasión sea exitosa), separadas por coma (una línea).\n"
          "Ejemplos:\n"
-         "Rusia,Polonia,3,2\n"
-         "Argentina,Uruguay,1,1\n"
+         "Rusia,Polonia,2\n"
+         "Argentina,Uruguay,1\n"
          "paso\n"
          "\n"
          "IMPORTANTE: No olvides que podés elegir NO atacar, en cuyo caso, respondé con la palabra: paso")))
