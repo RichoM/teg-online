@@ -13,7 +13,7 @@
             [teg-online.board :as b]
             [teg-online.ai.client :as ai]
             [teg-online.ai.models :refer [models-by-id]]
-            [teg-online.ai.scoring :refer [player-score]]
+            [teg-online.ai.scoring :as score]
             [teg-online.ai.response :as response]))
 
 (defonce world (js/World. (js/document.querySelector "#board-canvas")))
@@ -650,6 +650,7 @@
 
 (defn update-players [state]
   (go (let [{:keys [players turn-order turn] :as game} (:game @state)
+            player-scores (score/normalized-scores game)
             players-row (js/document.querySelector "#players-bar .row")
             player-count (count turn-order)
             player-width (/ 12 (if (> player-count 4)
@@ -684,7 +685,7 @@
                               [:span (teg/player-army-count game pid)]]
                              [:div.col-auto
                               [:i.fas.fa-star.me-1 {:style icon-style}]
-                              [:span (player-score game pid)]]]])))))))
+                              [:span (.toFixed (* 100 (player-scores pid)) 2)]]]])))))))
 
 (defn exchange-button-visible? [user game]
   (and (is-my-turn? user game)
@@ -1024,7 +1025,8 @@
                  [:div.row.m-2]
                  [:div.row [:h3
                             [:i.fas.fa-angle-right.me-2]
-                            (if ((secret-goal :validator-fn) old-game new-game winner)
+                            (if (and secret-goal ; Secret goal could be nil!
+                                     (secret-goal :validator-fn) old-game new-game winner)
                               (secret-goal :name)
                               (if ((teg/common-goal :validator-fn) old-game new-game winner)
                                 (teg/common-goal :name)
