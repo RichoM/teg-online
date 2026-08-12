@@ -963,7 +963,8 @@
            (reset-user-data new-game))))
 
 (defn start-fireworks []
-  (let [fireworks (-> (mm/make-morph :color "black"
+  (let [begin-time (js/Date.now)
+        fireworks (-> (mm/make-morph :color "black"
                                      :alpha 0
                                      :width (oget world :width)
                                      :height (oget world :height))
@@ -971,8 +972,9 @@
     (.addMorph world fireworks)
     (mm/on-step fireworks
                 (fn []
-                  (when (and (>= (oget fireworks :alpha) 0.75)
-                             (< (rand) 0.05))
+                  (when (and (< (- (js/Date.now) begin-time) 5000)
+                         (>= (oget fireworks :alpha) 0.15)
+                             (< (rand) 0.15))
                     (let [x (rand (oget fireworks :width))
                           y (rand (oget fireworks :height))
                           amount (+ 150 (rand 300))
@@ -981,7 +983,9 @@
                       (mm/fireworks world (clj->js {:x x :y y})
                                     :amount amount
                                     :min-magnitude min
-                                    :max-magnitude max)))))))
+                                    :max-magnitude max)))))
+    (go (<! (a/timeout 6000))
+        (mm/vanish fireworks 1))))
 
 (defn maybe-show-forced-exchange-dialog
   [state
@@ -1011,9 +1015,10 @@
 (defn maybe-show-game-over-dialog [state old-game new-game]
   (when (and (nil? (:winner old-game))
              (:winner new-game))
-    (when (= (get (:user @state) :id)
-             (:winner new-game))
-      #_(start-fireworks))
+    (when (or true
+              (= (get (:user @state) :id)
+                 (:winner new-game)))
+      (start-fireworks))
     (bs/alert "Fin del juego"
               (let [winner (:winner new-game)
                     winner-name (:name (teg/get-player new-game winner))
