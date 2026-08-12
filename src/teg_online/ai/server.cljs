@@ -14,7 +14,7 @@
             [teg-online.ai.prompt :refer [make-prompt]]
             [teg-online.ai.strategy :refer [strategy-prompt action-prompt]]
             [teg-online.ai.response :as response]
-            [teg-online.ai.models :refer [models]]
+            [teg-online.ai.models :refer [models-by-id]]
             [teg-online.utils.fs :as fs]))
 
 (defonce server (atom nil))
@@ -46,15 +46,22 @@
       (println "ERROR writing response:" error)
       (throw error))))
 
-(defn get-basic-actions! [game turn-actions log]
+(defn fetch-response [model prompt]
+  (let [model-name (:name model)
+        temperature (:temperature model)]
+    (ai/create-response!
+     (cond-> {:model model-name
+              :input prompt}
+       ; Only send the temperature if the model specifies it
+       (some? temperature)
+       (assoc :temperature temperature)))))
+
+(defn get-basic-actions! [game turn-actions model log]
   (go
-    (let [prompt (make-prompt game turn-actions)
+    (let [prompt (make-prompt game turn-actions)          
           response (when prompt
                      (:output_text
-                      (<? (ai/create-response!
-                           {:model "gpt-4.1-mini"
-                            :temperature 0
-                            :input prompt}))))
+                      (<? (fetch-response model prompt))))
           actions (if response
                     (response/parse-response game
                                              turn-actions
@@ -93,10 +100,7 @@ Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean max
       (let [initial-prompt (strategy-prompt game turn-actions)
             strat-response (when initial-prompt
                              (:output_text
-                              (<? (ai/create-response!
-                                   {:model (models model)
-                                    :temperature 0
-                                    :input initial-prompt}))))
+                              (<? (fetch-response model initial-prompt))))
             second-prompt (action-prompt game strat-response)
             action-response (when strat-response
                               (:output_text
@@ -135,16 +139,17 @@ Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean max
                (let [log (partial log (.toISOString (js/Date.)))]
                  (go (try
                        (let [{:keys [game turn-actions model]} (parse-request req)
+                             {:keys [basic?] :as model} (models-by-id model)
                              ;; TODO(Richo): Just for testing
-                             actions (if (or true (= :ai-2 (teg/get-current-player game)))
-                                       (<? (get-strategy! game turn-actions model log))
-                                       (<? (get-basic-actions! game turn-actions log)))]
+                             actions (if basic?
+                                       (<? (get-basic-actions! game turn-actions model log))
+                                       (<? (get-strategy! game turn-actions model log)))]
                          (doto res
                            (.type "text")
                            (.send (write-response actions))))
                        (catch :default err
                          (println "ERROR" err)
-                         ;(js/console.log "Request:" req)
+                         (js/console.log "Request:" req)
                          (when-not (oget res :?headersSent)
                            (doto res
                              (ocall! :status (or (oget err :?statusCode) 500))

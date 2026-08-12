@@ -50,36 +50,14 @@
       (println "ERROR trying to apply action:" err)
       game)))
 
-(def counter (atom 0))
-
-(comment
-
-  (def game (@teg-online.main/state :game))
-  (def turn-actions [])
-
-  (doseq [body (->> (keys models)
-                    (map (fn [model]
-                           (t/write writer {:game game
-                                            :turn-actions turn-actions
-                                            :model model}))))]
-    (foo! body (fn [response]
-                 (println response))))
-
-  (defn foo! [body action!]
-    (go (let [response (<? (fetch-response body))]
-          (action! response))))
-
-
-  )
-
 (defn ask! [state turn-actions]
   (let [game (:game state)]
-    (->> (keys models)
-         (map (fn [model]
+    (->> models
+         (map (fn [{:keys [id]}]
                 (let [body (t/write writer {:game game
                                             :turn-actions turn-actions
-                                            :model model})]
-                  [model
+                                            :model id})]
+                  [id
                    (go (try
                          (let [response (<? (fetch-response body))
                                {:keys [actions conversation]}

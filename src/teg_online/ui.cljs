@@ -12,7 +12,7 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ai.client :as ai]
-            [teg-online.ai.models :refer [models]]
+            [teg-online.ai.models :refer [models-by-id]]
             [teg-online.ai.scoring :refer [player-score]]
             [teg-online.ai.response :as response]))
 
@@ -1114,8 +1114,9 @@
         (.appendChild (doto (crate/html [:button.btn.btn-primary "Aplicar"])
                         (bs/on-click #(select-response! response))))))))
 
-(defn make-response-item! [idx model-name response-chan select-response!]
-  (let [header (crate/html
+(defn make-response-item! [idx model response-chan select-response!]
+  (let [model-name (:display-name model)
+        header (crate/html
                 [:div.d-flex.align-items-center.w-100
                  [:strong {:role "status"} model-name]
                  [:div.spinner-border.spinner-border-sm.ms-auto.me-3]])
@@ -1156,8 +1157,8 @@
                            [:div#accordion.accordion.font-monospace
                             (->> responses
                                  (map-indexed
-                                  (fn [i [model response-chan]]
-                                    (make-response-item! i (models model)
+                                  (fn [i [model-id response-chan]]
+                                    (make-response-item! i (models-by-id model-id)
                                                          response-chan
                                                          select-response!))))]]]))]
     (doto modal
