@@ -9,12 +9,12 @@
             [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.attack-prob :refer [initialize-chances]]
-            [clojure.string :as str]
             [teg-online.utils.openai :as ai]
             [teg-online.ai.prompt :refer [make-prompt]]
             [teg-online.ai.strategy :refer [strategy-prompt action-prompt]]
             [teg-online.ai.response :as response]
             [teg-online.ai.models :refer [models-by-id]]
+            [teg-online.ai.actions :as actions]
             [teg-online.utils.fs :as fs]))
 
 (defonce server (atom nil))
@@ -66,7 +66,7 @@
                     (response/parse-response game
                                              turn-actions
                                              response)
-                    [response/pass])]
+                    [actions/pass])]
       (<? (log (str "Basic action\n"
                     (:turn game) ". " (:phase game)
                     " / "
@@ -79,46 +79,44 @@
 
 (defn get-strategy! [game turn-actions model log]
   (go
-    (if false
-
-      (let [initial-prompt (strategy-prompt game turn-actions)
-            strat-response (when initial-prompt
-                             (:output_text
-                              (<? (fetch-response model initial-prompt))))
-            second-prompt (action-prompt game strat-response)
-            action-response (when strat-response
-                              (:output_text
-                               (<? (ai/create-response!
-                                    {:model "gpt-4.1-mini"
-                                     :temperature 0
-                                     :input second-prompt}))))
-            actions (if action-response
-                      (response/parse-response game
-                                               turn-actions
-                                               action-response)
-                      [response/pass])]
-        (<? (log (str "Strategy\n"
-                      (:turn game) ". " (:phase game)
-                      " / "
-                      (teg/get-current-player-name game))))
-        (when initial-prompt
-          (<? (log (str ">>> INITIAL PROMPT:\n" initial-prompt))))
-        (when strat-response
-          (<? (log (str ">>> STRATEGY:\n" strat-response))))
-        (when second-prompt
-          (<? (log (str ">>> SECOND PROMPT:\n" second-prompt))))
-        (when action-response
-          (<? (log (str ">>> ACTION:\n" action-response))))
-        (when actions
-          (<? (log actions)))
-        {:conversation [initial-prompt
-                        strat-response
-                        second-prompt
-                        action-response]
-         :actions actions}))))
+    (let [initial-prompt (strategy-prompt game turn-actions)
+          strat-response (when initial-prompt
+                           (:output_text
+                            (<? (fetch-response model initial-prompt))))
+          second-prompt (action-prompt game strat-response)
+          action-response (when strat-response
+                            (:output_text
+                             (<? (ai/create-response!
+                                  {:model "gpt-4.1-mini"
+                                   :temperature 0
+                                   :input second-prompt}))))
+          actions (if action-response
+                    (response/parse-response game
+                                             turn-actions
+                                             action-response)
+                    [actions/pass])]
+      (<? (log (str "Strategy\n"
+                    (:turn game) ". " (:phase game)
+                    " / "
+                    (teg/get-current-player-name game))))
+      (when initial-prompt
+        (<? (log (str ">>> INITIAL PROMPT:\n" initial-prompt))))
+      (when strat-response
+        (<? (log (str ">>> STRATEGY:\n" strat-response))))
+      (when second-prompt
+        (<? (log (str ">>> SECOND PROMPT:\n" second-prompt))))
+      (when action-response
+        (<? (log (str ">>> ACTION:\n" action-response))))
+      (when actions
+        (<? (log actions)))
+      {:conversation [initial-prompt
+                      strat-response
+                      second-prompt
+                      action-response]
+       :actions actions})))
 
 (defn get-random-actions! [game turn-actions model log]
-  (go (let [actions [response/pass]]
+  (go (let [actions [actions/pass]]
         {:conversation []
          :actions actions})))
 
@@ -130,16 +128,16 @@
   Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
                       "ACAACA second prompt"
                       "ACAACA actions"]
-       :actions [{:action ::response/add-army
+       :actions [{:action ::actions/add-army
                   :country ::board/argentina
                   :units 2}
-                 {:action ::response/add-army
+                 {:action ::actions/add-army
                   :country ::board/brazil
                   :units 2}
-                 {:action ::response/add-army
+                 {:action ::actions/add-army
                   :country ::board/peru
                   :units 1}
-                 response/pass]}))
+                 actions/pass]}))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
@@ -152,7 +150,7 @@
                              ;; TODO(Richo): Just for testing
                              actions (cond
                                        random? (<? (get-random-actions! game turn-actions model log))
-                                       true (<? (get-placeholder-actions! game turn-actions model log))
+                                       ;true (<? (get-placeholder-actions! game turn-actions model log))
                                        basic? (<? (get-basic-actions! game turn-actions model log))
                                        :else (<? (get-strategy! game turn-actions model log)))]
                          (doto res

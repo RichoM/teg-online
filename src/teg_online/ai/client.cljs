@@ -5,7 +5,7 @@
             [cognitect.transit :as t]
             [teg-online.game :as teg]
             [teg-online.ai.scoring :as score]
-            [teg-online.ai.response :as r]
+            [teg-online.ai.actions :as actions]
             [teg-online.ai.models :refer [models]]))
 
 
@@ -46,7 +46,7 @@
 
 (defn try-apply-action [game action]
   (try
-    (r/apply-action action game)
+    (actions/apply-action action game)
     (catch :default err
       (println "ERROR trying to apply action:" err)
       game)))
@@ -90,7 +90,7 @@
                                {:keys [actions conversation]}
                                (if response
                                  (t/read reader response)
-                                 {:actions [r/pass]})
+                                 {:actions [actions/pass]})
                                
                                mutation (fn [game]
                                           (reduce (fn [game action]
@@ -100,7 +100,7 @@
                            {:original-state state
                             :conversation conversation
                             :actions actions
-                            :pass? (= r/pass (last actions))
+                            :pass? (= actions/pass (last actions))
                             ;; TODO(Richo): Before applying the mutation we need to check that the new game state
                             ;; is equal the original game state, and also that we don't have a selected-snapshot!
                             :mutation mutation
