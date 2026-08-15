@@ -2,6 +2,7 @@
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.response :as r]
+            [teg-online.ai.actions :refer [get-valid-attacks get-valid-regroups]]
             [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
 
@@ -12,30 +13,6 @@
 ;; 3. Make it obvious that if a country is completely surrounded by countries of 
 ;;    your own, it's not really necessary to add armies, it's better to make those
 ;;    armies stronger instead.
-
-(defn get-valid-regroups [game]
-  (let [player-id (teg/get-current-player game)
-        player-countries (set (teg/player-countries game player-id))]
-    (->> player-countries
-         (filter (fn [country-id]
-                   (> (teg/get-army game country-id) 1)))
-         (mapcat (fn [country-id]
-                   (->> (:neighbours (board/countries country-id))
-                        (filter player-countries)
-                        (map (fn [neighbour]
-                               [country-id neighbour]))))))))
-
-(defn get-valid-attacks [game]
-  (let [player-id (teg/get-current-player game)
-        player-countries (set (teg/player-countries game player-id))]
-    (->> player-countries
-         (filter (fn [country-id]
-                   (> (teg/get-army game country-id) 1)))
-         (mapcat (fn [country-id]
-                   (->> (:neighbours (board/countries country-id))
-                        (remove player-countries)
-                        (map (fn [neighbour]
-                               [country-id neighbour]))))))))
 
 (def board-geography
   (str "El tablero de TEG está dividido en 6 continentes.\n"
