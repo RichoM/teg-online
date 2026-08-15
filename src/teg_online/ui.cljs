@@ -12,7 +12,7 @@
             [teg-online.game :as teg]
             [teg-online.board :as b]
             [teg-online.ai.client :as ai]
-            [teg-online.ai.models :refer [models-by-id]]
+            [teg-online.ai.models :refer [models models-by-id]]
             [teg-online.ai.scoring :as score]
             [teg-online.ai.response :as response]))
 
@@ -1087,14 +1087,25 @@
         (when-not (zero? delta-army)
           (moved-army-effect state country delta-army))))))
 
-(defn update-response-item! [model-name response header body select-response!]
-  (doto header
-    (oset! :innerText "")
-    (.appendChild (crate/html [:strong model-name])))
+(defn update-response-item!
+  [model-name response header body select-response!]
   (if-let [error (:error response)]
-    (doto body
-      (oset! :innerText (str "ERROR: " error)))
     (do
+      (doto header
+        (oset! :innerText "")
+        (.appendChild
+         (crate/html [:div.d-flex.align-items-center.w-100
+                      [:strong {:role "status"} model-name]
+                      [:span.ms-auto.me-3.text-danger "ERROR"]])))
+      (doto body
+        (oset! :innerText (str "ERROR: " error))))
+    (do
+      (doto header
+        (oset! :innerText "")
+        (.appendChild
+         (crate/html [:div.d-flex.align-items-center.w-100
+                      [:strong {:role "status"} model-name]
+                      [:span.ms-auto.me-3 (-> response :score :mean)]])))
       (doto body
         (oset! :innerText "")
         (oset! :style.max-height "500px")
@@ -1162,12 +1173,14 @@
                    :body [:div.container.overflow-hidden
                           [:div.row
                            [:div#accordion.accordion.font-monospace
-                            (->> responses
+                            (->> models
                                  (map-indexed
-                                  (fn [i [model-id response-chan]]
-                                    (make-response-item! i (models-by-id model-id)
-                                                         response-chan
-                                                         select-response!))))]]]))]
+                                  (fn [i model]
+                                    (when-let [response-chan (responses (:id model))]
+                                      (make-response-item! i model
+                                                           response-chan
+                                                           select-response!))))
+                                 (remove nil?))]]]))]
     (doto modal
       (js/makeDraggable)
       (bs/show-modal {:backdrop "static" :keyboard false}))
