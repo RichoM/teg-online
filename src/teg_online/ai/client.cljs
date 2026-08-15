@@ -4,6 +4,7 @@
             [teg-online.utils.async :refer [<? go-try]]
             [cognitect.transit :as t]
             [teg-online.game :as teg]
+            [teg-online.ai.scoring :as score]
             [teg-online.ai.response :as r]
             [teg-online.ai.models :refer [models]]))
 
@@ -50,6 +51,31 @@
       (println "ERROR trying to apply action:" err)
       game)))
 
+(defn mean [coll]
+  (/ (reduce + coll)
+     (count coll)))
+
+(defn calculate-score
+  ([game mutation]
+   (calculate-score game mutation
+                    (if (isa? (teg/get-current-phase game)
+                              ::teg/attack)
+                      100
+                      1)))
+  ([game mutation times]
+   (let [initial-scores (score/normalized-scores game)
+         delta-scores
+         (apply merge-with into
+                (->> (repeatedly times #(mutation game))
+                     (map score/normalized-scores)
+                     (map (fn [scores]
+                            (->> scores
+                                 (map (fn [[player-id score]]
+                                        [player-id (- score (initial-scores player-id))]))
+                                 (into {}))))
+                     (map #(update-vals % vector))))]
+     (update-vals delta-scores mean))))
+
 (defn ask! [state turn-actions]
   (let [game (:game state)]
     (->> models
@@ -60,21 +86,26 @@
                   [id
                    (go (try
                          (let [response (<? (fetch-response body))
+                               
                                {:keys [actions conversation]}
                                (if response
                                  (t/read reader response)
-                                 {:actions [r/pass]})]
+                                 {:actions [r/pass]})
+                               
+                               mutation (fn [game]
+                                          (reduce (fn [game action]
+                                                    (try-apply-action game action))
+                                                  game
+                                                  actions))]
                            {:original-state state
                             :conversation conversation
                             :actions actions
                             :pass? (= r/pass (last actions))
                             ;; TODO(Richo): Before applying the mutation we need to check that the new game state
                             ;; is equal the original game state, and also that we don't have a selected-snapshot!
-                            :mutation (fn [game]
-                                        (reduce (fn [game action]
-                                                  (try-apply-action game action))
-                                                game
-                                                actions))})
+                            :mutation mutation
+                            :score {:mean (get (calculate-score game mutation)
+                                               (teg/get-current-player game))}})
                          (catch :default err
                            {:error err})))])))
          (into {}))))
