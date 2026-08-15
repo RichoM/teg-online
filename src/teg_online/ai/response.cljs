@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [rand-int])
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
-            [teg-online.utils.core :as u]
             [clojure.string :as str]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -65,7 +64,6 @@
                     {:game game :origin origin :destination destination})))
   (teg/regroup game origin destination
                (min move (dec (teg/get-army game origin)))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
