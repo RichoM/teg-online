@@ -1,4 +1,4 @@
-(ns teg-online.ai.strategy
+(ns teg-online.ai.strategy-prompt
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.response :as r]

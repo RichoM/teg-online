@@ -1,4 +1,4 @@
-(ns teg-online.ai.prompt
+(ns teg-online.ai.basic-prompt
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.response :as r]
