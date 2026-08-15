@@ -58,7 +58,7 @@
 
 (defn get-basic-actions! [game turn-actions model log]
   (go
-    (let [prompt (make-prompt game turn-actions)          
+    (let [prompt (make-prompt game turn-actions)
           response (when prompt
                      (:output_text
                       (<? (fetch-response model prompt))))
@@ -80,23 +80,7 @@
 (defn get-strategy! [game turn-actions model log]
   (go
     (if false
-      (do (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
-          {:conversation [(strategy-prompt game turn-actions)
-                          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
 
-Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
-                          "ACAACA second prompt"
-                          "ACAACA actions"]
-           :actions [{:action ::response/add-army
-                      :country ::board/argentina
-                      :units 2}
-                     {:action ::response/add-army
-                      :country ::board/brazil
-                      :units 2}
-                     {:action ::response/add-army
-                      :country ::board/peru
-                      :units 1}
-                     response/pass]})
       (let [initial-prompt (strategy-prompt game turn-actions)
             strat-response (when initial-prompt
                              (:output_text
@@ -133,6 +117,30 @@ Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean max
                         action-response]
          :actions actions}))))
 
+(defn get-random-actions! [game turn-actions model log]
+  (go (let [actions [response/pass]]
+        {:conversation []
+         :actions actions})))
+
+(defn get-placeholder-actions! [game turn-actions model log]
+  (go (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
+      {:conversation [(strategy-prompt game turn-actions)
+                      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
+  
+  Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
+                      "ACAACA second prompt"
+                      "ACAACA actions"]
+       :actions [{:action ::response/add-army
+                  :country ::board/argentina
+                  :units 2}
+                 {:action ::response/add-army
+                  :country ::board/brazil
+                  :units 2}
+                 {:action ::response/add-army
+                  :country ::board/peru
+                  :units 1}
+                 response/pass]}))
+
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
       (.post (fn [req res]
@@ -140,10 +148,13 @@ Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean max
                  (go (try
                        (let [{:keys [game turn-actions model]} (parse-request req)
                              {:keys [basic?] :as model} (models-by-id model)
+                             random? (= :random (:id model))
                              ;; TODO(Richo): Just for testing
-                             actions (if basic?
-                                       (<? (get-basic-actions! game turn-actions model log))
-                                       (<? (get-strategy! game turn-actions model log)))]
+                             actions (cond
+                                       random? (<? (get-random-actions! game turn-actions model log))
+                                       true (<? (get-placeholder-actions! game turn-actions model log))
+                                       basic? (<? (get-basic-actions! game turn-actions model log))
+                                       :else (<? (get-strategy! game turn-actions model log)))]
                          (doto res
                            (.type "text")
                            (.send (write-response actions))))
