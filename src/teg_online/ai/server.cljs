@@ -1,6 +1,6 @@
 (ns teg-online.ai.server
   (:require [clojure.core.async :as a :refer [go <!]]
-            [teg-online.utils.async :refer [<?]]
+            [teg-online.utils.async :refer [go-try <?]]
             [oops.core :refer [oget oget+ oset! ocall! ocall!+]]
             ["express" :as express]
             ["body-parser" :as body-parser]
@@ -33,18 +33,10 @@
           (println "ERROR writing log:" error)))))
 
 (defn parse-request [req]
-  (try
-    (t/read reader (oget req :body))
-    (catch :default error
-      (println "ERROR parsing game:" error)
-      (throw error))))
+  (t/read reader (oget req :body)))
 
 (defn write-response [response]
-  (try
-    (t/write writer response)
-    (catch :default error
-      (println "ERROR writing response:" error)
-      (throw error))))
+  (t/write writer response))
 
 (defn fetch-response [model prompt]
   (let [model-name (:name model)
@@ -57,7 +49,7 @@
        (assoc :temperature temperature)))))
 
 (defn get-basic-actions! [game turn-actions model log]
-  (go
+  (go-try
     (let [prompt (make-prompt game turn-actions)
           response (when prompt
                      (:output_text
@@ -78,7 +70,7 @@
        :conversation [prompt response]})))
 
 (defn get-strategy! [game turn-actions model log]
-  (go
+  (go-try
     (let [initial-prompt (strategy-prompt game turn-actions)
           strat-response (when initial-prompt
                            (:output_text
@@ -116,28 +108,30 @@
        :actions actions})))
 
 (defn get-random-actions! [game turn-actions model log]
-  (go (let [actions [actions/pass]]
-        {:conversation []
-         :actions actions})))
+  (go-try
+   (let [actions [actions/pass]]
+     {:conversation []
+      :actions actions})))
 
 (defn get-placeholder-actions! [game turn-actions model log]
-  (go (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
-      {:conversation [(strategy-prompt game turn-actions)
-                      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
+  (go-try
+   (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
+   {:conversation [(strategy-prompt game turn-actions)
+                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
   
   Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
-                      "ACAACA second prompt"
-                      "ACAACA actions"]
-       :actions [{:action ::actions/add-army
-                  :country ::board/argentina
-                  :units 2}
-                 {:action ::actions/add-army
-                  :country ::board/brazil
-                  :units 2}
-                 {:action ::actions/add-army
-                  :country ::board/peru
-                  :units 1}
-                 actions/pass]}))
+                   "ACAACA second prompt"
+                   "ACAACA actions"]
+    :actions [{:action ::actions/add-army
+               :country ::board/argentina
+               :units 2}
+              {:action ::actions/add-army
+               :country ::board/brazil
+               :units 2}
+              {:action ::actions/add-army
+               :country ::board/peru
+               :units 1}
+              actions/pass]}))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
@@ -157,12 +151,11 @@
                            (.type "text")
                            (.send (write-response actions))))
                        (catch :default err
-                         (println "ERROR" err)
-                         (js/console.log "Request:" req)
+                         (js/console.error "ERROR!" err)
                          (when-not (oget res :?headersSent)
                            (doto res
-                             (ocall! :status (or (oget err :?statusCode) 500))
-                             (ocall! :send err)))))))))))
+                             (.status (or (oget err :?statusCode) 500))
+                             (.send (.-message err))))))))))))
 
 (defn start-server []
   (println "Starting server...")

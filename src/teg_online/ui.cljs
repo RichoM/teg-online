@@ -1098,7 +1098,13 @@
                       [:strong {:role "status"} model-name]
                       [:span.ms-auto.me-3.text-danger "ERROR"]])))
       (doto body
-        (oset! :innerText (str "ERROR: " error))))
+        (oset! :innerText
+               (str (when-let [{:keys [errors]} (ex-data error)]
+                      (str/join (keep (fn [error-msg]
+                                        (when-not (str/blank? error-msg)
+                                          (str error-msg "\n\n")))
+                                      errors)))
+                    (ex-message error)))))
     (do
       (doto header
         (oset! :innerText "")

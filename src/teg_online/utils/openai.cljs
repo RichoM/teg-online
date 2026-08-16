@@ -8,11 +8,6 @@
 
 (def llm (OpenAI.))
 
-(defn promise-error [err]
-  (ex-info "Promise error"
-           {:error :promise-error}
-           err))
-
 (defn create-response! [args]
   (let [c (a/promise-chan)]
     (doto (ocall! llm :responses.create
@@ -20,6 +15,6 @@
       (.then (fn [response]
                (a/put! c (js->clj response :keywordize-keys true)))
              (fn [error]
-               (js/console.log error)
-               (a/put! c (promise-error error)))))
+               (a/put! c (if (instance? js/Error error) error
+                             (js/Error. "ERROR!" (clj->js {:cause error})))))))
     c))

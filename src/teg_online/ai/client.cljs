@@ -12,11 +12,21 @@
 (defonce reader (t/reader :json))
 (defonce writer (t/writer :json))
 
-(defn error-handler [result-chan]
-  (fn [err]
-    (let [actual-error (if (instance? js/Error err) err
-                           (js/Error. "ERROR!" (clj->js {:cause err})))]
-      (a/put! result-chan actual-error))))
+(defn js-error [err]
+  (if (instance? js/Error err) err
+      (js/Error. "ERROR!" (clj->js {:cause err}))))
+
+(defn response-text
+  ([response]
+   (response-text response (fn [ch err] (a/put! ch err))))
+  ([response error-handler]
+   (let [result-chan (a/promise-chan)]
+     (doto (.text response)
+       (.then (fn [text]
+                (a/put! result-chan text)))
+       (.catch (fn [err] 
+                 (error-handler result-chan (js-error err)))))
+     result-chan)))
 
 (defn POST [url data]
   (let [result-chan (a/promise-chan)]
@@ -24,25 +34,28 @@
                     (clj->js {:method "POST"
                               :headers {"Content-Type" "text/plain"}
                               :body data}))
-      (.catch (error-handler result-chan))
+      (.catch (fn [err] (a/put! result-chan (js-error err))))
       (.then (fn [^js response]
-               (doto (.text response)
-                 (.then (fn [text]
-                          (a/put! result-chan text)))
-                 (.catch (error-handler result-chan))))))
+               (a/put! result-chan response))))
     result-chan))
 
 (defn fetch-response 
-  ([data] (fetch-response data 0))
-  ([data retry]
+  ([data] (fetch-response data []))
+  ([data errors]
    (go-try
     (try
-      (<? (POST "http://localhost:3000/ai" data))
+      (let [response (<? (POST "http://localhost:3000/ai" data))]
+        (if (.-ok response)
+          (<? (response-text response))
+          (let [text (<? (response-text response (fn [ch _] (a/close! ch))))]
+            (throw (js/Error (str "Response status: " (.-status response)
+                                  (when text (str "\n" text))))))))
       (catch :default error
-        (println (str "ERROR fetching response. Retry: " retry) error)
-        (if (< retry 3)
-          (<? (fetch-response data (inc retry)))
-          (throw (ex-info "Too many retries!" {:data data :retry retry}))))))))
+        (js/console.error
+         (str "ERROR fetching response. Retry: " (count errors)))
+        (if (< (count errors) 3)
+          (<? (fetch-response data (conj errors (.-message error))))
+          (throw (ex-info "Too many retries!" {:errors errors}))))))))
 
 (defn try-apply-action [game action]
   (try
