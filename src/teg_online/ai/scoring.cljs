@@ -66,53 +66,7 @@
 
 (comment
   
-  (map vector [1 2 3]
-       [4 5 6])
+  (def game (-> @teg-online.main/state :game))
 
-  (group-by odd? (range 10))
-
-  (def state teg-online.main/state)
-
-  (def game (-> @state :game))
-
-  (def player-id (-> game :turn-order first))
-
-  (teg/player-continents game player-id)
-  (teg/player-countries-by-continent game player-id)
-  (teg/player-countries game player-id)
-  (time (connected-countries game ::b/argentina))
-  (map (fn [empire]
-         [empire (empire-score game empire)])
-       (player-empires game player-id))
-  
-  (player-score game player-id)
   (normalized-scores game)
-  (map (partial player-score game)
-       (-> game :turn-order))
-
-  (set/difference #{1 2 3 4 5 6 7 8}
-                  ; #{1 2}
-                  ; #{2 3 4}
-                  )
-  (tap> *1)
-
-
-
-  (third #{1 2 3})
-
-  (player-score game player-id)
-
-  (tap> (-> @state :game))
-
-  (->> (vals (:players game))
-       (map (fn [{:keys [id]}]
-              [id (player-score game id)]))
-       (sort-by second >))
-
-  (->> player-countries
-       (remove (fn [country-id]
-                 (->> (-> b/countries country-id :neighbours)
-                      (filter player-countries)
-                      (seq)))))
-
   )

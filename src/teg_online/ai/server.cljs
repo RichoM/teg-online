@@ -109,9 +109,21 @@
 
 (defn get-random-actions! [game turn-actions model log]
   (go-try
-   (let [actions [actions/pass]]
+   (let [player-id (teg/get-current-player game)
+         {:keys [actions score]}
+         (->> (repeatedly #(actions/random-actions game turn-actions))
+              (take 100)
+              (map (fn [actions]
+                     (let [mutation (actions/make-mutation actions)
+                           score (actions/calculate-score game mutation)]
+                       {:actions actions
+                        :score (get score player-id ##-Inf)})))
+              (sort-by :score >)
+              (first))]
      {:conversation []
-      :actions actions})))
+      :actions (if (> score 0.001)
+                 actions
+                 [actions/pass])})))
 
 (defn get-placeholder-actions! [game turn-actions model log]
   (go-try
@@ -122,16 +134,7 @@
   Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
                    "ACAACA second prompt"
                    "ACAACA actions"]
-    :actions [{:action ::actions/add-army
-               :country ::board/argentina
-               :units 2}
-              {:action ::actions/add-army
-               :country ::board/brazil
-               :units 2}
-              {:action ::actions/add-army
-               :country ::board/peru
-               :units 1}
-              actions/pass]}))
+    :actions [actions/pass]}))
 
 (defn init-ai-controller! [^js app]
   (-> (.route app "/ai")
@@ -144,7 +147,7 @@
                              ;; TODO(Richo): Just for testing
                              actions (cond
                                        random? (<? (get-random-actions! game turn-actions model log))
-                                       ;true (<? (get-placeholder-actions! game turn-actions model log))
+                                       true (<? (get-placeholder-actions! game turn-actions model log))
                                        basic? (<? (get-basic-actions! game turn-actions model log))
                                        :else (<? (get-strategy! game turn-actions model log)))]
                          (doto res

@@ -21,9 +21,9 @@
                                        units (parse-long (str/trim units))]
                                    (when (and country-id
                                               (pos-int? units))
-                                     {:action ::add-army
+                                     (actions/add-army
                                       :country country-id
-                                      :units units}))))
+                                      :units units)))))
                          (actions/ensure-valid game)))]
       (doseq [action actions]
         (println action))
@@ -50,10 +50,10 @@
                                    (when (and attacker
                                               defender
                                               (pos-int? move))
-                                     {:action ::attack
+                                     (actions/attack
                                       :attacker attacker
                                       :defender defender
-                                      :move move}))))
+                                      :move move)))))
                          (actions/ensure-valid game)))]
       (doseq [action actions]
         (println action))
@@ -80,10 +80,10 @@
                                        move (parse-long (str/trim move))]
                                    (when (and src dest (pos-int? move)
                                               (not (invalid-regroups [src dest])))
-                                     {:action ::regroup
+                                     (actions/regroup
                                       :origin src
                                       :destination dest
-                                      :move move}))))
+                                      :move move)))))
                          (actions/ensure-valid game)))]
       (doseq [action actions]
         (println action))

@@ -57,37 +57,10 @@
           (<? (fetch-response data (conj errors (.-message error))))
           (throw (ex-info "Too many retries!" {:errors errors}))))))))
 
-(defn try-apply-action [game action]
-  (try
-    (actions/apply-action action game)
-    (catch :default err
-      (println "ERROR trying to apply action:" err)
-      game)))
-
-(defn mean [coll]
-  (/ (reduce + coll)
-     (count coll)))
-
-(defn calculate-score
-  ([game mutation]
-   (calculate-score game mutation
-                    (if (isa? (teg/get-current-phase game)
-                              ::teg/attack)
-                      100
-                      1)))
-  ([game mutation times]
-   (let [initial-scores (score/normalized-scores game)
-         delta-scores
-         (apply merge-with into
-                (->> (repeatedly times #(mutation game))
-                     (map score/normalized-scores)
-                     (map (fn [scores]
-                            (->> scores
-                                 (map (fn [[player-id score]]
-                                        [player-id (- score (initial-scores player-id))]))
-                                 (into {}))))
-                     (map #(update-vals % vector))))]
-     (update-vals delta-scores mean))))
+(defn read-response [response]
+  (if response
+    (t/read reader response)
+    {:actions [actions/pass]}))
 
 (defn ask! [state turn-actions]
   (let [game (:game state)]
@@ -99,17 +72,8 @@
                   [id
                    (go (try
                          (let [response (<? (fetch-response body))
-                               
-                               {:keys [actions conversation]}
-                               (if response
-                                 (t/read reader response)
-                                 {:actions [actions/pass]})
-                               
-                               mutation (fn [game]
-                                          (reduce (fn [game action]
-                                                    (try-apply-action game action))
-                                                  game
-                                                  actions))]
+                               {:keys [actions conversation]} (read-response response)
+                               mutation (actions/make-mutation actions)]
                            {:original-state state
                             :conversation conversation
                             :actions actions
@@ -117,7 +81,7 @@
                             ;; TODO(Richo): Before applying the mutation we need to check that the new game state
                             ;; is equal the original game state, and also that we don't have a selected-snapshot!
                             :mutation mutation
-                            :score {:mean (get (calculate-score game mutation)
+                            :score {:mean (get (actions/calculate-score game mutation)
                                                (teg/get-current-player game))}})
                          (catch :default err
                            {:error err})))])))

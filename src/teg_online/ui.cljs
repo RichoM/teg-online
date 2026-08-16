@@ -1111,7 +1111,16 @@
         (.appendChild
          (crate/html [:div.d-flex.align-items-center.w-100
                       [:strong {:role "status"} model-name]
-                      [:span.ms-auto.me-3 (-> response :score :mean)]])))
+                      (let [score (* 100 (-> response :score :mean))
+                            formatted-score (str (if (pos? score) "+" "")
+                                                 (.toFixed score 2))
+                            base-tag :span.ms-auto.me-3
+                            tag (keyword (str (subs (str base-tag) 1)
+                                              (cond
+                                                (pos? score) ".text-success"
+                                                (neg? score) ".text-danger"
+                                                :else ".text-secondary")))]
+                        [tag formatted-score])])))
       (doto body
         (oset! :innerText "")
         (oset! :style.max-height "500px")

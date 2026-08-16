@@ -1,8 +1,7 @@
 (ns teg-online.ai.basic-prompt
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
-            [teg-online.ai.response :as r]
-            [teg-online.ai.actions :refer [get-valid-attacks get-valid-regroups]]
+            [teg-online.ai.actions :refer [get-valid-attacks get-valid-regroups] :as actions]
             [teg-online.ai.attack-prob :refer [calculate-win-chance]]
             [clojure.string :as str]))
 
@@ -139,13 +138,13 @@
                     (fn [idx action]
                       (str (inc idx) ". "
                            (case (:action action)
-                             ::r/add-army (str "Agregaste " (:units action)
-                                               " ejércitos a " (country-name (:country action)))
-                             ::r/attack (str "Atacaste desde " (country-name (:attacker action))
-                                             " a " (country-name (:defender action)))
-                             ::r/regroup (str "Reagrupaste " (:move action) " ejércitos desde "
-                                              (country-name (:origin action)) " a "
-                                              (country-name (:destination action))))))
+                             ::actions/add-army (str "Agregaste " (:units action)
+                                                     " ejércitos a " (country-name (:country action)))
+                             ::actions/attack (str "Atacaste desde " (country-name (:attacker action))
+                                                   " a " (country-name (:defender action)))
+                             ::actions/regroup (str "Reagrupaste " (:move action) " ejércitos desde "
+                                                    (country-name (:origin action)) " a "
+                                                    (country-name (:destination action))))))
                     actions))
          "\n\n")
     ""))

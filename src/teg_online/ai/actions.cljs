@@ -1,6 +1,7 @@
 (ns teg-online.ai.actions
   (:require [teg-online.game :as teg]
-            [teg-online.board :as board]))
+            [teg-online.board :as board]
+            [teg-online.ai.scoring :as score]))
 
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
@@ -79,6 +80,27 @@
 
 (def pass {:action ::pass})
 
+(defn add-army 
+  [& {:keys [country units]}]
+  {:action ::add-army
+   :country country
+   :units units})
+
+(defn attack
+  [& {:keys [attacker defender move]}]
+  {:action ::attack
+   :attacker attacker
+   :defender defender
+   :move move})
+
+(defn regroup
+  [& {:keys [origin destination move]}]
+  {:action ::regroup
+   :origin origin
+   :destination destination
+   :move move})
+
+
 (defn valid? [game action]
   (try
     (apply-action action game)
@@ -97,3 +119,115 @@
     (if (seq valid-actions)
       valid-actions
       [pass])))
+
+(defn try-apply-action [game action]
+  (try
+    (apply-action action game)
+    (catch :default err
+      (println "ERROR trying to apply action:" err)
+      game)))
+
+(defn mean [coll]
+  (/ (reduce + coll)
+     (count coll)))
+
+(defn calculate-score
+  ([game mutation]
+   (calculate-score game mutation
+                    (if (isa? (teg/get-current-phase game)
+                              ::teg/attack)
+                      100
+                      1)))
+  ([game mutation times]
+   (let [initial-scores (score/normalized-scores game)
+         delta-scores
+         (apply merge-with into
+                (->> (repeatedly times #(mutation game))
+                     (map score/normalized-scores)
+                     (map (fn [scores]
+                            (->> scores
+                                 (map (fn [[player-id score]]
+                                        [player-id (- score (initial-scores player-id))]))
+                                 (into {}))))
+                     (map #(update-vals % vector))))]
+     (update-vals delta-scores mean))))
+
+(defn make-mutation [actions]
+  (fn [game]
+    (reduce (fn [game action]
+              (try-apply-action game action))
+            game
+            actions)))
+
+
+(defmulti random-actions (fn [game _turn-actions] (:phase game)))
+
+(defmethod random-actions ::teg/add-army [game turn-actions]
+  (let [player-id (teg/get-current-player game)]
+    (loop [actions []
+           countries (set (teg/player-countries game player-id))
+           remaining (- (teg/get-extra-army game)
+                        (reduce + (map :units turn-actions)))]
+      (if (<= remaining 0)
+        (conj actions pass)
+        (let [country (rand-nth (vec countries))
+              units (inc (rand-int remaining))]
+          (recur (conj actions (add-army
+                                :country country
+                                :units units))
+                 (disj countries country)
+                 (- remaining units)))))))
+
+(defmethod random-actions ::teg/attack [game _]
+  (let [valid-attacks (get-valid-attacks game)]
+    (if (seq valid-attacks)
+      (let [[attacker defender] (rand-nth valid-attacks)
+            attacker-army (teg/get-army game attacker)
+            move (inc (rand-int (min 3 (dec attacker-army))))]
+        [(attack
+          :attacker attacker
+          :defender defender
+          :move move)])
+      [pass])))
+
+(defmethod random-actions :default [_ _] [pass])
+
+
+
+(comment
+
+  (do
+    (def game (-> @teg-online.main/state :game))
+    (def player-id (teg/get-current-player game)))
+
+  (:phase game)
+  (def actions (random-actions game))
+
+  (get-valid-attacks game)
+
+
+  (time (tap> (->> (repeatedly #(random-actions game))
+                   (map (fn [actions]
+                          (let [mutation (make-mutation actions)
+                                score (calculate-score game mutation 1)]
+                            {:actions actions
+                             :score (-> score player-id)})))
+                   (take 100)
+                   (sort-by :score >))))
+
+  (->> (repeatedly #(random-actions game []))
+       (take 100)
+       (sort-by (fn [actions]
+                  (let [mutation (make-mutation actions)
+                        score (calculate-score game mutation)]
+                    (-> score player-id)))
+                >)
+       (first))
+  
+  (tap> *1)
+
+  (rand-nth (teg/player-countries game player-id))
+
+
+  (sort (set (take 1000 (repeatedly #(inc (rand-int 10))))))
+  )
