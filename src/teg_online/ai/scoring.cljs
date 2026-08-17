@@ -50,12 +50,14 @@
 (defn empire-score [game empire]
   (let [[active-countries inactive-countries] (split-active game empire)
         active-armies (count-army game active-countries)
+        inactive-armies (count-army game inactive-countries)
         isolated-by-continent (->> inactive-countries
                                    (group-by #(-> b/countries % :continent))
                                    (vals)
                                    (map count))]
-    (* active-armies
-       (count empire)
+    (+ (* (+ active-armies
+             (* 0.75 inactive-armies))
+          (count empire))
        (reduce * isolated-by-continent))))
 
 (defn player-absolute-score [game player-id]
