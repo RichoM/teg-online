@@ -1109,15 +1109,15 @@
                                           (str error-msg "\n\n")))
                                       errors)))
                     (ex-message error)))))
-    (do
+    (let [delta-score (-> response :score)]
       (doto header
         (oset! :innerText "")
         (.appendChild
          (crate/html [:div.d-flex.align-items-center.w-100
                       [:strong {:role "status"} model-name]
-                      (let [score (* 100 (-> response :score :mean))
+                      (let [score (-> delta-score :normalized)
                             formatted-score (str (if (pos? score) "+" "")
-                                                 (.toFixed score 2))
+                                                 (.toFixed (* 100 score) 2))
                             base-tag :span.ms-auto.me-3
                             tag (keyword (str (subs (str base-tag) 1)
                                               (cond
@@ -1148,6 +1148,17 @@
                         (->> (:actions response)
                              (map (fn [action]
                                     [:pre (pp/write action :stream nil)])))]))
+        (.appendChild (crate/html
+                       [:p.my-2
+                        [:strong "Score"]
+                        [:pre
+                         "Normalized (mean):   "
+                         (str (if (pos? (:normalized delta-score)) "+" "")
+                              (.toFixed (* 100 (:normalized delta-score)) 2))
+                         "\n"
+                         "Absolute (mean):     "
+                         (str (if (pos? (:absolute delta-score)) "+" "")
+                              (.toFixed (:absolute delta-score) 2))]]))
         (.appendChild (doto (crate/html [:button.btn.btn-primary "Aplicar"])
                         (bs/on-click #(select-response! response))))))))
 

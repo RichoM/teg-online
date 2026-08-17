@@ -110,20 +110,37 @@
 (defn get-random-actions! [game turn-actions model log]
   (go-try
    (let [player-id (teg/get-current-player game)
-         {:keys [actions score]}
-         (->> (repeatedly #(actions/random-actions game turn-actions))
-              (take 100)
+         scored-actions
+         (->> (repeatedly #(actions/random-actions game))
               (map (fn [actions]
                      (let [mutation (actions/make-mutation actions)
                            score (actions/calculate-score game mutation)]
                        {:actions actions
-                        :score (get score player-id ##-Inf)})))
-              (sort-by :score >)
-              (first))]
+                        :score (-> score player-id)})))
+              (take 100)
+              (vec))
+
+         best-normalized (->> scored-actions
+                              (sort-by (comp :normalized :score) >)
+                              (first))
+         best (if (pos? (-> best-normalized 
+                            :score :absolute))
+                best-normalized
+                (->> scored-actions
+                     (sort-by (comp :absolute :score) >)
+                     (first)))]
+     (println "ACTION:" best)
      {:conversation []
-      :actions (if (> score 0.0)
-                 actions
+      :actions (if (> (-> best :score :absolute) 0.0)
+                 (:actions best)
                  [actions/pass])})))
+
+(comment
+  
+  (do
+    (def game (-> @teg-online.main/state :game))
+    (def player-id (teg/get-current-player game)))
+  )
 
 (defn get-placeholder-actions! [game turn-actions model log]
   (go-try

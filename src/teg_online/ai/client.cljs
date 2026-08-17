@@ -81,8 +81,8 @@
                             ;; TODO(Richo): Before applying the mutation we need to check that the new game state
                             ;; is equal the original game state, and also that we don't have a selected-snapshot!
                             :mutation mutation
-                            :score {:mean (get (actions/calculate-score game mutation)
-                                               (teg/get-current-player game))}})
+                            :score (get (actions/calculate-score game mutation)
+                                        (teg/get-current-player game))})
                          (catch :default err
                            {:error err})))])))
          (into {}))))
