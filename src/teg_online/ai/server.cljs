@@ -121,13 +121,13 @@
               (sort-by :score >)
               (first))]
      {:conversation []
-      :actions (if (> score 0.001)
+      :actions (if (> score 0.0)
                  actions
                  [actions/pass])})))
 
 (defn get-placeholder-actions! [game turn-actions model log]
   (go-try
-   (<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
+   ;(<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
    {:conversation [(strategy-prompt game turn-actions)
                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
   

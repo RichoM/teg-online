@@ -650,7 +650,7 @@
 
 (defn update-players [state]
   (go (let [{:keys [players turn-order turn] :as game} (:game @state)
-            player-scores (score/normalized-scores game)
+            player-scores (score/calculate-scores game)
             players-row (js/document.querySelector "#players-bar .row")
             player-count (count turn-order)
             player-width (/ 12 (if (> player-count 4)
@@ -659,6 +659,7 @@
         (oset! players-row :innerHTML "")
         (doseq [[idx pid] (map-indexed vector turn-order)]
           (let [player (players pid)
+                scores (player-scores pid)
                 game-started? (teg/game-started? game)
                 playing? (and (:playing? player)
                               (seq (teg/player-countries game pid)))
@@ -684,8 +685,11 @@
                               [:i.fas.fa-shield-alt.me-1 {:style icon-style}]
                               [:span (teg/player-army-count game pid)]]
                              [:div.col-auto
+                              [:i.far.fa-star.me-1 {:style icon-style}]
+                              [:span (.toFixed (:absolute scores) 2)]]
+                             [:div.col-auto
                               [:i.fas.fa-star.me-1 {:style icon-style}]
-                              [:span (.toFixed (* 100 (player-scores pid)) 2)]]]])))))))
+                              [:span (.toFixed (* 100 (:normalized scores)) 2)]]]])))))))
 
 (defn exchange-button-visible? [user game]
   (and (is-my-turn? user game)
