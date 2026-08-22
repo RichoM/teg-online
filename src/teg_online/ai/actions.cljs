@@ -1,7 +1,8 @@
 (ns teg-online.ai.actions
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
-            [teg-online.ai.scoring :as score]))
+            [teg-online.ai.scoring :as score]
+            [teg-online.utils.core :refer [rand-int]]))
 
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
@@ -203,14 +204,34 @@
           :move move)])
       [pass])))
 
+(defmethod random-actions ::teg/regroup [game _]
+  (let [valid-regroup (get-valid-regroups game)]
+    (if (seq valid-regroup)
+      (let [[origin destination] (rand-nth valid-regroup)
+            origin-army (teg/get-army game origin)
+            move (rand-int 1 (inc (min 3 (dec origin-army))))]
+        [(regroup
+          :origin origin
+          :destination destination
+          :move move)])
+      [pass])))
+
 (defmethod random-actions :default [_ _] [pass])
 
 
 
 (comment
 
+  (def origin-army 2)
+
+  (->> (repeatedly #(rand-int 1 (inc (min 3 (dec origin-army)))))
+       (take 1000)
+       (set))
+  (def max-regroup (min 3 (dec origin-army)))
+  (def min-regroup 1)
+
   (swap! teg-online.main/state assoc :game game)
-  
+
   (do
     (def game (-> @teg-online.main/state :game))
     (def player-id (teg/get-current-player game)))
@@ -239,7 +260,7 @@
              (take 100)
              (sort-by (comp :normalized :score) >)
              (tap>)))
-  
+
 
   (let [player-id (teg/get-current-player game)
         scored-actions

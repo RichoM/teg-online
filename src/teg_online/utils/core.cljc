@@ -1,6 +1,7 @@
 (ns teg-online.utils.core
-  (:refer-clojure :exclude [format])
-  (:require [clojure.string :as str]))
+  (:refer-clojure :exclude [format rand-int])
+  (:require [clojure.core :as clj]
+            [clojure.string :as str]))
 
 (defn deal [cards players]
   (let [player-count (count players)]
@@ -42,3 +43,8 @@
        (str/replace t (str "%" (inc i)) (str val))
        (inc i))
       t)))
+
+(defn rand-int 
+  ([n] (clj/rand-int n))
+  ([min max]
+   (+ min (clj/rand-int (- max min)))))
