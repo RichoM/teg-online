@@ -7,7 +7,7 @@
             ["cors" :as cors]
             [cognitect.transit :as t]
             [teg-online.game :as teg]
-            [teg-online.board :as board]
+            [clojure.pprint :as pp]
             [teg-online.ai.attack-prob :refer [initialize-chances]]
             [teg-online.utils.openai :as ai]
             [teg-online.ai.basic-prompt :refer [make-prompt]]
@@ -15,7 +15,8 @@
             [teg-online.ai.response :as response]
             [teg-online.ai.models :refer [models-by-id]]
             [teg-online.ai.actions :as actions]
-            [teg-online.utils.fs :as fs]))
+            [teg-online.utils.fs :as fs]
+            [clojure.string :as str]))
 
 (defonce server (atom nil))
 
@@ -67,7 +68,8 @@
       (<? (log (str ">>> RESPONSE:\n" response)))
       (<? (log actions))
       {:actions actions
-       :conversation [prompt response]})))
+       :conversation [(str "Prompt\n" prompt) 
+                      (str "Response\n" response)]})))
 
 (defn get-strategy! [game turn-actions model log]
   (go-try
@@ -101,10 +103,10 @@
         (<? (log (str ">>> ACTION:\n" action-response))))
       (when actions
         (<? (log actions)))
-      {:conversation [initial-prompt
-                      strat-response
-                      second-prompt
-                      action-response]
+      {:conversation [(str "Prompt #1\n" initial-prompt)
+                      (str "Response #1\n" strat-response)
+                      (str "Prompt #2\n" second-prompt)
+                      (str "Response #2\n" action-response)]
        :actions actions})))
 
 (defn get-random-actions! [game turn-actions model log]
@@ -130,7 +132,13 @@
                      (sort-by (comp :absolute :score) >)
                      (first)))]
      (println "ACTION:" best)
-     {:conversation []
+     {:conversation [(str "Options (" (count scored-actions) ")"
+                          "\n\n"
+                          (->> scored-actions
+                               (sort-by (comp :normalized :score) >)
+                               (map (fn [scored-action]
+                                      (pp/write scored-action :stream nil)))
+                               (str/join "\n\n")))]
       :actions (if (> (-> best :score :absolute) 0.0)
                  (:actions best)
                  [actions/pass])})))
@@ -145,12 +153,12 @@
 (defn get-placeholder-actions! [game turn-actions model log]
   (go-try
    ;(<? (a/timeout (* 1000 (+ 2 (rand-int 10)))))
-   {:conversation [(strategy-prompt game turn-actions)
-                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
+   {:conversation [(str "Prompt #1" "\n" (strategy-prompt game turn-actions))
+                   "Response #1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dictum eros eu felis rhoncus lacinia. Fusce ullamcorper diam sit amet lacus molestie, aliquam sodales felis hendrerit. Nunc iaculis nulla et convallis volutpat. Duis risus libero, dignissim at leo at, interdum rutrum tortor. Vivamus ac rhoncus sapien. Ut lobortis tristique eleifend. Morbi malesuada, ex eu pretium maximus, libero nulla condimentum magna, nec accumsan diam felis ac tortor. Nulla at justo orci. Donec at convallis arcu, quis pellentesque orci. Duis ornare erat leo, eget bibendum nulla interdum quis. Donec viverra, risus at lacinia congue, odio mauris fringilla mauris, ac faucibus lacus nulla eget massa.
   
   Aenean mattis facilisis urna, sit amet pharetra augue ullamcorper at. Aenean maximus velit purus, quis facilisis erat vulputate pharetra. Aliquam erat volutpat. Praesent arcu metus, rhoncus vitae urna non, vulputate eleifend metus. Nunc tristique, risus nec fermentum efficitur, ex leo consectetur metus, sit amet posuere neque turpis id lectus. Nullam feugiat volutpat egestas. Quisque quis augue aliquam, volutpat lorem et, varius ipsum. Morbi tristique neque quis augue luctus sagittis. Duis tincidunt porta tellus non ultricies. Nulla id diam arcu. Pellentesque elementum scelerisque turpis. Nam varius arcu et dui fringilla gravida a eu tortor. Sed ultricies sem vitae felis varius, vitae maximus ex commodo."
-                   "ACAACA second prompt"
-                   "ACAACA actions"]
+                   "Prompt #2\nACAACA second prompt"
+                   "Response #2\nACAACA actions"]
     :actions [actions/pass]}))
 
 (defn init-ai-controller! [^js app]

@@ -222,13 +222,6 @@
 
 (comment
 
-  (def origin-army 2)
-
-  (->> (repeatedly #(rand-int 1 (inc (min 3 (dec origin-army)))))
-       (take 1000)
-       (set))
-  (def max-regroup (min 3 (dec origin-army)))
-  (def min-regroup 1)
 
   (swap! teg-online.main/state assoc :game game)
 
@@ -240,6 +233,8 @@
       (def mutation (make-mutation actions))
       (def times 100))
 
+  (calculate-score game mutation)
+  (tap> actions)
   (get-valid-attacks game)
 
   (do

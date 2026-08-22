@@ -1129,21 +1129,16 @@
         (oset! :innerText "")
         (oset! :style.max-height "500px")
         (oset! :style.overflow "scroll"))
-      (doseq [[idx [prompt resp]] (->> (:conversation response)
-                                       (partition-all 2)
-                                       (map-indexed vector))]
-        (doto body
-          (.appendChild (crate/html
-                         [:details
-                          [:summary (str "Prompt #" (inc idx))]
-                          [:p [:pre prompt]]]))
-          (.appendChild (crate/html
-                         [:details
-                          [:summary (str "Response #" (inc idx))]
-                          [:p [:pre resp]]]))))
+      (doseq [conv (:conversation response)]
+        (let [[header content] (str/split conv #"\n" 2)]
+          (doto body
+            (.appendChild (crate/html
+                           [:details
+                            [:summary header]
+                            [:p [:pre content]]])))))
       (doto body
         (.appendChild (crate/html
-                       [:p.my-2
+                       [:p.my-3
                         [:strong "Actions"]
                         (->> (:actions response)
                              (map (fn [action]
