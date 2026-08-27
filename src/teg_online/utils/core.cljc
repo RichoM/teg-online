@@ -48,3 +48,22 @@
   ([n] (clj/rand-int n))
   ([min max]
    (+ min (clj/rand-int (- max min)))))
+
+
+(defn partitions
+  ([n] (partitions n n))
+  ([remaining max-part]
+   (if (zero? remaining)
+     [[]]
+     (for [part (range (min remaining max-part) 0 -1)
+           rest (partitions (- remaining part) part)]
+       (cons part rest)))))
+
+(defn combinations [items n]
+  (cond
+    (< n 1) []
+    (= n 1) (map vector items)
+    :else (let [items (set items)]
+            (for [item items
+                  rest (combinations (disj items item) (dec n))]
+              (cons item rest)))))

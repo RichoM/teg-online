@@ -4,6 +4,8 @@
 
 (def models (->> [{:id :random
                    :name "random"}
+                  {:id :best
+                   :name "best"}
                   {:id :gpt-4.1-mini/basic_t00
                    :name "gpt-4.1-mini"
                    :basic? true

@@ -2,7 +2,7 @@
   (:require [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.scoring :as score]
-            [teg-online.utils.core :refer [rand-int]]))
+            [teg-online.utils.core :refer [rand-int] :as u]))
 
 (defn get-valid-regroups [game]
   (let [player-id (teg/get-current-player game)
@@ -137,7 +137,7 @@
    (calculate-score game mutation
                     (if (isa? (teg/get-current-phase game)
                               ::teg/attack)
-                      100
+                      1000
                       1)))
   ([game mutation times]
    (let [initial-scores (score/calculate-scores game)
@@ -173,6 +173,50 @@
               (try-apply-action game action))
             game
             actions)))
+
+(defmulti all-actions (fn [game _turn-actions] (:phase game)))
+
+(defmethod all-actions ::teg/add-army [game turn-actions]
+  (let [player-id (teg/get-current-player game)
+        player-countries (->> (teg/player-countries game player-id)
+                              (filter (partial score/in-conflict? game))
+                              (vec))
+        remaining (- (teg/get-extra-army game)
+                     (reduce + (map :units turn-actions)))
+        combinations (memoize (partial u/combinations player-countries))]
+    (->> (u/partitions remaining)
+         (mapcat (fn [part]
+                   (->> (combinations (count part))
+                        (map (fn [comb]
+                               (conj (mapv (fn [country units]
+                                             (add-army
+                                              :country country
+                                              :units units))
+                                           comb
+                                           part)
+                                     pass)))))))))
+
+(defmethod all-actions ::teg/attack [game _]
+  (->> (get-valid-attacks game)
+       (mapcat (fn [[attacker defender]]
+                 (let [attacker-army (teg/get-army game attacker)]
+                   (->> (range 1 (inc (min 3 (dec attacker-army))))
+                        (map (fn [move]
+                               [(attack
+                                 :attacker attacker
+                                 :defender defender
+                                 :move move)]))))))))
+
+(defmethod all-actions ::teg/regroup [game _]
+  (->> (get-valid-regroups game)
+       (mapcat (fn [[origin destination]]
+                 (let [origin-army (teg/get-army game origin)]
+                   (->> (range 1 origin-army)
+                        (map (fn [move]
+                               [(regroup
+                                 :origin origin
+                                 :destination destination
+                                 :move move)]))))))))
 
 (defmulti random-actions (fn [game _turn-actions] (:phase game)))
 
@@ -221,9 +265,21 @@
 
 
 (comment
+  (->> (teg/player-countries game player-id)
+       (filter (partial score/in-conflict? game))
+       (count))
+
+  (->> (all-actions game)
+       (take 10))
 
 
-  (swap! teg-online.main/state assoc :game game)
+  (->> (all-actions game)
+       (map (fn [actions]
+              {:actions actions :score (calculate-score game (make-mutation actions))}))
+       #_(drop 10000)
+       (take 1000))
+
+  (tap> *1)
 
   (do
     (def game (-> @teg-online.main/state :game))

@@ -112,30 +112,47 @@
 (defn get-random-actions! [game turn-actions model log]
   (go-try
    (let [player-id (teg/get-current-player game)
-         scored-actions
-         (->> (repeatedly #(actions/random-actions game))
-              (map (fn [actions]
-                     (let [mutation (actions/make-mutation actions)
-                           score (actions/calculate-score game mutation)]
-                       {:actions actions
-                        :score (-> score player-id)})))
-              (take 100)
-              (vec))
+         actions (->> (repeatedly #(actions/random-actions game turn-actions))
+                      (take 1000)
+                      (vec)
+                      (rand-nth))
+         score (get (actions/calculate-score
+                     game
+                     (actions/make-mutation actions))
+                    player-id)]
+     {:conversation []
+      :actions (if (pos? (:absolute score))
+                 actions
+                 [actions/pass])})))
 
-         best-normalized (->> scored-actions
-                              (sort-by (comp :normalized :score) >)
-                              (first))
-         best (if (pos? (-> best-normalized 
-                            :score :absolute))
-                best-normalized
-                (->> scored-actions
-                     (sort-by (comp :absolute :score) >)
-                     (first)))]
+(defn get-best-actions! [game turn-actions model log]
+  (go-try
+   (let [player-id (teg/get-current-player game)
+         all-actions (->> (actions/all-actions game turn-actions)
+                          (take 1000)
+                          (mapv (fn [actions]
+                                  (let [mutation (actions/make-mutation actions)
+                                        score (actions/calculate-score game mutation)]
+                                    {:actions actions
+                                     :score (-> score player-id)}))))
+         sort-normalized (delay
+                           (->> all-actions
+                                (sort-by (comp :normalized :score) >)))
+         sort-absolute (delay
+                         (->> all-actions
+                              (sort-by (comp :absolute :score) >)))
+         best-normalized (delay
+                           (first @sort-normalized))
+         best-absolute (delay
+                         (first @sort-absolute))
+         best (if (and (pos? (-> @best-normalized :score :normalized))
+                       (pos? (-> @best-normalized :score :absolute)))
+                @best-normalized
+                @best-absolute)]
      (println "ACTION:" best)
-     {:conversation [(str "Options (" (count scored-actions) ")"
+     {:conversation [(str "Options (" (count all-actions) ")"
                           "\n\n"
-                          (->> scored-actions
-                               (sort-by (comp :normalized :score) >)
+                          (->> @sort-normalized
                                (map (fn [scored-action]
                                       (pp/write scored-action :stream nil)))
                                (str/join "\n\n")))]
@@ -169,8 +186,10 @@
                        (let [{:keys [game turn-actions model]} (parse-request req)
                              {:keys [basic?] :as model} (models-by-id model)
                              random? (= :random (:id model))
+                             best? (= :best (:id model))
                              ;; TODO(Richo): Just for testing
                              actions (cond
+                                       best? (<? (get-best-actions! game turn-actions model log))
                                        random? (<? (get-random-actions! game turn-actions model log))
                                        true (<? (get-placeholder-actions! game turn-actions model log))
                                        basic? (<? (get-basic-actions! game turn-actions model log))
