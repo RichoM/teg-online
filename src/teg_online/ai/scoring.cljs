@@ -62,12 +62,14 @@
      (+ army enemy-army)))
 
 (defn border-advantage [game empire]
-  (->> (borders game empire)
-       (map (fn [[country neighbour]]
-              (border-strengh
-               (teg/get-army game country)
-               (teg/get-army game neighbour))))
-       (reduce +)))
+  (let [empire-borders (borders game empire)]
+    (/ (->> empire-borders
+            (map (fn [[country neighbour]]
+                   (inc (border-strengh
+                         (teg/get-army game country)
+                         (teg/get-army game neighbour)))))
+            (reduce +))
+       (count empire-borders))))
 
 (defn empire-score [game empire]
   (let [[active-countries inactive-countries] (split-active game empire)
@@ -77,9 +79,9 @@
                                    (group-by #(-> b/countries % :continent))
                                    (vals)
                                    (map count))]
-    (+ (* (+ active-armies
-             (* 0.75 inactive-armies))
-          (count empire))
+    (* (+ active-armies
+          (* 0.75 inactive-armies))
+       (count empire)
        (reduce * isolated-by-continent)
        (border-advantage game empire))))
 
@@ -104,6 +106,12 @@
     (def game (-> @teg-online.main/state :game))
     (def player-id (teg/get-current-player game)))
 
+  (def empires (player-empires game :ai-1))
+  (def empire (first empires))
+  (def active-countries (first (split-active game empire)))
+  (def inactive-countries (second (split-active game empire)))
+  (empire-score game empire)
+
   (tap> game)
   (:countries game)
 
@@ -117,8 +125,6 @@
                    (sort-by count >)
                    (first)))
 
+  (empire-score game empire)
 
-
-
-
-  (empire-score game empire))
+  )
