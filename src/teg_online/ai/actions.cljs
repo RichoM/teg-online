@@ -137,33 +137,34 @@
    (calculate-score game mutation
                     (if (isa? (teg/get-current-phase game)
                               ::teg/attack)
-                      1000
+                      10000
                       1)))
   ([game mutation times]
    (let [initial-scores (score/calculate-scores game)
          delta-scores
          (apply merge-with into
                 (->> (repeatedly times #(mutation game))
-                     (map score/calculate-scores)
-                     (map (fn [scores]
-                            (->> scores
-                                 (map (fn [[player-id score]]
-                                        (let [{:keys [absolute normalized]}
-                                              (initial-scores player-id)]
-                                          [player-id
-                                           {:absolute (- (:absolute score)
-                                                         absolute)
-                                            :normalized (- (:normalized score)
-                                                           normalized)}])))
-                                 (into {}))))
-                     (map #(update-vals % vector))))]
+                     (map (memoize score/calculate-scores))
+                     (map (memoize
+                           (fn [scores]
+                             (->> scores
+                                  (map (fn [[player-id score]]
+                                         (let [{:keys [absolute normalized]}
+                                               (initial-scores player-id)]
+                                           [player-id
+                                            {:absolute (- (:absolute score)
+                                                          absolute)
+                                             :normalized (- (:normalized score)
+                                                            normalized)}])))
+                                  (into {})))))
+                     (mapv #(update-vals % vector))))]
      (update-vals delta-scores
                   (fn [scores]
                     {:absolute (->> scores
-                                    (map :absolute)
+                                    (mapv :absolute)
                                     (mean))
                      :normalized (->> scores
-                                      (map :normalized)
+                                      (mapv :normalized)
                                       (mean))})))))
 
 
