@@ -71,6 +71,10 @@
             (reduce +))
        (count empire-borders))))
 
+(defn- p! [label value]
+  ;(println label "->" value)
+  value)
+
 (defn empire-score [game empire]
   (let [[active-countries inactive-countries] (split-active game empire)
         active-armies (count-army game active-countries)
@@ -79,11 +83,16 @@
                                    (group-by #(-> b/countries % :continent))
                                    (vals)
                                    (map count))]
-    (* (+ active-armies
-          (* 0.75 inactive-armies))
-       (count empire)
-       (reduce * isolated-by-continent)
-       (border-advantage game empire))))
+    (p! "EMPIRE" empire)
+    (* (p! "Armies"
+           (+ active-armies
+              (* 0.75 inactive-armies)))
+       (p! "Countries"
+           (count empire))
+       (p! "Continents"
+           (reduce * isolated-by-continent))
+       (p! "Border"
+           (border-advantage game empire)))))
 
 (defn player-absolute-score [game player-id]
   (->> (player-empires game player-id)

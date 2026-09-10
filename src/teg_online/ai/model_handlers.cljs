@@ -147,17 +147,16 @@
     #{:random} get-random-actions!
     #{:best} get-best-actions!
 
-    #{:gpt-4.1-mini/basic_t00
-      :gpt-4.1-mini/basic_t05
-      :gpt-4.1-mini/basic_t10}
-    get-basic-actions!
+    #_(#{:gpt-4.1-mini/basic_t00
+         :gpt-4.1-mini/basic_t05
+         :gpt-4.1-mini/basic_t10}
+       get-basic-actions!
 
-    #{:gpt-4.1-mini/strat_t00
-      :gpt-4.1-mini/strat_t05
-      :gpt-4.1-mini/strat_t10
-      :gpt-5.4-mini
-      :gpt-5.4}
-    get-strategy!
-    
+       #{:gpt-4.1-mini/strat_t00
+         :gpt-4.1-mini/strat_t05
+         :gpt-4.1-mini/strat_t10
+         :gpt-5.4-mini
+         :gpt-5.4}
+       get-strategy!)
+
     get-placeholder-actions!))
-
