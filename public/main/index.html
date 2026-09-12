@@ -93,6 +93,27 @@
       modalElement.style.cursor = "move";
       modalElement.onmousedown = dragMouseDown;
     }
+
+    function downloadCanvas(id) {
+      const canvas = document.getElementById('board-canvas');
+      
+      canvas.toBlob((blob) => {
+        // 1. Create a temporary URL for the file blob
+        const url = URL.createObjectURL(blob);
+        
+        // 2. Create a temporary anchor element
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'board-' + id + '.jpg'; // The file name
+        
+        // 3. Trigger the download programmatically
+        link.click();
+        
+        // 4. Clean up the URL object to free memory
+        URL.revokeObjectURL(url);
+      }, 'image/jpeg'); // You can also use 'image/jpeg'
+    }
+
     </script>
     
     <script src="js/main.js"></script>
