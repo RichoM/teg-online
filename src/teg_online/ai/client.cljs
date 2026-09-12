@@ -62,9 +62,12 @@
     (t/read reader response)
     {:actions [actions/pass]}))
 
-(defn ask! [state turn-actions]
+(defn ask! 
+  ([state turn-actions]
+   (ask! state turn-actions models))
+  ([state turn-actions enabled-models]
   (let [game (:game state)]
-    (->> models
+    (->> enabled-models
          (map (fn [{:keys [id]}]
                 (let [body (t/write writer {:game game
                                             :turn-actions turn-actions
@@ -85,4 +88,4 @@
                                         (teg/get-current-player game))})
                          (catch :default err
                            {:error err})))])))
-         (into {}))))
+         (into {})))))
