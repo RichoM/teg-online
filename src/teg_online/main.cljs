@@ -147,7 +147,46 @@
 (comment
   @state
 
-  ()
+
+  (def game (-> @state :game))
+  
+  (def player (-> game :turn-order first))
+  (tap> game)
+
+  (b/continents ::b/africa)
+  (b/get-countries-by-continent ::b/africa)
+  
+  (reduce (fn [game country]
+            (assoc-in game [:countries country :owner] player))
+          game
+          (b/get-countries-by-continent ::b/africa))
+  (tap> *1)
 
   
+  (swap! state update :game #(reduce (fn [game country]
+                                       (assoc-in game [:countries country :owner] player))
+                                     %
+                                     (b/get-countries-by-continent ::b/africa)))
+  
+  (swap! state update :game
+         #(-> %
+              (assoc-in [:countries ::b/españa :army] 3)
+              (assoc-in [:countries ::b/polonia :army] 2)
+              (assoc-in [:countries ::b/turquia :army] 2)
+              (assoc-in [:countries ::b/israel :army] 3)))
+
+  (swap! state update :game
+         #(-> %
+              (assoc-in [:countries ::b/sahara :army] 3)
+              (assoc-in [:countries ::b/egipto :army] 5)))
+  
+  (swap! state update :game
+         #(-> %
+              (assoc-in [:countries ::b/sahara :army] 1)
+              (assoc-in [:countries ::b/egipto :army] 1)
+              (assoc-in [:countries ::b/sudafrica :army] 4)
+              (assoc-in [:countries ::b/zaire :army] 2)
+              (assoc-in [:countries ::b/etiopia :army] 2)
+              (assoc-in [:countries ::b/madagascar :army] 3)))
+
   )
