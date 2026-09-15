@@ -176,30 +176,29 @@
 
 (defn strategy-prompt
   [{:keys [players turn phase] :as game} turn-actions]
-  (when-let [current-player (teg/get-current-player game)]
-    (when-let [phase-prompt (game-phase-prompt game turn-actions)]
-      (let [turn-actions-prompt (turn-actions-prompt turn-actions)]
-        (println)
-        (println turn phase)
-        (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
-             "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
-             "Todos los jugadores tienen el mismo objetivo: conquistar 30 países para ganar la partida.\n"
-             "\n"
-             board-geography
-             "\n\n"
-             "El estado del tablero en este momento de la partida es el siguiente.\n"
-             (get-board-state game)
-             "\n\n"
-             turn-actions-prompt
-             phase-prompt
-             "\n\n"
-             "Teniendo en cuenta el estado actual del tablero y los objetivos a mediano plazo, describí *brevemente* qué harías a continuación y por qué.\n\n"
-             "Consideraciones importantes:\n"
-             "1. Si lo que vas a hacer es _incorporar o reagrupar ejércitos_, tené en cuenta los ejércitos de países enemigos y los posibles ataques que podrías recibir.\n"
-             "2. Si lo que vas a hacer es _atacar_, tené en cuenta que los ataques fallidos pueden dejar el país desprotegido para el próximo turno.\n"
-             "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.\n"
-             "4. Algunos países limitan con otros países de otros continentes, es importante reforzar los ejércitos de estos países cuando queremos conquistar (y defender) un continente.\n"
-             "5. No intentes ir directamente al objetivo, a veces conviene primero ganar fuerza conquistando todos los países de un continente mientras avanzás hacia cumplir el objetivo.\n")))))
+  (when-let [phase-prompt (game-phase-prompt game turn-actions)]
+    (let [turn-actions-prompt (turn-actions-prompt turn-actions)]
+      (println)
+      (println turn phase)
+      (str "Estás jugando una partida de T.E.G. (Plan Táctico y Estratégico de la Guerra).\n"
+           "Vos sos el jugador " (inc (mod turn (count players))) ".\n"
+           "Todos los jugadores tienen el mismo objetivo: conquistar 30 países para ganar la partida.\n"
+           "\n"
+           board-geography
+           "\n\n"
+           "El estado del tablero en este momento de la partida es el siguiente.\n"
+           (get-board-state game)
+           "\n\n"
+           turn-actions-prompt
+           phase-prompt
+           "\n\n"
+           "Teniendo en cuenta el estado actual del tablero y los objetivos a mediano plazo, describí *brevemente* qué harías a continuación y por qué.\n\n"
+           "Consideraciones importantes:\n"
+           "1. Si lo que vas a hacer es _incorporar o reagrupar ejércitos_, tené en cuenta los ejércitos de países enemigos y los posibles ataques que podrías recibir.\n"
+           "2. Si lo que vas a hacer es _atacar_, tené en cuenta que los ataques fallidos pueden dejar el país desprotegido para el próximo turno.\n"
+           "3. No estás obligado a _atacar_ siempre, a veces es preferible preservar las fuerzas para el futuro.\n"
+           "4. Algunos países limitan con otros países de otros continentes, es importante reforzar los ejércitos de estos países cuando queremos conquistar (y defender) un continente.\n"
+           "5. No intentes ir directamente al objetivo, a veces conviene primero ganar fuerza conquistando todos los países de un continente mientras avanzás hacia cumplir el objetivo.\n"))))
 
 (defmulti action-prompt (fn [game _strat] (:phase game)))
 
