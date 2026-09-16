@@ -2,9 +2,11 @@
   (:require [teg-online.utils.core :as u]))
 
 (def models (->> [{:id :random
-                   :name "random"}
+                   :name "random"
+                   :local? true}
                   {:id :best
-                   :name "best"}
+                   :name "best"
+                   :local? true}
                   {:id :gpt-4.1-mini/basic_t00
                    :name "gpt-4.1-mini"
                    :temperature 0

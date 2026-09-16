@@ -1,12 +1,11 @@
 (ns teg-online.ai.client
   (:require [clojure.core.async :as a :refer [go <!]]
-            [clojure.string :as str]
             [teg-online.utils.async :refer [<? go-try]]
             [cognitect.transit :as t]
             [teg-online.game :as teg]
-            [teg-online.ai.scoring :as score]
             [teg-online.ai.actions :as actions]
-            [teg-online.ai.models :refer [models]]))
+            [teg-online.ai.models :refer [models]]
+            [teg-online.ai.local-handlers :refer [handler-by-id]]))
 
 
 (defonce reader (t/reader :json))
@@ -68,24 +67,29 @@
   ([state turn-actions enabled-models]
   (let [game (:game state)]
     (->> enabled-models
-         (map (fn [{:keys [id]}]
-                (let [body (t/write writer {:game game
-                                            :turn-actions turn-actions
-                                            :model id})]
-                  [id
-                   (go (try
-                         (let [response (<? (fetch-response body))
-                               {:keys [actions conversation]} (read-response response)
-                               mutation (actions/make-mutation actions)]
-                           {:original-state state
-                            :conversation conversation
-                            :actions actions
-                            :pass? (= actions/pass (last actions))
-                            ;; TODO(Richo): Before applying the mutation we need to check that the new game state
-                            ;; is equal the original game state, and also that we don't have a selected-snapshot!
-                            :mutation mutation
-                            :score (get (actions/calculate-score game mutation)
-                                        (teg/get-current-player game))})
-                         (catch :default err
-                           {:error err})))])))
+         (map (fn [{:keys [id local?] :as model}]
+                [id
+                 (go (try
+                       (let [{:keys [actions conversation]}
+                             (if local?
+                               (let [log (fn [timestamp data]
+                                           (js/console.log timestamp data))
+                                     get-actions! (handler-by-id id)]
+                                 (<? (get-actions! game turn-actions model log)))
+                               (let [body (t/write writer {:game game
+                                                           :turn-actions turn-actions
+                                                           :model id})
+                                     response (<? (fetch-response body))]
+                                 (read-response response)))
+
+                             mutation (actions/make-mutation actions)]
+                         {:original-state state
+                          :conversation conversation
+                          :actions actions
+                          :pass? (= actions/pass (last actions))
+                          :mutation mutation
+                          :score (get (<? (actions/calculate-score game mutation))
+                                      (teg/get-current-player game))})
+                       (catch :default err
+                         {:error err})))]))
          (into {})))))

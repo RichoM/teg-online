@@ -1,5 +1,6 @@
 (ns teg-online.ai.actions
-  (:require [teg-online.game :as teg]
+  (:require [clojure.core.async :refer [go <!] :as a]
+            [teg-online.game :as teg]
             [teg-online.board :as board]
             [teg-online.ai.scoring :as score]
             [teg-online.utils.core :refer [rand-int] :as u]))
@@ -132,6 +133,25 @@
   (/ (reduce + coll)
      (count coll)))
 
+(defn process-async!
+  "This function will evaluate f for each of the elements in coll in a separate go block
+   and yielding back to the browser every chunk-size elements to avoid hanging the UI."
+  [f coll chunk-size]
+  (let [out-chan (a/promise-chan)
+        chunks   (partition-all chunk-size coll)]
+    (a/go-loop [remaining-chunks chunks
+                result []]
+      (if (seq remaining-chunks)
+        (let [current-chunk (first remaining-chunks)
+              processed-chunk (<! (->> current-chunk
+                                       (mapv f)
+                                       (a/map vector)))]
+          (<! (a/timeout 1))
+          (recur (rest remaining-chunks) (into result processed-chunk)))
+        (a/put! out-chan result)))
+    out-chan))
+
+
 (defn calculate-score
   ([game mutation]
    (calculate-score game mutation
@@ -140,32 +160,31 @@
                       10000
                       1)))
   ([game mutation times]
-   (let [initial-scores (score/calculate-scores game)
-         delta-scores
-         (apply merge-with into
-                (->> (repeatedly times #(mutation game))
-                     (map (memoize score/calculate-scores))
-                     (map (memoize
-                           (fn [scores]
-                             (->> scores
-                                  (map (fn [[player-id score]]
-                                         (let [{:keys [absolute normalized]}
-                                               (initial-scores player-id)]
-                                           [player-id
-                                            {:absolute (- (:absolute score)
-                                                          absolute)
-                                             :normalized (- (:normalized score)
-                                                            normalized)}])))
-                                  (into {})))))
-                     (mapv #(update-vals % vector))))]
-     (update-vals delta-scores
-                  (fn [scores]
-                    {:absolute (->> scores
-                                    (mapv :absolute)
-                                    (mean))
-                     :normalized (->> scores
-                                      (mapv :normalized)
-                                      (mean))})))))
+   (go
+     (let [initial-scores (score/calculate-scores game)
+           calculate-scores' (memoize #(->> (score/calculate-scores %)
+                                            (map (fn [[player-id score]]
+                                                   (let [{:keys [absolute normalized]}
+                                                         (initial-scores player-id)]
+                                                     [player-id
+                                                      {:absolute (- (:absolute score)
+                                                                    absolute)
+                                                       :normalized (- (:normalized score)
+                                                                      normalized)}])))
+                                            (into {})))
+           delta-scores (apply merge-with into
+                               (->> (<! (process-async! #(go (calculate-scores' %))
+                                                        (repeatedly times #(mutation game))
+                                                        100))
+                                    (mapv #(update-vals % vector))))]
+       (update-vals delta-scores
+                    (fn [scores]
+                      {:absolute (->> scores
+                                      (mapv :absolute)
+                                      (mean))
+                       :normalized (->> scores
+                                        (mapv :normalized)
+                                        (mean))}))))))
 
 
 (defn make-mutation [actions]
