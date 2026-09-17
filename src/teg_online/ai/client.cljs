@@ -7,6 +7,10 @@
             [teg-online.ai.models :refer [models]]
             [teg-online.ai.local-handlers :refer [handler-by-id]]))
 
+(def ^:const SERVER_URL
+  (if ^boolean js/goog.DEBUG
+    "http://localhost:3000/ai"
+    "https://teg-online-qlex.onrender.com/ai"))
 
 (defonce reader (t/reader :json))
 (defonce writer (t/writer :json))
@@ -43,7 +47,7 @@
   ([data errors]
    (go-try
     (try
-      (let [response (<? (POST "http://localhost:3000/ai" data))]
+      (let [response (<? (POST SERVER_URL data))]
         (if (.-ok response)
           (<? (response-text response))
           (let [text (<? (response-text response (fn [ch _] (a/close! ch))))]
