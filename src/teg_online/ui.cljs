@@ -31,9 +31,7 @@
 
 (defn is-my-turn? [user game]
   (and (not (teg/game-over? game))
-       ; HACK(Richo): Just for testing!
-       (= (get user :id)
-          (teg/get-current-player game))))
+       (= :human (:type (teg/get-player game (teg/get-current-player game))))))
 
 (defn show-toast [msg]
   (-> (bs/make-toast :header (list [:h5 msg]
@@ -228,12 +226,12 @@
                                       (if (empty? countries)
                                         [:h3 "No tenés ninguna tarjeta de país"]
                                         (map (fn [country-id]
-                                             (let [country-name (:name (b/countries country-id))
-                                                   card-image (-> game :cards country-id :type card-images)]
-                                               [:div.row.my-2.border.border-dark.align-items-center
-                                                [:div.col-6 [:h1 country-name]]
-                                                [:div.col-6 [:img.img-fluid {:src card-image}]]]))
-                                           countries))]
+                                               (let [country-name (:name (b/countries country-id))
+                                                     card-image (-> game :cards country-id :type card-images)]
+                                                 [:div.row.my-2.border.border-dark.align-items-center
+                                                  [:div.col-6 [:h1 country-name]]
+                                                  [:div.col-6 [:img.img-fluid {:src card-image}]]]))
+                                             countries))]
                                      [:div.col]]]
                              :footer bs/accept-modal-btn)
               (bs/show-modal)))))
@@ -379,7 +377,7 @@
 (defmethod finish-turn! ::teg/regroup [state]
   (go (when (<! (bs/confirm "Confirmar" "¿Terminar turno?"))
         (let [regroups (get-in @state [:ui :user-data :regroups] [])]
-          (swap! state 
+          (swap! state
                  #(-> %
                       (update :ui dissoc :user-data)
                       (update :game (fn [game]
@@ -572,7 +570,7 @@
               :counter counter}))))
 
 (defn init-countries [state]
-  (go (<! (a/map vector (map (partial init-country state) 
+  (go (<! (a/map vector (map (partial init-country state)
                              (shuffle country-data))))))
 
 (defn init-map []
@@ -674,7 +672,7 @@
                              [:div.col-auto.text-truncate
                               [:i.fas.fa-square.me-1 {:style icon-style}]
                               [:span {:class (when (and game-started?
-                                                        (not playing?)) 
+                                                        (not playing?))
                                                "text-decoration-line-through")}
                                (player :name)]]]
                             [:div.row
@@ -703,7 +701,7 @@
        (= 0 (get-in @state [:ui :user-data :remaining] 0))))
 
 (defmethod finish-turn-enabled? :default [state]
-  (is-my-turn? (:user @state) 
+  (is-my-turn? (:user @state)
                (:game @state)))
 
 (defmulti status-panel-title (fn [state] (-> @state :game :phase)))
@@ -827,7 +825,7 @@
         (println (= old new))))))
 
 (defn pause-from-current-snapshot! [state]
-  (swap! state assoc-in [:debug :selected-snapshot] 
+  (swap! state assoc-in [:debug :selected-snapshot]
          (dec (count (-> @state :debug :snapshots)))))
 
 (defn init-debug-panel! [state]
@@ -958,7 +956,7 @@
 (defmethod reset-user-data :default [_] {})
 
 (defn maybe-reset-user-data
-  [state 
+  [state
    {old-turn :turn, old-phase :phase}
    {new-turn :turn, new-phase :phase, :as new-game}]
   (when-not (= [old-phase old-turn]
@@ -977,7 +975,7 @@
     (mm/on-step fireworks
                 (fn []
                   (when (and (< (- (js/Date.now) begin-time) 5000)
-                         (>= (oget fireworks :alpha) 0.15)
+                             (>= (oget fireworks :alpha) 0.15)
                              (< (rand) 0.15))
                     (let [x (rand (oget fireworks :width))
                           y (rand (oget fireworks :height))
@@ -995,7 +993,7 @@
   [state
    {old-turn :turn, old-phase :phase}
    {new-turn :turn, new-phase :phase, :as new-game}]
-  (when-not (teg/game-over? new-game)
+  #_(when-not (teg/game-over? new-game)
     (when-not (= [old-phase old-turn]
                  [new-phase new-turn])
       (let [user (:user @state)]
@@ -1012,9 +1010,6 @@
       (when (and secret-goal
                  (nil? (teg/get-player-goal old-game user-id)))
         (bs/alert "Objetivo secreto" secret-goal)))))
-
-(:richo nil)
-
 
 (defn maybe-show-game-over-dialog [state old-game new-game]
   (when (and (nil? (:winner old-game))
@@ -1214,14 +1209,20 @@
         (bs/hide-modal modal)
         result))))
 
-(defn try-update-ai! [state]
+(defn try-update-ai! [state {:keys [type]}]
   (go
     (loop [turn-actions []]
-      (let [responses (ai/ask! @state turn-actions)]
+      (let [responses (ai/ask! @state turn-actions
+                               (if (= :debug type)
+                                 models
+                                 (->> models
+                                      (filterv #(= (:id %) type)))))]
         (<! (a/timeout 1500)) ; Small delay before showing the modal
         (let [{:keys [original-state pass?
                       actions mutation]}
-              (<? (show-ai-response-modal responses))]
+              (if (> (count responses) 1)
+                (<? (show-ai-response-modal responses))
+                (<? (responses type)))]
           (if (= (:game @state)
                  (:game original-state))
             (if (nil? (-> @state :debug :selected-snapshot))
@@ -1261,10 +1262,11 @@
                (or (some? (-> old :debug :selected-snapshot))
                    (not= [(:turn old-game) (:phase old-game)]
                          [(:turn new-game) (:phase new-game)])))
-      (when (str/starts-with?
-             (str (teg/get-current-player new-game))
-             ":ai")
-        (try-update-ai! state)))))
+      (when-let [player (teg/get-player
+                         new-game
+                         (teg/get-current-player new-game))]
+        (when (not= :human (:type player))
+          (try-update-ai! state player))))))
 
 (defn initialize [state]
   (go (.removeAllSubmorphs world)
@@ -1281,11 +1283,14 @@
       ))
 
 (comment
-  
+
   (inc nil)
-  
+
 
   (def state teg-online.main/state)
+
+  (def game (-> @state :game))
+  (teg/get-player game (teg/get-current-player game))
   (-> @state :debug :selected-snapshot)
 
   (restart-from-current-snapshot! state)
@@ -1294,5 +1299,4 @@
   [(-> @state :debug :snapshots count)
    (-> @state :debug :selected-snapshot)]
 
-  (tap> @state)
-  )
+  (tap> @state))

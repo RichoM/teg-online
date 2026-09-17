@@ -1,18 +1,18 @@
 (ns teg-online.main
   (:require [clojure.core.async :as a :refer [go <!]]
             [clojure.string :as str]
-            [oops.core :refer [oget oget+ oset!]]
+            [oops.core :refer [oget oget+ oset! ocall!]]
             [crate.core :as crate]
             [teg-online.utils.bootstrap :as bs]
             [teg-online.firebase :as fb]
             [teg-online.game :as teg]
             [teg-online.board :as b]
-            [teg-online.ui :as ui]))
+            [teg-online.ui :as ui]
+            [teg-online.ai.models :refer [models]]))
 
 (enable-console-print!)
 
 (defonce state (atom {:game (teg/new-game)
-                      :user nil
                       :game-id nil}))
 
 (defn ask-user-name []
@@ -113,26 +113,125 @@
                             :keyboard false}))
         (remove-watch state ::waiting-for-players))))
 
-(defn initialize-ai [state]
+(defn show-new-game-dialog []
+  (go (let [get-form-data (fn [form]
+                            (let [regex #"elements\[(\d+)\]\[(\w+)\]"]
+                              (->> (js->clj (js/Object.fromEntries (js/FormData. form)))
+                                   (map (fn [[key val]]
+                                          (let [[_ index key] (re-matches regex key)]
+                                            {:index (int index)
+                                             :key (keyword key)
+                                             :value val}))))))
+
+            get-players (fn [form]
+                          (->> (get-form-data form)
+                               (group-by :index)
+                               (map (fn [[_ values]]
+                                      (merge (->> values
+                                                  (map (fn [{:keys [key value]}]
+                                                         [key value]))
+                                                  (into {})))))
+                               (mapv (fn [{:keys [name type]}]
+                                       {:name name
+                                        :type (keyword type)}))))
+
+            make-element!
+            (fn [idx]
+              (let [input (crate/html
+                           [:input.form-control.form-control-lg.text-center
+                            {:type "text" :name (str "elements[" idx "][name]")
+                             :placeholder "Nombre del jugador"
+                             :value (str "Jugador " (inc idx))
+                             :required true}])
+
+                    row (crate/html
+                         [:tr
+                          [:td
+                           input]
+                          [:td.text-center
+                           [:select.form-select.form-select-lg.text-center
+                            {:name (str "elements[" idx "][type]")}
+                            [:option {:value "human"} "human"]
+                            (->> models
+                                 (map (fn [{:keys [id display-name]}]
+                                        [:option {:value (subs (str id) 1)} display-name])))
+                            [:option {:value "debug"} "all (debug)"]]]
+                          [:td.text-center
+                           [:button.btn.btn-lg.btn-outline-danger {:type "button"}
+                            [:i.fas.fa-trash]]]])]
+                (doto input
+                  (.addEventListener
+                   "keyup" #(if (.checkValidity input)
+                              (ocall! input :classList.remove "is-invalid")
+                              (ocall! input :classList.add "is-invalid"))))
+                (doto (.querySelector row "button")
+                  (bs/on-click #(.remove row)))
+                row))
+
+            add-player-btn (crate/html
+                            [:button.btn.btn-secondary.btn-lg
+                             {:type "button" :aria-label "Agregar jugador"}
+                             "Agregar jugador"])
+
+            start-game-btn (crate/html
+                            [:button.btn.btn-primary.btn-lg
+                             {:type "button" :aria-label "Iniciar partida"}
+                             "Iniciar partida!"])
+
+            form (crate/html [:form.container.needs-validation
+                              {:novalidate true}
+                              [:div.row
+                               [:table.table.table-borderless.text-center
+                                [:thead
+                                 [:tr
+                                  [:th.text-center "Nombre"]
+                                  [:th.text-center "Tipo"]
+                                  [:th.text-center]]]
+                                [:tbody]]]
+                              [:div.row.justify-content-center
+                               [:div.col-auto add-player-btn]
+                               [:div.col-auto start-game-btn]]])
+            add-player! (fn []
+                          (let [tbody (.querySelector form "tbody")
+                                idx (.-length (.querySelectorAll tbody "tr"))
+                                row (make-element! idx)]
+                            (.appendChild tbody row)))
+            modal (bs/make-modal
+                   :body [:div.container-fluid.font-monospace
+                          form])]
+        (doto add-player-btn
+          (bs/on-click #(let [tbody (.querySelector form "tbody")
+                              idx (apply max (->> (get-form-data form)
+                                                  (map :index)))
+                              row (make-element! (inc idx))]
+                          (.appendChild tbody row))))
+        (doto start-game-btn
+          (bs/on-click #(when (.checkValidity form)
+                          (bs/hide-modal modal))))
+        (dotimes [_ 4]
+          (add-player!))
+        (<! (bs/show-modal modal {:backdrop "static"
+                                  :keyboard false}))
+        (get-players form))))
+
+(defn start-game! [state players]
   (swap! state update :game
          (fn [game]
-           (let [{user-id :id, user-name :name} (:user @state)]
-             (-> game
-                 (teg/join-game user-id user-name)
-                 (teg/join-game :ai-1 "AI 1")
-                 (teg/join-game :ai-2 "AI 2")
-                 ;(teg/join-game :ai-3 "AI 3")
-                 ;(teg/join-game :ai-4 "AI 4")
-                 teg/start-game
-                 teg/distribute-goals
-                 teg/distribute-countries)))))
+           (-> (reduce (fn [game {:keys [name type]}]
+                         (teg/join-game game (keyword (str (random-uuid)))
+                                        name type))
+                       game
+                       players)
+               teg/start-game
+               teg/distribute-goals
+               teg/distribute-countries))))
 
 (defn init []
   (go
     (print "HELLO")
     (ui/initialize state)
-    (swap! state assoc :user (<! (get-this-user)))
-    (initialize-ai state)
+    ;(swap! state assoc :user (<! (get-this-user)))
+    (start-game! state (<! (show-new-game-dialog)))
     (print "BYE")))
 
 

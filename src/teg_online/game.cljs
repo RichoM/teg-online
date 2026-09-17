@@ -18,12 +18,13 @@
    :winner nil
    :current-turn nil})
 
-(defn new-player [id name]
+(defn new-player [id name type]
   {:id id
    :goal nil
    :name name
    :playing? true
-   :exchanges 0})
+   :exchanges 0
+   :type type})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Queries
@@ -444,13 +445,13 @@
           (assoc new-game :winner player-id)
           new-game)))))
 
-(defn join-game [game id name]
+(defn join-game [game id name type]
   (if (contains? (game :players) id)
     (throw (ex-info (u/format "Player with id %1 already joined" id)
                     {:game game, :id id, :name name}))
     (-> game
         (update :turn-order conj id)
-        (update :players assoc id (new-player id name)))))
+        (update :players assoc id (new-player id name type)))))
 
 (defn start-game [game]
   (-> game
