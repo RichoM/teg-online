@@ -140,7 +140,6 @@
               (let [input (crate/html
                            [:input.form-control.form-control-lg.text-center
                             {:type "text" :name (str "elements[" idx "][name]")
-                             :placeholder "Nombre del jugador"
                              :value (str "Jugador " (inc idx))
                              :required true}])
 
@@ -201,12 +200,16 @@
                           form])]
         (doto add-player-btn
           (bs/on-click #(let [tbody (.querySelector form "tbody")
-                              idx (apply max (->> (get-form-data form)
-                                                  (map :index)))
-                              row (make-element! (inc idx))]
-                          (.appendChild tbody row))))
+                              indices (->> (get-form-data form)
+                                           (map :index)
+                                           (set))]
+                          (when (< (count indices) 8)
+                            (let [idx (apply max indices)
+                                  row (make-element! (if idx (inc idx) 0))]
+                              (.appendChild tbody row))))))
         (doto start-game-btn
-          (bs/on-click #(when (.checkValidity form)
+          (bs/on-click #(when (and (.checkValidity form)
+                                   (<= 2 (count (get-players form)) 8))
                           (bs/hide-modal modal))))
         (dotimes [_ 4]
           (add-player!))
